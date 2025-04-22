@@ -1,0 +1,40 @@
+# LangLearn Mobile App Structure
+
+LangLearnMobile/
+├── app.json                 # Expo configuration
+├── App.js                   # Root component
+├── babel.config.js          # Babel configuration
+├── package.json             # Dependencies and scripts
+├── assets/                  # Static assets (images, fonts)
+│   ├── adaptive-icon.png
+│   ├── favicon.png
+│   ├── icon.png
+│   └── splash.png
+├── src/                     # Source code
+│   ├── components/          # Reusable components
+│   │   ├── AudioVisualizer.js
+│   │   ├── ChatInput.js
+│   │   ├── Conversation.js
+│   │   ├── Message.js
+│   │   ├── StatusPill.js
+│   │   ├── ToggleSwitch.js
+│   │   ├── TutorHeader.js
+│   │   └── VoiceRecorder.js
+│   ├── hooks/               # Custom hooks
+│   │   └── useVoiceRecorder.js 
+│   ├── screens/             # App screens
+│   │   ├── AppHeader.js     # Main app header (formerly AppHead)
+│   │   ├── LanguageLanding.js
+│   │   └── SpanishTutor.js  # Main tutor screen
+│   ├── styles/              # Styling
+│   │   ├── colors.js        # Color constants
+│   │   ├── spacing.js       # Spacing constants
+│   │   └── typography.js    # Typography styles
+│   ├── utils/               # Utility functions
+│   │   ├── api.js           # API calls
+│   │   ├── audio.js         # Audio processing
+│   │   └── text.js          # Text normalization
+│   └── constants/           # App constants
+│       ├── languages.js     # Language data
+│       └── settings.js      # Default settings
+└── node_modules/            # Dependencies (generated)
