@@ -71,157 +71,183 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>LangLearn</Text>
-          <Text style={styles.tagline}>Your AI-powered language learning companion</Text>
-        </View>
+  <SafeAreaView style={styles.container}>
+    <StatusBar style="dark" />
+    <ScrollView contentContainerStyle={styles.scrollContent}>
+      <View style={styles.header}>
+        <Text style={styles.title}>LangLearn</Text>
+        <Text style={styles.tagline}>Your AI-powered language learning companion</Text>
+      </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Choose Your Languages</Text>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Choose Your Languages</Text>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>I speak:</Text>
-            <View style={styles.languageOptions}>
-              {languages.map(lang => (
-                <TouchableOpacity
-                  key={`native-${lang.code}`}
-                  style={[
-                    styles.languageOption,
-                    nativeLanguage === lang.code && styles.selectedOption,
-                    { width: getItemWidth() }
-                  ]}
-                  onPress={() => setNativeLanguage(lang.code)}
-                >
-                  <Text style={styles.languageFlag}>{lang.flag}</Text>
-                  <Text style={[
-                    styles.languageName,
-                    nativeLanguage === lang.code && styles.selectedText
-                  ]}>
-                    {lang.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>I want to learn:</Text>
-            <View style={styles.languageOptions}>
-              {languages.map(lang => (
-                <TouchableOpacity
-                  key={`target-${lang.code}`}
-                  style={[
-                    styles.languageOption,
-                    targetLanguage === lang.code && styles.selectedOption,
-                    nativeLanguage === lang.code && styles.disabledOption,
-                    { width: getItemWidth() }
-                  ]}
-                  disabled={nativeLanguage === lang.code}
-                  onPress={() => nativeLanguage !== lang.code && setTargetLanguage(lang.code)}
-                >
-                  <Text style={styles.languageFlag}>{lang.flag}</Text>
-                  <Text style={[
-                    styles.languageName,
-                    targetLanguage === lang.code && styles.selectedText
-                  ]}>
-                    {lang.name}
-                  </Text>
-                  {nativeLanguage === lang.code && (
-                    <View style={styles.disabledOverlay}>
-                      <Text style={styles.disabledText}>Already speak</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>My level:</Text>
-            <View style={styles.languageOptions}>
-              {['beginner', 'intermediate', 'advanced'].map(level => (
-                <TouchableOpacity
-                  key={level}
-                  style={[
-                    styles.languageOption,
-                    difficulty === level && styles.selectedOption,
-                    { width: getItemWidth() }
-                  ]}
-                  onPress={() => setDifficulty(level)}
-                >
-                  <Text style={styles.difficultyIcon}>
-                    {level === 'beginner' ? '🌱' : level === 'intermediate' ? '🌿' : '🌳'}
-                  </Text>
-                  <Text style={[
-                    styles.languageName,
-                    difficulty === level && styles.selectedText
-                  ]}>
-                    {level.charAt(0).toUpperCase() + level.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>What would you like to practice? (Optional)</Text>
-            <View style={styles.textAreaContainer}>
-              <TextInput
-                style={styles.textArea}
-                value={learningObjective}
-                onChangeText={setLearningObjective}
-                placeholder="Examples:\n• I want to practice ordering food at restaurants\n• Help me with past tense conjugation\n• Let's discuss travel and vacations\n• I need help with business vocabulary"
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-                placeholderTextColor="#adb5bd"
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.startButton,
-              (!nativeLanguage || !targetLanguage) && styles.disabledButton,
-              isLoading && styles.loadingButton
-            ]}
-            onPress={handleStartLearning}
-            disabled={!nativeLanguage || !targetLanguage || isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.startButtonText}>Start Learning</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.features}>
-          <View style={styles.feature}>
-            <Text style={styles.featureIcon}>🎙️</Text>
-            <Text style={styles.featureTitle}>Voice Conversation</Text>
-            <Text style={styles.featureText}>Practice speaking with our AI tutor and get instant feedback</Text>
-          </View>
-          <View style={styles.feature}>
-            <Text style={styles.featureIcon}>✍️</Text>
-            <Text style={styles.featureTitle}>Grammar Correction</Text>
-            <Text style={styles.featureText}>Learn from your mistakes with real-time corrections</Text>
-          </View>
-          <View style={styles.feature}>
-            <Text style={styles.featureIcon}>🔄</Text>
-            <Text style={styles.featureTitle}>Natural Alternatives</Text>
-            <Text style={styles.featureText}>Discover how native speakers would express the same ideas</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>I speak:</Text>
+          <View style={styles.languageOptions}>
+            {languages.map(lang => (
+              <TouchableOpacity
+                key={`native-${lang.code}`}
+                style={[
+                  styles.languageOption,
+                  nativeLanguage === lang.code && styles.selectedOption,
+                  { width: getItemWidth() }
+                ]}
+                onPress={() => setNativeLanguage(lang.code)}
+              >
+                <Text style={styles.languageFlag}>{lang.flag}</Text>
+                <Text style={[
+                  styles.languageName,
+                  nativeLanguage === lang.code && styles.selectedText
+                ]}>
+                  {lang.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>I want to learn:</Text>
+          <View style={styles.languageOptions}>
+            {languages.map(lang => (
+              <TouchableOpacity
+                key={`target-${lang.code}`}
+                style={[
+                  styles.languageOption,
+                  targetLanguage === lang.code && styles.selectedOption,
+                  nativeLanguage === lang.code && styles.disabledOption,
+                  { width: getItemWidth() }
+                ]}
+                disabled={nativeLanguage === lang.code}
+                onPress={() => nativeLanguage !== lang.code && setTargetLanguage(lang.code)}
+              >
+                <Text style={styles.languageFlag}>{lang.flag}</Text>
+                <Text style={[
+                  styles.languageName,
+                  targetLanguage === lang.code && styles.selectedText
+                ]}>
+                  {lang.name}
+                </Text>
+                {nativeLanguage === lang.code && (
+                  <View style={styles.disabledOverlay}>
+                    <Text style={styles.disabledText}>Already speak</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My level:</Text>
+          <View style={styles.languageOptions}>
+            {['beginner', 'intermediate', 'advanced'].map(level => (
+              <TouchableOpacity
+                key={level}
+                style={[
+                  styles.languageOption,
+                  difficulty === level && styles.selectedOption,
+                  { width: getItemWidth() }
+                ]}
+                onPress={() => setDifficulty(level)}
+              >
+                <Text style={styles.difficultyIcon}>
+                  {level === 'beginner' ? '🌱' : level === 'intermediate' ? '🌿' : '🌳'}
+                </Text>
+                <Text style={[
+                  styles.languageName,
+                  difficulty === level && styles.selectedText
+                ]}>
+                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>What would you like to practice? (Optional)</Text>
+          <View style={styles.textAreaContainer}>
+            <TextInput
+              style={styles.textArea}
+              value={learningObjective}
+              onChangeText={setLearningObjective}
+              placeholder="Examples:\n• I want to practice ordering food at restaurants\n• Help me with past tense conjugation\n• Let's discuss travel and vacations\n• I need help with business vocabulary"
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              placeholderTextColor="#adb5bd"
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.startButton,
+            (!nativeLanguage || !targetLanguage) && styles.disabledButton,
+            isLoading && styles.loadingButton
+          ]}
+          onPress={handleStartLearning}
+          disabled={!nativeLanguage || !targetLanguage || isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.startButtonText}>Start Learning</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.features}>
+        <View style={styles.feature}>
+          <Text style={styles.featureIcon}>🎙️</Text>
+          <Text style={styles.featureTitle}>Voice Conversation</Text>
+          <Text style={styles.featureText}>Practice speaking with our AI tutor and get instant feedback</Text>
+        </View>
+        <View style={styles.feature}>
+          <Text style={styles.featureIcon}>✍️</Text>
+          <Text style={styles.featureTitle}>Grammar Correction</Text>
+          <Text style={styles.featureText}>Learn from your mistakes with real-time corrections</Text>
+        </View>
+        <View style={styles.feature}>
+          <Text style={styles.featureIcon}>🔄</Text>
+          <Text style={styles.featureTitle}>Natural Alternatives</Text>
+          <Text style={styles.featureText}>Discover how native speakers would express the same ideas</Text>
+        </View>
+      </View>
+
+      {/* New Microphone Test Button */}
+      <TouchableOpacity
+        style={styles.testButton}
+        onPress={() => navigation.navigate('AudioTest')}
+      >
+        <Text style={styles.testButtonText}>Microphone Test</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  </SafeAreaView>
+);
 };
 
 const styles = StyleSheet.create({
+    // Add these styles to your existing StyleSheet in LanguageLanding.tsx
+  testButton: {
+    backgroundColor: '#e9ecef',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 40,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: '#ced4da',
+  },
+  testButtonText: {
+    color: '#495057',
+    fontWeight: '500',
+    fontSize: 16,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
