@@ -2,7 +2,11 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 
 // Update this to your actual API URL
-const API_URL = 'https://language-tutor-984417336702.asia-east1.run.app/chat';
+//const API_URL = 'https://language-tutor-984417336702.asia-east1.run.app';
+const API_URL = 'http://192.168.86.26:8004';
+
+
+
 
 interface ChatParams {
   message: string;
@@ -123,7 +127,7 @@ export const sendVoiceRecording = async ({
 };
 
 /**
- * Downloads an audio file from the API server
+ * Downloads an audio file from the API server with improved error handling and format support
  */
 export const downloadAudio = async (audioUrl: string): Promise<string> => {
   try {
@@ -131,17 +135,70 @@ export const downloadAudio = async (audioUrl: string): Promise<string> => {
       ? audioUrl
       : `${API_URL}${audioUrl.startsWith('/') ? audioUrl : '/' + audioUrl}`;
 
-    // Create a unique filename based on timestamp
-    const fileName = `audio_${Date.now()}.${audioUrl.endsWith('.mp3') ? 'mp3' : 'wav'}`;
+    console.log("Downloading audio from:", fullUrl);
+
+    // Extract file extension from URL
+    const urlParts = fullUrl.split('.');
+    const fileExtension = urlParts.length > 1 ? urlParts[urlParts.length - 1].toLowerCase() : 'mp3';
+
+    // Determine content type based on extension
+    let contentType;
+    switch (fileExtension) {
+      case 'mp3':
+        contentType = 'audio/mpeg';
+        break;
+      case 'wav':
+        contentType = 'audio/wav';
+        break;
+      case 'm4a':
+        contentType = 'audio/m4a';
+        break;
+      default:
+        contentType = 'audio/mpeg'; // Default to mp3
+    }
+
+    // Create a unique filename with proper extension
+    const fileName = `audio_${Date.now()}.${fileExtension}`;
     const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
 
+    // First check if the URL is accessible
+    try {
+      const headResponse = await fetch(fullUrl, { method: 'HEAD' });
+      if (!headResponse.ok) {
+        throw new Error(`Server returned ${headResponse.status} ${headResponse.statusText}`);
+      }
+
+      // Get actual content type from server if available
+      const serverContentType = headResponse.headers.get('content-type');
+      if (serverContentType && serverContentType.includes('audio/')) {
+        contentType = serverContentType;
+      }
+    } catch (headError) {
+      console.log("HEAD request failed, proceeding with download anyway:", headError);
+    }
+
+    // Download with proper options
+    const downloadOptions = {
+      headers: {
+        'Accept': contentType,
+        'Content-Type': contentType,
+      }
+    };
+
     // Download the file
-    const downloadResult = await FileSystem.downloadAsync(fullUrl, fileUri);
+    const downloadResult = await FileSystem.downloadAsync(fullUrl, fileUri, downloadOptions);
 
     if (downloadResult.status !== 200) {
       throw new Error(`Failed to download audio: ${downloadResult.status}`);
     }
 
+    // Verify the downloaded file exists and has content
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    if (!fileInfo.exists || fileInfo.size === 0) {
+      throw new Error('Downloaded file is empty or does not exist');
+    }
+
+    console.log(`Audio downloaded successfully: ${fileUri} (${fileInfo.size} bytes)`);
     return fileUri;
   } catch (error) {
     console.error('Audio download error:', error);

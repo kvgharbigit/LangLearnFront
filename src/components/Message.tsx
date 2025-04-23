@@ -89,11 +89,11 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
                     color: isUser ? '#90CAF9' : '#2196F3'
                   }
                 }}
-                baseStyle={[
-                  styles.annotationText,
-                  isUser ? styles.userAnnotationText : {},
-                  isEquivalentToCorrected ? styles.identicalText : {}
-                ]}
+                baseStyle={{
+                  ...styles.annotationText,
+                  ...(isUser ? styles.userAnnotationText : {}),
+                  ...(isEquivalentToCorrected ? styles.identicalText : {})
+                }}
               />
 
               {isEquivalentToCorrected && (
@@ -129,11 +129,11 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
                     color: isUser ? '#E1BEE7' : '#9C27B0'
                   }
                 }}
-                baseStyle={[
-                  styles.annotationText,
-                  isUser ? styles.userAnnotationText : {},
-                  isEquivalentToNative ? styles.identicalText : {}
-                ]}
+                baseStyle={{
+                  ...styles.annotationText,
+                  ...(isUser ? styles.userAnnotationText : {}),
+                  ...(isEquivalentToNative ? styles.identicalText : {})
+                }}
               />
 
               {isEquivalentToNative && (
