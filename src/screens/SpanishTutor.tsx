@@ -65,6 +65,8 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
   // Refs
   const scrollViewRef = useRef<ScrollView>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const playbackCallbackRef = useRef<((status: Audio.PlaybackStatus) => void) | null>(null);
+
 
   // Get language display info
   const getLanguageInfo = (code: string): LanguageInfo => {
@@ -210,7 +212,8 @@ useEffect(() => {
 
       // Configure audio session with correct constant values
       await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
+
+        allowsRecordingIOS: false, //When this flag is set to true, playback may be routed to the phone earpiece instead of to the speaker. Set it back to false after stopping recording to reenable playback through the speaker.
         playsInSilentModeIOS: true,
         shouldDuckAndroid: true,
         playThroughEarpieceAndroid: false,
@@ -224,6 +227,9 @@ useEffect(() => {
 
       // Clean up any existing sound object
       if (soundRef.current) {
+        if (playbackCallbackRef.current) {
+          soundRef.current.setOnPlaybackStatusUpdate(null); // Remove old listener
+        }
         await soundRef.current.unloadAsync();
         soundRef.current = null;
       }
@@ -315,10 +321,35 @@ const playAudio = async (audioUrl: string): Promise<void> => {
     // First try direct streaming (avoid downloading if possible)
     try {
       console.log("Attempting direct streaming...");
+
+      const onStatusUpdate = (status: Audio.PlaybackStatus): void => {
+          if (!status.isLoaded) {
+            if (status.error) {
+              console.error(`Audio playback error: ${status.error}`);
+            }
+            return;
+          }
+
+          if (status.isPlaying) {
+            setIsPlaying(true);
+          } else if (status.didJustFinish) {
+            console.log("Audio finished playing.");
+            setIsPlaying(false);
+
+            // Cleanup the sound so pause button disappears
+            if (soundRef.current) {
+              soundRef.current.unloadAsync().catch(err => console.error('Unload failed:', err));
+              soundRef.current = null;
+            }
+          }
+        };
+
+        playbackCallbackRef.current = onStatusUpdate;
+
       const { sound } = await Audio.Sound.createAsync(
         { uri: fixedUrl },
-        { shouldPlay: false, rate: tempo }, // Don't auto-play until we verify it works
-        onPlaybackStatusUpdate
+        { shouldPlay: false}, // Don't auto-play until we verify it works
+        onStatusUpdate
       );
 
       // Check if the sound loaded successfully
@@ -395,38 +426,6 @@ const playAudio = async (audioUrl: string): Promise<void> => {
 };
 
 // Enhanced playback status handling
-const onPlaybackStatusUpdate = (status: Audio.PlaybackStatus): void => {
-  if (!status.isLoaded) {
-    // Handle load error
-    if (status.error) {
-      console.error(`Audio playback error: ${status.error}`);
-    }
-    return;
-  }
-
-  // Log playback progress for debugging
-  if (status.isPlaying) {
-    console.log(`Playing at: ${status.positionMillis}/${status.durationMillis} ms`);
-  }
-
-  if (status.isPlaying) {
-    // Audio is playing
-    setIsPlaying(true);
-  } else if (status.didJustFinish) {
-    // Audio finished playing
-    console.log("Audio playback completed successfully");
-    setIsPlaying(false);
-
-    // If continuous conversation enabled, start recording
-    if (continuousConversation && voiceInputEnabled) {
-      if (!isRecording && !isProcessing) {
-        setTimeout(() => {
-          startRecording();
-        }, 500); // Small delay before starting to record
-      }
-    }
-  }
-};
 
   // Process recorded audio
   const handleAudioData = async (): Promise<void> => {
