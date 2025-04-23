@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef  } from 'react';
 import {
   View,
   Text,
@@ -57,7 +57,8 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [voiceInputEnabled, setVoiceInputEnabled] = useState<boolean>(false);
   const [debugMode, setDebugMode] = useState<boolean>(false);
-  const [continuousConversation, setContinuousConversation] = useState<boolean>(false);
+  const [autoSendEnabled, setAutoSendEnabled] = useState<boolean>(false);
+  const [autoRecordEnabled, setAutoRecordEnabled] = useState<boolean>(false);
 
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -132,16 +133,17 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
   // Handle media recorder stop event
   useEffect(() => {
     if (!isRecording && hasSpeech && !isProcessing) {
+      console.log("🟢 handleAudioData() TRIGGERED");
       handleAudioData();
     }
   }, [isRecording, hasSpeech, isProcessing]);
 
   // This effect watches for the end of silence countdown and triggers auto-submission
   useEffect(() => {
-    if (isRecording && hasSpeech && silenceDetected && silenceCountdown === 0) {
+    if (autoSendEnabled && isRecording && hasSpeech && silenceDetected && silenceCountdown === 0) {
       stopRecording();
     }
-  }, [isRecording, hasSpeech, silenceDetected, silenceCountdown, stopRecording]);
+  }, [autoSendEnabled, isRecording, hasSpeech, silenceDetected, silenceCountdown]);
 
   // Silence safety mechanism
   useEffect(() => {
@@ -194,7 +196,21 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [targetLanguage, learningObjective]);
 
+  //Auto send eval
+  useEffect(() => {
+    console.log("🧪 Auto-Send Evaluation", {
+      autoSendEnabled,
+      isRecording,
+      hasSpeech,
+      silenceDetected,
+      silenceCountdown
+    });
 
+    if (autoSendEnabled && isRecording && hasSpeech && silenceDetected && silenceCountdown === 0) {
+      console.log("✅ Auto-Send Triggered — Calling stopRecording()");
+      stopRecording();
+    }
+  }, [autoSendEnabled, isRecording, hasSpeech, silenceDetected, silenceCountdown]);
 
   // Cleanup sound on unmount
   // Place this useEffect in your SpanishTutor component
@@ -341,6 +357,13 @@ const playAudio = async (audioUrl: string): Promise<void> => {
               soundRef.current.unloadAsync().catch(err => console.error('Unload failed:', err));
               soundRef.current = null;
             }
+            if (autoRecordEnabled) {
+              setTimeout(() => {
+                if (!isRecording) {
+                  startRecording();
+                }
+              }, 1500);
+            }
           }
         };
 
@@ -430,7 +453,7 @@ const playAudio = async (audioUrl: string): Promise<void> => {
   // Process recorded audio
   const handleAudioData = async (): Promise<void> => {
     const audioUri = getAudioURI();
-
+    console.log("🎧 Audio URI to submit:", audioUri);
     if (!audioUri) {
       setStatusMessage('No audio data recorded');
       return;
@@ -461,6 +484,7 @@ const playAudio = async (audioUrl: string): Promise<void> => {
       });
 
       setStatusMessage('Received response from server');
+      console.log("📨 Received response from server:", response);
 
       // Update conversation
       setHistory(prev => {
@@ -594,8 +618,10 @@ const playAudio = async (audioUrl: string): Promise<void> => {
         setTempo={setTempo}
         voiceInputEnabled={voiceInputEnabled}
         toggleVoiceInput={toggleVoiceInput}
-        continuousConversation={continuousConversation}
-        setContinuousConversation={setContinuousConversation}
+        autoSendEnabled={autoSendEnabled}
+        setAutoSendEnabled={setAutoSendEnabled}
+        autoRecordEnabled={autoRecordEnabled}
+        setAutoRecordEnabled={setAutoRecordEnabled}
         debugMode={debugMode}
         setDebugMode={setDebugMode}
         navigation={navigation}

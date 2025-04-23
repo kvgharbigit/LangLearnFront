@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import HTML from 'react-native-render-html';
 import { normalizeText, areMessagesEquivalent, highlightDifferences } from '../utils/text';
@@ -47,6 +47,34 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isSystem = message.role === 'system';
+  const correctedTagsStyles = useMemo(() => ({
+    strong: {
+      fontWeight: 'bold',
+      textDecorationLine: 'underline',
+      opacity: 0.8,
+      color: isUser ? '#90CAF9' : '#2196F3'
+    }
+  }), [isUser]);
+
+  const correctedBaseStyle = useMemo(() => ({
+    ...styles.annotationText,
+    ...(isUser ? styles.userAnnotationText : {}),
+    ...(isEquivalentToCorrected ? styles.identicalText : {})
+  }), [isUser, isEquivalentToCorrected]);
+  const nativeTagsStyles = useMemo(() => ({
+    strong: {
+      fontWeight: 'bold',
+      textDecorationLine: 'underline',
+      opacity: 0.8,
+      color: isUser ? '#E1BEE7' : '#9C27B0'
+    }
+  }), [isUser]);
+
+  const nativeBaseStyle = useMemo(() => ({
+    ...styles.annotationText,
+    ...(isUser ? styles.userAnnotationText : {}),
+    ...(isEquivalentToNative ? styles.identicalText : {})
+  }), [isUser, isEquivalentToNative]);
 
   return (
     <View style={[
@@ -81,19 +109,8 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
               <HTML
                 source={{ html: highlightedCorrected }}
                 contentWidth={300}
-                tagsStyles={{
-                  strong: {
-                    fontWeight: 'bold',
-                    textDecorationLine: 'underline',
-                    opacity: 0.8,
-                    color: isUser ? '#90CAF9' : '#2196F3'
-                  }
-                }}
-                baseStyle={{
-                  ...styles.annotationText,
-                  ...(isUser ? styles.userAnnotationText : {}),
-                  ...(isEquivalentToCorrected ? styles.identicalText : {})
-                }}
+                tagsStyles={correctedTagsStyles}
+                baseStyle={correctedBaseStyle}
               />
 
               {isEquivalentToCorrected && (
@@ -121,19 +138,8 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
               <HTML
                 source={{ html: highlightedNative }}
                 contentWidth={300}
-                tagsStyles={{
-                  strong: {
-                    fontWeight: 'bold',
-                    textDecorationLine: 'underline',
-                    opacity: 0.8,
-                    color: isUser ? '#E1BEE7' : '#9C27B0'
-                  }
-                }}
-                baseStyle={{
-                  ...styles.annotationText,
-                  ...(isUser ? styles.userAnnotationText : {}),
-                  ...(isEquivalentToNative ? styles.identicalText : {})
-                }}
+                tagsStyles={nativeTagsStyles}
+                baseStyle={nativeBaseStyle}
               />
 
               {isEquivalentToNative && (
@@ -240,4 +246,11 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Message;
+export default React.memo(Message, (prev, next) => {
+  return (
+    prev.message.content === next.message.content &&
+    prev.message.corrected === next.message.corrected &&
+    prev.message.natural === next.message.natural &&
+    prev.originalUserMessage === next.originalUserMessage
+  );
+});

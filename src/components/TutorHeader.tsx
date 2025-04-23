@@ -56,8 +56,10 @@ interface TutorHeaderProps {
   setTempo: (tempo: number) => void;
   voiceInputEnabled: boolean;
   toggleVoiceInput: () => void;
-  continuousConversation: boolean;
-  setContinuousConversation: (enabled: boolean) => void;
+  autoSendEnabled: boolean;
+  setAutoSendEnabled: (value: boolean) => void;
+  autoRecordEnabled: boolean;
+  setAutoRecordEnabled: (value: boolean) => void;
   debugMode: boolean;
   setDebugMode: (enabled: boolean) => void;
   navigation: NativeStackNavigationProp<RootStackParamList, 'SpanishTutor'>;
@@ -70,8 +72,10 @@ const TutorHeader: React.FC<TutorHeaderProps> = ({
   setTempo,
   voiceInputEnabled,
   toggleVoiceInput,
-  continuousConversation,
-  setContinuousConversation,
+  autoSendEnabled,
+  setAutoSendEnabled,
+  autoRecordEnabled,
+  setAutoRecordEnabled,
   debugMode,
   setDebugMode,
   navigation
@@ -162,15 +166,27 @@ const TutorHeader: React.FC<TutorHeaderProps> = ({
           </View>
 
           {voiceInputEnabled && (
-            <View style={styles.controlGroup}>
-              <ToggleSwitch
-                isOn={continuousConversation}
-                onToggle={() => setContinuousConversation(!continuousConversation)}
-                label="Auto"
-                disabled={!voiceInputEnabled}
-              />
-            </View>
+            <>
+              <View style={styles.controlGroup}>
+                <ToggleSwitch
+                  isOn={autoSendEnabled}
+                  onToggle={() => setAutoSendEnabled(!autoSendEnabled)}
+                  label="Auto-Send"
+                  disabled={!voiceInputEnabled}
+                />
+              </View>
+
+              <View style={styles.controlGroup}>
+                <ToggleSwitch
+                  isOn={autoRecordEnabled}
+                  onToggle={() => setAutoRecordEnabled(!autoRecordEnabled)}
+                  label="Auto-Record"
+                  disabled={!voiceInputEnabled}
+                />
+              </View>
+            </>
           )}
+
 
           <TouchableOpacity
             style={[
