@@ -39,6 +39,10 @@
           "microphonePermission": "LangLearn needs access to your microphone for voice conversation practice."
         }
       ]
-    ]
+    ],
+    "jsEngine": "hermes",
+    "experimental": {
+      "newArchEnabled": true
+    }
   }
 }

@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 
 // Update this to your actual API URL
-const API_URL = 'http://your-api-url.com';
+const API_URL = 'https://language-tutor-984417336702.asia-east1.run.app/chat';
 
 interface ChatParams {
   message: string;
