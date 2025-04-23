@@ -1,4 +1,4 @@
-// useVoiceRecorder.ts
+// useVoiceRecorder.ts - Updated based on working AudioTestScreen approach
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
@@ -91,10 +91,18 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
   // Request permissions
   useEffect(() => {
     const requestPermissions = async (): Promise<void> => {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') {
-        setStatusMessage('Microphone permissions not granted');
-        console.error('Microphone permissions not granted');
+      try {
+        console.log('Requesting audio recording permissions...');
+        const { status } = await Audio.requestPermissionsAsync();
+        if (status !== 'granted') {
+          setStatusMessage('Microphone permissions not granted');
+          console.error('Microphone permissions not granted');
+        } else {
+          console.log('Permissions granted:', status);
+        }
+      } catch (error) {
+        console.error('Error requesting permissions:', error);
+        setStatusMessage(`Permission error: ${error instanceof Error ? error.message : String(error)}`);
       }
     };
 
@@ -108,6 +116,7 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
 
   // Cleanup function
   const cleanup = useCallback((): void => {
+    console.log('Running cleanup...');
     // Clear silence detector interval
     if (silenceDetectorRef.current) {
       clearInterval(silenceDetectorRef.current);
@@ -157,9 +166,12 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
     return () => clearInterval(interval);
   }, []);
 
-  // Start recording function
+  // Start recording function - Using approach from AudioTestScreen
   const startRecording = useCallback(async (): Promise<void> => {
-    if (isRecording || isProcessing) return;
+    if (isRecording || isProcessing) {
+      console.log('Already recording or processing, ignoring start request');
+      return;
+    }
 
     try {
       // Reset state
@@ -174,68 +186,139 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       silenceStartRef.current = null;
       recordingUriRef.current = null;
 
-      setStatusMessage('Requesting microphone permissions...');
+      setStatusMessage('Preparing to record...');
 
       // Clean up previous resources
       cleanup();
 
-      // Set up audio mode for recording
+      // Ensure audio mode is set for recording - CRITICAL PART
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
+        // Use numeric constants directly instead of nested objects
+        interruptionModeIOS: 1, // 1 = DoNotMix
+        interruptionModeAndroid: 1, // 1 = DoNotMix
+        shouldDuckAndroid: false,
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: false,
       });
 
-      // Get recording directory for temp files
-      const documentDirectory = FileSystem.documentDirectory;
-      // Generate recording path
-      const recordingPath = `${documentDirectory}recording_${Date.now()}.${Platform.OS === 'ios' ? 'm4a' : 'webm'}`;
+      // Generate file path for recording
+      const fileDirectory = FileSystem.documentDirectory;
+      const fileName = `recording_${Date.now()}.${Platform.OS === 'ios' ? 'm4a' : 'webm'}`;
+      const fileUri = fileDirectory + fileName;
 
-      // Configure recording options
-      const recordingOptions: Audio.RecordingOptions = {
+      console.log(`Recording to file: ${fileUri}`);
+
+      // Create a new recording object
+      const recording = new Audio.Recording();
+
+      // Begin recording with HIGH_QUALITY preset for better metering
+      await recording.prepareToRecordAsync({
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
         android: {
-          extension: '.webm',
-          outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_WEBM,
-          audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_OPUS,
-          sampleRate: 44100,
-          numberOfChannels: 1,
-          bitRate: 128000,
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY.android,
+          meteringEnabled: true,
         },
         ios: {
-          extension: '.m4a',
-          outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_MPEG4AAC,
-          audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_MAX,
-          sampleRate: 44100,
-          numberOfChannels: 1,
-          bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,
+          meteringEnabled: true,
         },
         web: {
           mimeType: 'audio/webm',
           bitsPerSecond: 128000,
-        },
-      };
+        }
+      });
 
-      // Create recording object
-      const { recording } = await Audio.Recording.createAsync(
-        recordingOptions,
-        onRecordingStatusUpdate,
-        100 // Update status every 100ms
-      );
+      // Set up status update handler using event listener
+      recording.setOnRecordingStatusUpdate((status) => {
+        if (!mountedRef.current) return;
+
+        if (status.isRecording) {
+          // Get the metering level (dB) and convert to a 0-100 scale
+          const db = status.metering !== undefined ? status.metering : -160;
+          const normalizedLevel = Math.max(0, (db + 160) / 160 * 100);
+
+          console.log(`Recording status update: level=${normalizedLevel.toFixed(1)}, raw=${db}`);
+
+          setAudioLevel(normalizedLevel);
+          if (normalizedLevel > peakLevel) {
+            setPeakLevel(normalizedLevel);
+          }
+
+          // SPEECH DETECTION
+          if (normalizedLevel > settings.speechThreshold) {
+            if (!hasSpeechRef.current) {
+              console.log(`Speech detected! Level: ${normalizedLevel.toFixed(1)}`);
+              hasSpeechRef.current = true;
+              silenceDetectedRef.current = false;
+              silenceStartRef.current = null;
+              setSilenceCountdown(null);
+              setStatusMessage('Recording speech...');
+            }
+          }
+
+          // SILENCE DETECTION - only check if we've detected speech previously
+          if (hasSpeechRef.current && recordingStartTimeRef.current !== null) {
+            const recordingTime = Date.now() - recordingStartTimeRef.current;
+
+            // Only process silence after minimum recording time
+            if (recordingTime > settings.minRecordingTime) {
+              // Check if current level is below silence threshold
+              if (normalizedLevel < settings.silenceThreshold) {
+                // Start silence timer if not already started
+                if (silenceStartRef.current === null) {
+                  silenceStartRef.current = Date.now();
+                  silenceDetectedRef.current = true;
+                  setStatusMessage('Silence detected after speech...');
+                } else {
+                  // Calculate current silence duration
+                  const silenceDuration = Date.now() - silenceStartRef.current;
+
+                  // Show countdown to user
+                  const remainingTime = Math.ceil((settings.silenceDuration - silenceDuration) / 1000);
+                  setSilenceCountdown(remainingTime);
+
+                  // Check if silence duration threshold is reached
+                  if (silenceDuration > settings.silenceDuration) {
+                    setStatusMessage('Silence threshold reached - auto-stopping');
+
+                    // Use setTimeout to ensure we don't call stop during interval execution
+                    setTimeout(() => {
+                      if (mountedRef.current && isRecording) {
+                        stopRecording();
+                      }
+                    }, 0);
+                  } else {
+                    setStatusMessage(`Silence detected (${remainingTime}s until auto-submit)...`);
+                  }
+                }
+              } else {
+                // Audio level is above silence threshold, so reset silence detection
+                if (silenceStartRef.current !== null) {
+                  silenceStartRef.current = null;
+                  silenceDetectedRef.current = false;
+                  setSilenceCountdown(null);
+                  setStatusMessage('Recording speech...');
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Start recording
+      await recording.startAsync();
 
       recordingRef.current = recording;
-      recordingUriRef.current = recordingPath;
+      recordingUriRef.current = fileUri;
       setStatusMessage('Recording started! Waiting for speech...');
       setIsRecording(true);
 
       // Start tracking recording time
       recordingStartTimeRef.current = Date.now();
 
-      // Set up silence detection interval
+      // Set up silence detection interval (used for UI updates)
       silenceDetectorRef.current = setInterval(() => {
         if (!mountedRef.current || !isRecording) {
           if (silenceDetectorRef.current) {
@@ -243,10 +326,15 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
           }
           return;
         }
-
-        // Note: This interval is mostly for UI updates and silence countdown
-        // The actual audio level detection happens in onRecordingStatusUpdate
       }, settings.checkInterval);
+
+      // Get initial status to confirm recording is working
+      try {
+        const status = await recording.getStatusAsync();
+        console.log('Initial recording status:', status);
+      } catch (err) {
+        console.error('Error getting recording status:', err);
+      }
 
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -254,107 +342,71 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       setIsRecording(false);
       cleanup();
     }
-  }, [cleanup, isProcessing, isRecording, settings]);
-
-  // Monitor recording status
-  const onRecordingStatusUpdate = (status: RecordingStatus): void => {
-    if (!mountedRef.current) return;
-
-    if (status.isRecording) {
-      // Get the metering level (dB) and convert to a 0-100 scale
-      // Note: metering level is usually negative, with 0 being max volume and -160 being silence
-      const db = status.metering || -160; // Default to -160dB if metering is not available
-      const normalizedLevel = Math.max(0, (db + 160) / 160 * 100); // Convert to 0-100 scale
-
-      setAudioLevel(normalizedLevel);
-      if (normalizedLevel > peakLevel) {
-        setPeakLevel(normalizedLevel);
-      }
-
-      // SPEECH DETECTION
-      if (normalizedLevel > settings.speechThreshold) {
-        if (!hasSpeechRef.current) {
-          console.log(`Speech detected! Level: ${normalizedLevel.toFixed(1)}`);
-          hasSpeechRef.current = true;
-          silenceDetectedRef.current = false;
-          silenceStartRef.current = null;
-          setSilenceCountdown(null);
-          setStatusMessage('Recording speech...');
-        }
-      }
-
-      // SILENCE DETECTION - only check if we've detected speech previously
-      if (hasSpeechRef.current && recordingStartTimeRef.current !== null) {
-        const recordingTime = Date.now() - recordingStartTimeRef.current;
-
-        // Only process silence after minimum recording time
-        if (recordingTime > settings.minRecordingTime) {
-          // Check if current level is below silence threshold
-          if (normalizedLevel < settings.silenceThreshold) {
-            // Start silence timer if not already started
-            if (silenceStartRef.current === null) {
-              silenceStartRef.current = Date.now();
-              silenceDetectedRef.current = true;
-              setStatusMessage('Silence detected after speech...');
-            } else {
-              // Calculate current silence duration
-              const silenceDuration = Date.now() - silenceStartRef.current;
-
-              // Show countdown to user
-              const remainingTime = Math.ceil((settings.silenceDuration - silenceDuration) / 1000);
-              setSilenceCountdown(remainingTime);
-
-              // Check if silence duration threshold is reached
-              if (silenceDuration > settings.silenceDuration) {
-                setStatusMessage('Silence threshold reached - auto-stopping');
-
-                // Use setTimeout to ensure we don't call stop during interval execution
-                setTimeout(() => {
-                  if (mountedRef.current && isRecording) {
-                    stopRecording();
-                  }
-                }, 0);
-              } else {
-                setStatusMessage(`Silence detected (${remainingTime}s until auto-submit)...`);
-              }
-            }
-          } else {
-            // Audio level is above silence threshold, so reset silence detection
-            if (silenceStartRef.current !== null) {
-              silenceStartRef.current = null;
-              silenceDetectedRef.current = false;
-              setSilenceCountdown(null);
-              setStatusMessage('Recording speech...');
-            }
-          }
-        }
-      }
-    }
-  };
+  }, [cleanup, isProcessing, isRecording, peakLevel, settings]);
 
   // Stop recording function
   const stopRecording = useCallback(async (): Promise<void> => {
     setStatusMessage('Stopping recording...');
-    setIsRecording(false);
 
-    if (recordingRef.current) {
-      try {
-        await recordingRef.current.stopAndUnloadAsync();
-      } catch (err) {
-        console.error('Error stopping recorder:', err);
-        setStatusMessage(`Error stopping: ${err instanceof Error ? err.message : String(err)}`);
-      }
-
-      // Clear silence detector
-      if (silenceDetectorRef.current) {
-        clearInterval(silenceDetectorRef.current);
-        silenceDetectorRef.current = null;
-      }
-
-      // We keep hasSpeech true until the next recording starts
-      setSilenceDetected(false);
-      silenceDetectedRef.current = false;
+    if (!recordingRef.current) {
+      console.log('No recording to stop');
+      setIsRecording(false);
+      return;
     }
+
+    try {
+      console.log('Stopping recording...');
+      await recordingRef.current.stopAndUnloadAsync();
+      console.log('Recording stopped');
+
+      const uri = recordingRef.current.getURI();
+      console.log('Recording URI:', uri);
+
+      if (uri) {
+        recordingUriRef.current = uri;
+
+        // Check file size to confirm it worked
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(uri);
+          console.log('Recording file info:', fileInfo);
+          if (fileInfo.exists && fileInfo.size === 0) {
+            console.warn('Warning: Recording file is empty!');
+          }
+        } catch (fileError) {
+          console.error('File check error:', fileError);
+        }
+      } else {
+        console.warn('No URI from recording');
+      }
+
+      // Configure audio for playback
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        // Use numeric constants directly
+        interruptionModeIOS: 1, // 1 = DoNotMix
+        interruptionModeAndroid: 1, // 1 = DoNotMix
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+      });
+
+    } catch (err) {
+      console.error('Error stopping recorder:', err);
+      setStatusMessage(`Error stopping: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // Clear silence detector
+    if (silenceDetectorRef.current) {
+      clearInterval(silenceDetectorRef.current);
+      silenceDetectorRef.current = null;
+    }
+
+    // Reset recording reference but maintain speech flag for processing
+    recordingRef.current = null;
+    setIsRecording(false);
+    setSilenceDetected(false);
+    silenceDetectedRef.current = false;
   }, []);
 
   // Get the recorded audio URI
