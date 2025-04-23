@@ -532,33 +532,24 @@ const playAudio = async (audioUrl: string): Promise<void> => {
     if (isRecording) {
       stopRecording();
     } else {
-      startRecording();
-    }
-  };
-
-  // Function to pause audio playback
-  const pauseAudio = async (): Promise<void> => {
-    if (soundRef.current) {
-      try {
-        await soundRef.current.pauseAsync();
-        setIsPlaying(false);
-      } catch (error) {
-        console.error('Error pausing audio:', error);
+      // Stop any playing audio before starting recording
+      if (isPlaying && soundRef.current) {
+        soundRef.current.stopAsync().then(() => {
+          setIsPlaying(false);
+          startRecording();
+        }).catch(error => {
+          console.error('Error stopping audio:', error);
+          startRecording();
+        });
+      } else {
+        startRecording();
       }
     }
   };
 
-  // Function to resume audio playback
-  const resumeAudio = async (): Promise<void> => {
-    if (soundRef.current) {
-      try {
-        await soundRef.current.playAsync();
-        setIsPlaying(true);
-      } catch (error) {
-        console.error('Error resuming audio:', error);
-      }
-    }
-  };
+
+
+
 
   // Render conversation messages
   const renderMessages = () => {
@@ -750,17 +741,7 @@ const playAudio = async (audioUrl: string): Promise<void> => {
         )}
       </View>
 
-      {/* Audio controls */}
-      {isPlaying && (
-        <View style={styles.audioControls}>
-          <TouchableOpacity
-            style={styles.audioControlButton}
-            onPress={pauseAudio}
-          >
-            <Text style={styles.audioControlText}>Pause Audio</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+
     </SafeAreaView>
   );
 };
