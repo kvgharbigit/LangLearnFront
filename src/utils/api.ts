@@ -61,11 +61,30 @@ export const sendTextMessage = async (
       throw new Error(`Server responded with status: ${response.status}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+
+    // Add message_index for the latest assistant message to use with streaming
+    if (data.has_audio && data.history && data.history.length > 0) {
+      // Find the index of the last assistant message
+      const lastAssistantIndex = data.history.length - 1;
+      data.message_index = lastAssistantIndex;
+    }
+
+    return data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;
   }
+};
+
+// Add a new helper function to get the streaming audio URL
+export const getAudioStreamUrl = (
+  conversationId: string,
+  messageIndex: number = -1,
+  tempo: number = 0.75,
+  targetLanguage: string = 'es'
+) => {
+  return `${API_URL}/stream-audio/${conversationId}?message_index=${messageIndex}&tempo=${tempo}&target_language=${targetLanguage}`;
 };
 
 /**

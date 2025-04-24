@@ -267,57 +267,57 @@ useEffect(() => {
 }, []);
 
   // Text chat handler
-  const handleSubmit = async (inputMessage: string): Promise<void> => {
-    if (!inputMessage.trim() || isLoading) return;
+  // Text chat handler
+const handleSubmit = async (inputMessage: string): Promise<void> => {
+  if (!inputMessage.trim() || isLoading) return;
 
-    const userMessage: MessageType = {
-      role: 'user',
-      content: inputMessage,
+  const userMessage: MessageType = {
+    role: 'user',
+    content: inputMessage,
+    timestamp: new Date().toISOString()
+  };
+
+  setHistory(prev => [...prev, userMessage]);
+  setIsLoading(true);
+
+  try {
+    const response = await api.sendTextMessage(
+      inputMessage,
+      conversationId,
+      tempo,
+      difficulty,
+      nativeLanguage,
+      targetLanguage,
+      learningObjective
+    );
+
+    if (!conversationId && response.conversation_id) {
+      setConversationId(response.conversation_id);
+    }
+
+    setHistory(response.history);
+
+    if (response.has_audio) {
+      setStatusMessage('Streaming audio...');
+      await playAudio(response.conversation_id, response.message_index);
+    }
+  } catch (error) {
+    console.error('Error sending message:', error);
+    const errorMessage: MessageType = {
+      role: 'system',
+      content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
       timestamp: new Date().toISOString()
     };
 
-    setHistory(prev => [...prev, userMessage]);
-    setIsLoading(true);
-
-    try {
-      const response = await api.sendTextMessage(
-        inputMessage,
-        conversationId,
-        tempo,
-        difficulty,
-        nativeLanguage,
-        targetLanguage,
-        learningObjective
-      );
-
-      if (!conversationId && response.conversation_id) {
-        setConversationId(response.conversation_id);
-      }
-
-      setHistory(response.history);
-
-      if (response.audio_url) {
-        const audioUrl = `https://storage.googleapis.com/language-tutor-app-2025-audio-files/${response.audio_url.replace(/^\/?static\/audio\//, 'static/audio/')}`;
-        setStatusMessage('Playing audio ...' + audioUrl);
-        await playAudio(audioUrl);
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const errorMessage: MessageType = {
-        role: 'system',
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-        timestamp: new Date().toISOString()
-      };
-
-      setHistory(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    setHistory(prev => [...prev, errorMessage]);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
 // Updated playAudio function for SpanishTutor.tsx
 
-const playAudio = async (audioUrl: string): Promise<void> => {
+const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
   try {
     // Ensure we unload any previous sound before creating a new one
     if (soundRef.current) {
@@ -325,111 +325,74 @@ const playAudio = async (audioUrl: string): Promise<void> => {
       soundRef.current = null;
     }
 
-    console.log("Loading audio from URL:", audioUrl);
+    console.log("Streaming audio from server...");
 
-    // Make sure the URL is properly formatted
-    const fixedUrl = audioUrl.startsWith('http')
-      ? audioUrl
-      : `https://storage.googleapis.com/language-tutor-app-2025-audio-files/${audioUrl.replace(/^\/?static\/audio\//, "static/audio/")}`;;
+    // Build the audio URL for direct streaming
+    const audioUrl = api.getAudioStreamUrl(
+      conversationId,
+      messageIndex,
+      tempo,
+      targetLanguage
+    );
+    console.log("Audio streaming URL:", audioUrl);
 
-    console.log("Fixed URL:", fixedUrl);
-
-    // First try direct streaming (avoid downloading if possible)
-    try {
-      console.log("Attempting direct streaming...");
-
-      const onStatusUpdate = (status: Audio.PlaybackStatus): void => {
-          if (!status.isLoaded) {
-            if (status.error) {
-              console.error(`Audio playback error: ${status.error}`);
-            }
-            return;
-          }
-
-          if (status.isPlaying) {
-            setIsPlaying(true);
-          } else if (status.didJustFinish) {
-            console.log("Audio finished playing.");
-            setIsPlaying(false);
-
-            // Cleanup the sound so pause button disappears
-            if (soundRef.current) {
-              soundRef.current.unloadAsync().catch(err => console.error('Unload failed:', err));
-              soundRef.current = null;
-            }
-            if (autoRecordEnabled) {
-              setTimeout(() => {
-                if (!isRecording) {
-                  startRecording();
-                }
-              }, 1500);
-            }
-          }
-        };
-
-        playbackCallbackRef.current = onStatusUpdate;
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: fixedUrl },
-        { shouldPlay: false}, // Don't auto-play until we verify it works
-        onStatusUpdate
-      );
-
-      // Check if the sound loaded successfully
-      const status = await sound.getStatusAsync();
-      if (status.isLoaded) {
-        console.log("Direct streaming successful");
-        soundRef.current = sound;
-        await sound.playAsync(); // Start playing after we know it loaded
-        setIsPlaying(true);
-        console.log("Setting audio playing");
+    const onStatusUpdate = (status: Audio.PlaybackStatus): void => {
+      if (!status.isLoaded) {
+        if (status.error) {
+          console.error(`Audio playback error: ${status.error}`);
+        }
         return;
       }
 
-      // If we got here, loading worked but playback might not, let's try download method
-      await sound.unloadAsync();
-    } catch (streamError) {
-      console.log("Direct streaming failed, trying download method:", streamError);
-    }
+      if (status.isPlaying) {
+        setIsPlaying(true);
+      } else if (status.didJustFinish) {
+        console.log("Audio finished playing.");
+        setIsPlaying(false);
 
-    // Download the audio file as fallback
-    try {
-      const localUri = await api.downloadAudio(fixedUrl);
-      console.log("Downloaded to local URI:", localUri);
-
-      // Force audio file format recognition by adding extension if missing
-      let playableUri = localUri;
-      if (!localUri.toLowerCase().endsWith('.mp3') && !localUri.toLowerCase().endsWith('.wav')) {
-        // This helps iOS recognize the format properly
-        if (fixedUrl.toLowerCase().endsWith('.mp3')) {
-          // Rename the file with .mp3 extension
-          const newUri = `${localUri}.mp3`;
-          await FileSystem.copyAsync({ from: localUri, to: newUri });
-          playableUri = newUri;
+        // Cleanup the sound so pause button disappears
+        if (soundRef.current) {
+          soundRef.current.unloadAsync().catch(err => console.error('Unload failed:', err));
+          soundRef.current = null;
+        }
+        if (autoRecordEnabled) {
+          setTimeout(() => {
+            if (!isRecording) {
+              startRecording();
+            }
+          }, 1500);
         }
       }
+    };
 
-      // Create sound object with proper audio settings for iOS
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: playableUri },
-        {
-          shouldPlay: true,
-          rate: tempo,
-          progressUpdateIntervalMillis: 200,
-          positionMillis: 0,
-          volume: 1.0,
-          isMuted: false,
-          isLooping: false,
-          audioPan: 0,
-        },
-        onPlaybackStatusUpdate
-      );
+    playbackCallbackRef.current = onStatusUpdate;
 
+    // Create sound object with streaming
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: audioUrl },
+      {
+        shouldPlay: false,
+        rate: 1.0,
+        progressUpdateIntervalMillis: 200,
+        positionMillis: 0,
+        volume: 1.0,
+        isMuted: false,
+        isLooping: false,
+        audioPan: 0,
+      },
+      onStatusUpdate
+    );
+
+    // Check if the sound loaded successfully
+    const status = await sound.getStatusAsync();
+    if (status.isLoaded) {
+      console.log("Direct streaming successful");
       soundRef.current = sound;
+      await sound.playAsync(); // Start playing after we know it loaded
       setIsPlaying(true);
-    } catch (downloadError) {
-      console.error('Error playing downloaded audio:', downloadError);
-      throw downloadError; // Re-throw to be caught by the outer catch
+      console.log("Setting audio playing");
+    } else {
+      throw new Error("Audio failed to load properly");
     }
   } catch (error) {
     console.error('Error playing audio:', error);
@@ -447,7 +410,6 @@ const playAudio = async (audioUrl: string): Promise<void> => {
     setIsPlaying(false);
   }
 };
-
 // Enhanced playback status handling
 
   // Process recorded audio
