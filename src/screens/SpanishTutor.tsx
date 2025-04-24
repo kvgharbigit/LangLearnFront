@@ -413,97 +413,97 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
 // Enhanced playback status handling
 
   // Process recorded audio
-  const handleAudioData = async (): Promise<void> => {
-    const audioUri = getAudioURI();
-    console.log("🎧 Audio URI to submit:", audioUri);
-    if (!audioUri) {
-      setStatusMessage('No audio data recorded');
-      return;
-    }
+  // Process recorded audio
+const handleAudioData = async (): Promise<void> => {
+  const audioUri = getAudioURI();
+  console.log("🎧 Audio URI to submit:", audioUri);
+  if (!audioUri) {
+    setStatusMessage('No audio data recorded');
+    return;
+  }
 
-    setIsLoading(true);
-    setIsProcessing(true);
-    setStatusMessage('Processing audio data...');
+  setIsLoading(true);
+  setIsProcessing(true);
+  setStatusMessage('Processing audio data...');
 
-    try {
-      // Show temporary message
-      const tempMessage: MessageType = {
-        role: 'user',
-        content: "🎤 Processing voice...",
-        timestamp: new Date().toISOString(),
-        isTemporary: true
-      };
-      setHistory(prev => [...prev, tempMessage]);
+  try {
+    // Show temporary message
+    const tempMessage: MessageType = {
+      role: 'user',
+      content: "🎤 Processing voice...",
+      timestamp: new Date().toISOString(),
+      isTemporary: true
+    };
+    setHistory(prev => [...prev, tempMessage]);
 
-      const response = await api.sendVoiceRecording({
-        audioUri,
-        conversationId,
-        tempo,
-        difficulty,
-        nativeLanguage,
-        targetLanguage,
-        learningObjective
-      });
+    const response = await api.sendVoiceRecording({
+      audioUri,
+      conversationId,
+      tempo,
+      difficulty,
+      nativeLanguage,
+      targetLanguage,
+      learningObjective
+    });
 
-      setStatusMessage('Received response from server');
-      console.log("📨 Received response from server:", response);
+    setStatusMessage('Received response from server');
+    console.log("📨 Received response from server:", response);
 
-      // Update conversation
-      setHistory(prev => {
-        const filtered = prev.filter(msg => !msg.isTemporary);
+    // Update conversation
+    setHistory(prev => {
+      const filtered = prev.filter(msg => !msg.isTemporary);
 
-        if (response.transcribed_text) {
-          return [
-            ...filtered,
-            {
-              role: 'user',
-              content: response.transcribed_text,
-              timestamp: new Date().toISOString()
-            },
-            {
-              role: 'assistant',
-              content: response.reply,
-              corrected: response.corrected,
-              natural: response.natural,
-              timestamp: new Date().toISOString()
-            }
-          ];
-        }
-        return filtered;
-      });
-
-      if (!conversationId && response.conversation_id) {
-        setConversationId(response.conversation_id);
-      }
-
-      // Play audio
-      if (response.audio_url) {
-        const audioUrl = `https://storage.googleapis.com/language-tutor-app-2025-audio-files/${response.audio_url.replace(/^\/?static\/audio\//, 'static/audio/')}`;
-        setStatusMessage('Playing audio response...' + audioUrl);
-        await playAudio(audioUrl);
-      }
-
-    } catch (error) {
-      console.error('Error processing voice input:', error);
-      setStatusMessage(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-
-      setHistory(prev => {
-        const filtered = prev.filter(msg => !msg.isTemporary);
+      if (response.transcribed_text) {
         return [
           ...filtered,
           {
-            role: 'system',
-            content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+            role: 'user',
+            content: response.transcribed_text,
+            timestamp: new Date().toISOString()
+          },
+          {
+            role: 'assistant',
+            content: response.reply,
+            corrected: response.corrected,
+            natural: response.natural,
             timestamp: new Date().toISOString()
           }
         ];
-      });
-    } finally {
-      setIsLoading(false);
-      setIsProcessing(false);
-      resetRecording();
+      }
+      return filtered;
+    });
+
+    if (!conversationId && response.conversation_id) {
+      setConversationId(response.conversation_id);
     }
-  };
+
+    // Play audio using the same approach as text input
+    if (response.has_audio) {
+      setStatusMessage('Streaming audio...');
+      await playAudio(response.conversation_id, response.message_index);
+    }
+
+  } catch (error) {
+    console.error('Error processing voice input:', error);
+    setStatusMessage(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+    setHistory(prev => {
+      const filtered = prev.filter(msg => !msg.isTemporary);
+      return [
+        ...filtered,
+        {
+          role: 'system',
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+          timestamp: new Date().toISOString()
+        }
+      ];
+    });
+  } finally {
+    setIsLoading(false);
+    setIsProcessing(false);
+    resetRecording();
+  }
+};
 
   // UI Handlers
   const toggleVoiceInput = (): void => {
@@ -514,24 +514,34 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
     setStatusMessage(`Voice input ${!voiceInputEnabled ? 'enabled' : 'disabled'}`);
   };
 
-  const handleVoiceButtonClick = (): void => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      // Stop any playing audio before starting recording
-      if (isPlaying && soundRef.current) {
-        soundRef.current.stopAsync().then(() => {
-          setIsPlaying(false);
-          startRecording();
-        }).catch(error => {
-          console.error('Error stopping audio:', error);
-          startRecording();
-        });
-      } else {
+  const handleVoiceButtonClick = async (): Promise<void> => {
+  if (isRecording) {
+    stopRecording();
+  } else {
+    // Stop any playing audio before starting recording
+    if (isPlaying && soundRef.current) {
+      try {
+        // First check if the sound is loaded
+        const status = await soundRef.current.getStatusAsync();
+
+        if (status.isLoaded) {
+          // Give a short delay to ensure no seeking is in progress
+          await new Promise(resolve => setTimeout(resolve, 50));
+          await soundRef.current.stopAsync();
+        }
+
+        setIsPlaying(false);
+        startRecording();
+      } catch (error) {
+        console.warn('Non-critical error stopping audio:', error);
+        setIsPlaying(false);
         startRecording();
       }
+    } else {
+      startRecording();
     }
-  };
+  }
+};
 
 
 
