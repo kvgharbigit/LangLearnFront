@@ -58,8 +58,8 @@ interface TutorHeaderProps {
   toggleVoiceInput: () => void;
   autoSendEnabled: boolean;
   setAutoSendEnabled: (value: boolean) => void;
-  autoRecordEnabled: boolean;
-  setAutoRecordEnabled: (value: boolean) => void;
+  autoRecordEnabled: boolean;  // Kept for compatibility but will be ignored
+  setAutoRecordEnabled: (value: boolean) => void;  // Kept for compatibility but will be ignored
   debugMode: boolean;
   setDebugMode: (enabled: boolean) => void;
   navigation: NativeStackNavigationProp<RootStackParamList, 'SpanishTutor'>;
@@ -74,8 +74,6 @@ const TutorHeader: React.FC<TutorHeaderProps> = ({
   toggleVoiceInput,
   autoSendEnabled,
   setAutoSendEnabled,
-  autoRecordEnabled,
-  setAutoRecordEnabled,
   debugMode,
   setDebugMode,
   navigation
@@ -161,32 +159,20 @@ const TutorHeader: React.FC<TutorHeaderProps> = ({
             <ToggleSwitch
               isOn={voiceInputEnabled}
               onToggle={toggleVoiceInput}
-              label="Voice"
+              label="Voice Input"
             />
           </View>
 
           {voiceInputEnabled && (
-            <>
-              <View style={styles.controlGroup}>
-                <ToggleSwitch
-                  isOn={autoSendEnabled}
-                  onToggle={() => setAutoSendEnabled(!autoSendEnabled)}
-                  label="Auto-Send"
-                  disabled={!voiceInputEnabled}
-                />
-              </View>
-
-              <View style={styles.controlGroup}>
-                <ToggleSwitch
-                  isOn={autoRecordEnabled}
-                  onToggle={() => setAutoRecordEnabled(!autoRecordEnabled)}
-                  label="Auto-Record"
-                  disabled={!voiceInputEnabled}
-                />
-              </View>
-            </>
+            <View style={styles.controlGroup}>
+              <ToggleSwitch
+                isOn={autoSendEnabled}
+                onToggle={() => setAutoSendEnabled(!autoSendEnabled)}
+                label="Auto-Send"
+                disabled={!voiceInputEnabled}
+              />
+            </View>
           )}
-
 
           <TouchableOpacity
             style={[

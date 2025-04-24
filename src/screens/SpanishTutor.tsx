@@ -58,7 +58,6 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
   const [voiceInputEnabled, setVoiceInputEnabled] = useState<boolean>(false);
   const [debugMode, setDebugMode] = useState<boolean>(false);
   const [autoSendEnabled, setAutoSendEnabled] = useState<boolean>(false);
-  const [autoRecordEnabled, setAutoRecordEnabled] = useState<boolean>(false);
 
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -67,7 +66,6 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const playbackCallbackRef = useRef<((status: Audio.PlaybackStatus) => void) | null>(null);
-
 
   // Get language display info
   const getLanguageInfo = (code: string): LanguageInfo => {
@@ -138,29 +136,22 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [isRecording, hasSpeech, isProcessing]);
 
-  // This effect watches for the end of silence countdown and triggers auto-submission
+  // NEW AUTO-SEND IMPLEMENTATION
+  // This is a simplified auto-send feature that triggers when:
+  // 1. Auto-send is enabled
+  // 2. We're recording
+  // 3. Speech has been detected
+  // 4. Silence has been detected for the required duration (when silenceCountdown reaches 0)
   useEffect(() => {
-    if (autoSendEnabled && isRecording && hasSpeech && silenceDetected && silenceCountdown === 0) {
-      stopRecording();
-    }
-  }, [autoSendEnabled, isRecording, hasSpeech, silenceDetected, silenceCountdown]);
-
-  // Silence safety mechanism
-  useEffect(() => {
-    let silenceTimer: NodeJS.Timeout | null = null;
-
-    if (isRecording && hasSpeech && silenceDetected) {
-      silenceTimer = setTimeout(() => {
+    if (autoSendEnabled && isRecording && hasSpeech && silenceDetected) {
+      // If silence countdown has reached 0 or is less than 0, stop recording
+      // This will trigger the audio processing flow
+      if (silenceCountdown !== null && silenceCountdown <= 0) {
+        console.log("📢 Auto-send triggered - stopping recording");
         stopRecording();
-      }, AUDIO_SETTINGS.SILENCE_DURATION + 500);
-    }
-
-    return () => {
-      if (silenceTimer) {
-        clearTimeout(silenceTimer);
       }
-    };
-  }, [isRecording, hasSpeech, silenceDetected, stopRecording]);
+    }
+  }, [autoSendEnabled, isRecording, hasSpeech, silenceDetected, silenceCountdown, stopRecording]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -196,314 +187,281 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [targetLanguage, learningObjective]);
 
-  //Auto send eval
-  useEffect(() => {
-    console.log("🧪 Auto-Send Evaluation", {
-      autoSendEnabled,
-      isRecording,
-      hasSpeech,
-      silenceDetected,
-      silenceCountdown
-    });
-
-    if (autoSendEnabled && isRecording && hasSpeech && silenceDetected && silenceCountdown === 0) {
-      console.log("✅ Auto-Send Triggered — Calling stopRecording()");
-      stopRecording();
-    }
-  }, [autoSendEnabled, isRecording, hasSpeech, silenceDetected, silenceCountdown]);
-
   // Cleanup sound on unmount
-  // Place this useEffect in your SpanishTutor component
-
-// Audio setup and permission handling
-// Updated Audio setup useEffect with correct constants
-useEffect(() => {
-  const setupAudio = async () => {
-    try {
-      // Request audio permissions
-      const permission = await Audio.requestPermissionsAsync();
-      if (!permission.granted) {
-        console.warn('Audio permissions not granted');
-      }
-
-      // Configure audio session with correct constant values
-      await Audio.setAudioModeAsync({
-
-        allowsRecordingIOS: false, //When this flag is set to true, playback may be routed to the phone earpiece instead of to the speaker. Set it back to false after stopping recording to reenable playback through the speaker.
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-        staysActiveInBackground: false,
-        // Use the correct enum values for interruption modes
-        interruptionModeIOS: 1, // Audio.InterruptionModeIOS.DoNotMix = 1
-        interruptionModeAndroid: 1, // Audio.InterruptionModeAndroid.DoNotMix = 1
-      });
-
-      console.log('Audio session configured successfully');
-
-      // Clean up any existing sound object
-      if (soundRef.current) {
-        if (playbackCallbackRef.current) {
-          soundRef.current.setOnPlaybackStatusUpdate(null); // Remove old listener
+  useEffect(() => {
+    const setupAudio = async () => {
+      try {
+        // Request audio permissions
+        const permission = await Audio.requestPermissionsAsync();
+        if (!permission.granted) {
+          console.warn('Audio permissions not granted');
         }
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
+
+        // Configure audio session with correct constant values
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+          staysActiveInBackground: false,
+          // Use the correct enum values for interruption modes
+          interruptionModeIOS: 1, // Audio.InterruptionModeIOS.DoNotMix = 1
+          interruptionModeAndroid: 1, // Audio.InterruptionModeAndroid.DoNotMix = 1
+        });
+
+        console.log('Audio session configured successfully');
+
+        // Clean up any existing sound object
+        if (soundRef.current) {
+          if (playbackCallbackRef.current) {
+            soundRef.current.setOnPlaybackStatusUpdate(null); // Remove old listener
+          }
+          await soundRef.current.unloadAsync();
+          soundRef.current = null;
+        }
+      } catch (error) {
+        console.error('Failed to set up audio system:', error);
       }
-    } catch (error) {
-      console.error('Failed to set up audio system:', error);
-    }
-  };
+    };
 
-  setupAudio();
+    setupAudio();
 
-  // Cleanup function
-  return () => {
-    if (soundRef.current) {
-      soundRef.current.unloadAsync().catch(error => {
-        console.error('Error cleaning up audio:', error);
-      });
-    }
-  };
-}, []);
+    // Cleanup function
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(error => {
+          console.error('Error cleaning up audio:', error);
+        });
+      }
+    };
+  }, []);
 
   // Text chat handler
-  // Text chat handler
-const handleSubmit = async (inputMessage: string): Promise<void> => {
-  if (!inputMessage.trim() || isLoading) return;
+  const handleSubmit = async (inputMessage: string): Promise<void> => {
+    if (!inputMessage.trim() || isLoading) return;
 
-  const userMessage: MessageType = {
-    role: 'user',
-    content: inputMessage,
-    timestamp: new Date().toISOString()
-  };
-
-  setHistory(prev => [...prev, userMessage]);
-  setIsLoading(true);
-
-  try {
-    const response = await api.sendTextMessage(
-      inputMessage,
-      conversationId,
-      tempo,
-      difficulty,
-      nativeLanguage,
-      targetLanguage,
-      learningObjective
-    );
-
-    if (!conversationId && response.conversation_id) {
-      setConversationId(response.conversation_id);
-    }
-
-    setHistory(response.history);
-
-    if (response.has_audio) {
-      setStatusMessage('Streaming audio...');
-      await playAudio(response.conversation_id, response.message_index);
-    }
-  } catch (error) {
-    console.error('Error sending message:', error);
-    const errorMessage: MessageType = {
-      role: 'system',
-      content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+    const userMessage: MessageType = {
+      role: 'user',
+      content: inputMessage,
       timestamp: new Date().toISOString()
     };
 
-    setHistory(prev => [...prev, errorMessage]);
-  } finally {
-    setIsLoading(false);
-  }
-};
+    setHistory(prev => [...prev, userMessage]);
+    setIsLoading(true);
 
-// Updated playAudio function for SpanishTutor.tsx
+    try {
+      const response = await api.sendTextMessage(
+        inputMessage,
+        conversationId,
+        tempo,
+        difficulty,
+        nativeLanguage,
+        targetLanguage,
+        learningObjective
+      );
 
-const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
-  try {
-    // Ensure we unload any previous sound before creating a new one
-    if (soundRef.current) {
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
-    }
-
-    console.log("Streaming audio from server...");
-
-    // Build the audio URL for direct streaming
-    const audioUrl = api.getAudioStreamUrl(
-      conversationId,
-      messageIndex,
-      tempo,
-      targetLanguage
-    );
-    console.log("Audio streaming URL:", audioUrl);
-
-    const onStatusUpdate = (status: Audio.PlaybackStatus): void => {
-      if (!status.isLoaded) {
-        if (status.error) {
-          console.error(`Audio playback error: ${status.error}`);
-        }
-        return;
+      if (!conversationId && response.conversation_id) {
+        setConversationId(response.conversation_id);
       }
 
-      if (status.isPlaying) {
-        setIsPlaying(true);
-      } else if (status.didJustFinish) {
-        console.log("Audio finished playing.");
-        setIsPlaying(false);
+      setHistory(response.history);
 
-        // Cleanup the sound so pause button disappears
-        if (soundRef.current) {
-          soundRef.current.unloadAsync().catch(err => console.error('Unload failed:', err));
-          soundRef.current = null;
-        }
-        if (autoRecordEnabled) {
-          setTimeout(() => {
-            if (!isRecording) {
-              startRecording();
-            }
-          }, 1500);
-        }
+      if (response.has_audio) {
+        setStatusMessage('Streaming audio...');
+        await playAudio(response.conversation_id, response.message_index);
       }
-    };
-
-    playbackCallbackRef.current = onStatusUpdate;
-
-    // Create sound object with streaming
-    const { sound } = await Audio.Sound.createAsync(
-      { uri: audioUrl },
-      {
-        shouldPlay: false,
-        rate: 1.0,
-        progressUpdateIntervalMillis: 200,
-        positionMillis: 0,
-        volume: 1.0,
-        isMuted: false,
-        isLooping: false,
-        audioPan: 0,
-      },
-      onStatusUpdate
-    );
-
-    // Check if the sound loaded successfully
-    const status = await sound.getStatusAsync();
-    if (status.isLoaded) {
-      console.log("Direct streaming successful");
-      soundRef.current = sound;
-      await sound.playAsync(); // Start playing after we know it loaded
-      setIsPlaying(true);
-      console.log("Setting audio playing");
-    } else {
-      throw new Error("Audio failed to load properly");
-    }
-  } catch (error) {
-    console.error('Error playing audio:', error);
-
-    // Show an error message to the user
-    setHistory(prev => [
-      ...prev,
-      {
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: MessageType = {
         role: 'system',
-        content: "Sorry, I couldn't play the audio response. You can continue with text chat.",
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
         timestamp: new Date().toISOString()
+      };
+
+      setHistory(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
+    try {
+      // Ensure we unload any previous sound before creating a new one
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
       }
-    ]);
 
-    setIsPlaying(false);
-  }
-};
-// Enhanced playback status handling
+      console.log("Streaming audio from server...");
+
+      // Build the audio URL for direct streaming
+      const audioUrl = api.getAudioStreamUrl(
+        conversationId,
+        messageIndex,
+        tempo,
+        targetLanguage
+      );
+      console.log("Audio streaming URL:", audioUrl);
+
+      const onStatusUpdate = (status: Audio.PlaybackStatus): void => {
+        if (!status.isLoaded) {
+          if (status.error) {
+            console.error(`Audio playback error: ${status.error}`);
+          }
+          return;
+        }
+
+        if (status.isPlaying) {
+          setIsPlaying(true);
+        } else if (status.didJustFinish) {
+          console.log("Audio finished playing.");
+          setIsPlaying(false);
+
+          // Cleanup the sound so pause button disappears
+          if (soundRef.current) {
+            soundRef.current.unloadAsync().catch(err => console.error('Unload failed:', err));
+            soundRef.current = null;
+          }
+        }
+      };
+
+      playbackCallbackRef.current = onStatusUpdate;
+
+      // Create sound object with streaming
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        {
+          shouldPlay: false,
+          rate: 1.0,
+          progressUpdateIntervalMillis: 200,
+          positionMillis: 0,
+          volume: 1.0,
+          isMuted: false,
+          isLooping: false,
+          audioPan: 0,
+        },
+        onStatusUpdate
+      );
+
+      // Check if the sound loaded successfully
+      const status = await sound.getStatusAsync();
+      if (status.isLoaded) {
+        console.log("Direct streaming successful");
+        soundRef.current = sound;
+        await sound.playAsync(); // Start playing after we know it loaded
+        setIsPlaying(true);
+        console.log("Setting audio playing");
+      } else {
+        throw new Error("Audio failed to load properly");
+      }
+    } catch (error) {
+      console.error('Error playing audio:', error);
+
+      // Show an error message to the user
+      setHistory(prev => [
+        ...prev,
+        {
+          role: 'system',
+          content: "Sorry, I couldn't play the audio response. You can continue with text chat.",
+          timestamp: new Date().toISOString()
+        }
+      ]);
+
+      setIsPlaying(false);
+    }
+  };
 
   // Process recorded audio
-  // Process recorded audio
-const handleAudioData = async (): Promise<void> => {
-  const audioUri = getAudioURI();
-  console.log("🎧 Audio URI to submit:", audioUri);
-  if (!audioUri) {
-    setStatusMessage('No audio data recorded');
-    return;
-  }
+  const handleAudioData = async (): Promise<void> => {
+    const audioUri = getAudioURI();
+    console.log("🎧 Audio URI to submit:", audioUri);
+    if (!audioUri) {
+      setStatusMessage('No audio data recorded');
+      return;
+    }
 
-  setIsLoading(true);
-  setIsProcessing(true);
-  setStatusMessage('Processing audio data...');
+    setIsLoading(true);
+    setIsProcessing(true);
+    setStatusMessage('Processing audio data...');
 
-  try {
-    // Show temporary message
-    const tempMessage: MessageType = {
-      role: 'user',
-      content: "🎤 Processing voice...",
-      timestamp: new Date().toISOString(),
-      isTemporary: true
-    };
-    setHistory(prev => [...prev, tempMessage]);
+    try {
+      // Show temporary message
+      const tempMessage: MessageType = {
+        role: 'user',
+        content: "🎤 Processing voice...",
+        timestamp: new Date().toISOString(),
+        isTemporary: true
+      };
+      setHistory(prev => [...prev, tempMessage]);
 
-    const response = await api.sendVoiceRecording({
-      audioUri,
-      conversationId,
-      tempo,
-      difficulty,
-      nativeLanguage,
-      targetLanguage,
-      learningObjective
-    });
+      const response = await api.sendVoiceRecording({
+        audioUri,
+        conversationId,
+        tempo,
+        difficulty,
+        nativeLanguage,
+        targetLanguage,
+        learningObjective
+      });
 
-    setStatusMessage('Received response from server');
-    console.log("📨 Received response from server:", response);
+      setStatusMessage('Received response from server');
+      console.log("📨 Received response from server:", response);
 
-    // Update conversation
-    setHistory(prev => {
-      const filtered = prev.filter(msg => !msg.isTemporary);
+      // Update conversation
+      setHistory(prev => {
+        const filtered = prev.filter(msg => !msg.isTemporary);
 
-      if (response.transcribed_text) {
+        if (response.transcribed_text) {
+          return [
+            ...filtered,
+            {
+              role: 'user',
+              content: response.transcribed_text,
+              timestamp: new Date().toISOString()
+            },
+            {
+              role: 'assistant',
+              content: response.reply,
+              corrected: response.corrected,
+              natural: response.natural,
+              timestamp: new Date().toISOString()
+            }
+          ];
+        }
+        return filtered;
+      });
+
+      if (!conversationId && response.conversation_id) {
+        setConversationId(response.conversation_id);
+      }
+
+      // Play audio using the same approach as text input
+      if (response.has_audio) {
+        setStatusMessage('Streaming audio...');
+        await playAudio(response.conversation_id, response.message_index);
+      }
+
+    } catch (error) {
+      console.error('Error processing voice input:', error);
+      setStatusMessage(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+      setHistory(prev => {
+        const filtered = prev.filter(msg => !msg.isTemporary);
         return [
           ...filtered,
           {
-            role: 'user',
-            content: response.transcribed_text,
-            timestamp: new Date().toISOString()
-          },
-          {
-            role: 'assistant',
-            content: response.reply,
-            corrected: response.corrected,
-            natural: response.natural,
+            role: 'system',
+            content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
             timestamp: new Date().toISOString()
           }
         ];
-      }
-      return filtered;
-    });
-
-    if (!conversationId && response.conversation_id) {
-      setConversationId(response.conversation_id);
+      });
+    } finally {
+      setIsLoading(false);
+      setIsProcessing(false);
+      resetRecording();
     }
-
-    // Play audio using the same approach as text input
-    if (response.has_audio) {
-      setStatusMessage('Streaming audio...');
-      await playAudio(response.conversation_id, response.message_index);
-    }
-
-  } catch (error) {
-    console.error('Error processing voice input:', error);
-    setStatusMessage(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-
-    setHistory(prev => {
-      const filtered = prev.filter(msg => !msg.isTemporary);
-      return [
-        ...filtered,
-        {
-          role: 'system',
-          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-          timestamp: new Date().toISOString()
-        }
-      ];
-    });
-  } finally {
-    setIsLoading(false);
-    setIsProcessing(false);
-    resetRecording();
-  }
-};
+  };
 
   // UI Handlers
   const toggleVoiceInput = (): void => {
@@ -515,37 +473,33 @@ const handleAudioData = async (): Promise<void> => {
   };
 
   const handleVoiceButtonClick = async (): Promise<void> => {
-  if (isRecording) {
-    stopRecording();
-  } else {
-    // Stop any playing audio before starting recording
-    if (isPlaying && soundRef.current) {
-      try {
-        // First check if the sound is loaded
-        const status = await soundRef.current.getStatusAsync();
+    if (isRecording) {
+      stopRecording();
+    } else {
+      // Stop any playing audio before starting recording
+      if (isPlaying && soundRef.current) {
+        try {
+          // First check if the sound is loaded
+          const status = await soundRef.current.getStatusAsync();
 
-        if (status.isLoaded) {
-          // Give a short delay to ensure no seeking is in progress
-          await new Promise(resolve => setTimeout(resolve, 50));
-          await soundRef.current.stopAsync();
+          if (status.isLoaded) {
+            // Give a short delay to ensure no seeking is in progress
+            await new Promise(resolve => setTimeout(resolve, 50));
+            await soundRef.current.stopAsync();
+          }
+
+          setIsPlaying(false);
+          startRecording();
+        } catch (error) {
+          console.warn('Non-critical error stopping audio:', error);
+          setIsPlaying(false);
+          startRecording();
         }
-
-        setIsPlaying(false);
-        startRecording();
-      } catch (error) {
-        console.warn('Non-critical error stopping audio:', error);
-        setIsPlaying(false);
+      } else {
         startRecording();
       }
-    } else {
-      startRecording();
     }
-  }
-};
-
-
-
-
+  };
 
   // Render conversation messages
   const renderMessages = () => {
@@ -592,8 +546,8 @@ const handleAudioData = async (): Promise<void> => {
         toggleVoiceInput={toggleVoiceInput}
         autoSendEnabled={autoSendEnabled}
         setAutoSendEnabled={setAutoSendEnabled}
-        autoRecordEnabled={autoRecordEnabled}
-        setAutoRecordEnabled={setAutoRecordEnabled}
+        autoRecordEnabled={false} // Removed this feature
+        setAutoRecordEnabled={() => {}} // Empty function
         debugMode={debugMode}
         setDebugMode={setDebugMode}
         navigation={navigation}
@@ -713,13 +667,19 @@ const handleAudioData = async (): Promise<void> => {
                   <>
                     <Text style={styles.statusIcon}>🔇</Text>
                     <Text style={styles.statusText}>
-                      Silence detected - will auto-submit {silenceCountdown ? `in ${silenceCountdown}s` : 'shortly'}
+                      {autoSendEnabled
+                        ? `Silence detected - will auto-submit ${silenceCountdown ? `in ${silenceCountdown}s` : 'shortly'}`
+                        : 'Silence detected - press Stop when finished'}
                     </Text>
                   </>
                 ) : hasSpeech ? (
                   <>
                     <Text style={styles.statusIcon}>🗣️</Text>
-                    <Text style={styles.statusText}>Recording your speech... Pause to auto-submit</Text>
+                    <Text style={styles.statusText}>
+                      {autoSendEnabled
+                        ? 'Recording your speech... Pause to auto-submit'
+                        : 'Recording your speech...'}
+                    </Text>
                   </>
                 ) : (
                   <>
@@ -738,8 +698,6 @@ const handleAudioData = async (): Promise<void> => {
           />
         )}
       </View>
-
-
     </SafeAreaView>
   );
 };

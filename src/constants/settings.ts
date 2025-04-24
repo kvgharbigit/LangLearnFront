@@ -3,10 +3,10 @@
 // Default audio settings for voice recording
 export const AUDIO_SETTINGS = {
   // Silence detection threshold (below this level is considered silence)
-  SILENCE_THRESHOLD: 40,
+  SILENCE_THRESHOLD: 80,
 
   // Speech detection threshold (above this level is considered speech)
-  SPEECH_THRESHOLD: 70,
+  SPEECH_THRESHOLD: 80,
 
   // Time in milliseconds to wait in silence before auto-stopping
   SILENCE_DURATION: 1500,
