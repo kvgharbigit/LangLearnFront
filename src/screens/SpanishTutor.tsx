@@ -164,28 +164,28 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Welcome message when the component mounts
   useEffect(() => {
-    if (history.length === 0) {
-      let welcomeMessage: MessageType = {
-        role: 'assistant',
+  if (history.length === 0) {
+    let welcomeMessage: MessageType = {
+      role: 'assistant',
+      content: targetLanguage === 'es'
+        ? '¡Hola! Soy tu tutor de español. ¿Cómo puedo ayudarte hoy?'
+        : 'Hello! I\'m your English tutor. How can I help you today?',
+      timestamp: new Date().toISOString()
+    };
+
+    // Add learning objective to welcome message if provided
+    if (learningObjective) {
+      welcomeMessage = {
+        ...welcomeMessage,
         content: targetLanguage === 'es'
-          ? '¡Hola! Soy tu tutor de español. ¿Cómo puedo ayudarte hoy?'
-          : 'Hello! I\'m your English tutor. How can I help you today?',
-        timestamp: new Date().toISOString()
+          ? `¡Hola! Veo que quieres practicar: "${learningObjective}". ¡Empecemos!`
+          : `Hello! I see you want to practice: "${learningObjective}". Let's begin!`
       };
-
-      // Add learning objective to welcome message if provided
-      if (learningObjective) {
-        welcomeMessage = {
-          ...welcomeMessage,
-          content: targetLanguage === 'es'
-            ? `¡Hola! Veo que quieres practicar: "${learningObjective}". ¡Empecemos!`
-            : `Hello! I see you want to practice: "${learningObjective}". Let's begin!`
-        };
-      }
-
-      setHistory([welcomeMessage]);
     }
-  }, [targetLanguage, learningObjective]);
+
+    setHistory([welcomeMessage]);
+  }
+}, [targetLanguage, learningObjective, history.length]);
 
   // Cleanup function for all recording-related resources
   const cleanup = () => {
@@ -432,52 +432,99 @@ const startPreRecordingListener = async () => {
 };
 
   // Text chat handler
-  const handleSubmit = async (inputMessage: string) => {
-    if (!inputMessage.trim() || isLoading) return;
+  // Text chat handler
+const handleSubmit = async (inputMessage: string) => {
+  if (!inputMessage.trim() || isLoading) return;
 
-    const userMessage: MessageType = {
-      role: 'user',
-      content: inputMessage,
+  // Add user message to history immediately
+  const userMessage: MessageType = {
+    role: 'user',
+    content: inputMessage,
+    timestamp: new Date().toISOString()
+  };
+
+  setHistory(prev => [...prev, userMessage]);
+  setIsLoading(true);
+
+  try {
+    const response = await api.sendTextMessage(
+      inputMessage,
+      conversationId,
+      tempo,
+      difficulty,
+      nativeLanguage,
+      targetLanguage,
+      learningObjective
+    );
+
+    if (!conversationId && response.conversation_id) {
+      setConversationId(response.conversation_id);
+    }
+
+    // Update history, but preserve our modified structure
+    if (response.history && response.history.length > 0) {
+      // We need to map the server response to our new structure
+      // where corrections are attached to the user's messages
+
+      const newHistory: MessageType[] = [];
+
+      for (let i = 0; i < response.history.length; i++) {
+        const currentMsg = response.history[i];
+
+        if (currentMsg.role === 'user') {
+          // Find the next assistant message (if any)
+          const nextMsg = i + 1 < response.history.length ? response.history[i + 1] : null;
+
+          // Check if the next message has corrections meant for this user message
+          if (nextMsg && nextMsg.role === 'assistant' && (nextMsg.corrected || nextMsg.natural)) {
+            // Add user message with corrections from the assistant message
+            newHistory.push({
+              ...currentMsg,
+              corrected: nextMsg.corrected,
+              natural: nextMsg.natural
+            });
+
+            // Add assistant message without the corrections
+            if (nextMsg) {
+              newHistory.push({
+                role: nextMsg.role,
+                content: nextMsg.content,
+                timestamp: nextMsg.timestamp
+              });
+            }
+
+            // Skip the next message since we've already processed it
+            i++;
+          } else {
+            // Regular user message without corrections
+            newHistory.push(currentMsg);
+          }
+        } else if (currentMsg.role === 'assistant' || currentMsg.role === 'system') {
+          // Regular assistant or system message
+          newHistory.push(currentMsg);
+        }
+      }
+
+      setHistory(newHistory);
+    }
+
+    if (response.has_audio) {
+      setStatusMessage('Streaming audio...');
+      await playAudio(response.conversation_id, response.message_index);
+    }
+  } catch (error) {
+    console.error('Error sending message:', error);
+    const errorMessage: MessageType = {
+      role: 'system',
+      content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
       timestamp: new Date().toISOString()
     };
 
-    setHistory(prev => [...prev, userMessage]);
-    setIsLoading(true);
-
-    try {
-      const response = await api.sendTextMessage(
-        inputMessage,
-        conversationId,
-        tempo,
-        difficulty,
-        nativeLanguage,
-        targetLanguage,
-        learningObjective
-      );
-
-      if (!conversationId && response.conversation_id) {
-        setConversationId(response.conversation_id);
-      }
-
-      setHistory(response.history);
-
-      if (response.has_audio) {
-        setStatusMessage('Streaming audio...');
-        await playAudio(response.conversation_id, response.message_index);
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const errorMessage: MessageType = {
-        role: 'system',
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-        timestamp: new Date().toISOString()
-      };
-
-      setHistory(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    setHistory(prev => [...prev, errorMessage]);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
 const playAudio = async (conversationId, messageIndex = -1) => {
   try {
@@ -761,95 +808,97 @@ const playAudio = async (conversationId, messageIndex = -1) => {
 };
 
   const handleAudioData = async () => {
-    const audioUri = getAudioURI();
-    console.log("🎧 Audio URI to submit:", audioUri);
-    if (!audioUri) {
-      setStatusMessage('No audio data recorded');
-      return;
-    }
+  const audioUri = getAudioURI();
+  console.log("🎧 Audio URI to submit:", audioUri);
+  if (!audioUri) {
+    setStatusMessage('No audio data recorded');
+    return;
+  }
 
-    setIsLoading(true);
-    setIsProcessing(true);
-    setStatusMessage('Processing audio data...');
+  setIsLoading(true);
+  setIsProcessing(true);
+  setStatusMessage('Processing audio data...');
 
-    try {
-      // Show temporary message
-      const tempMessage: MessageType = {
-        role: 'user',
-        content: "🎤 Processing voice...",
-        timestamp: new Date().toISOString(),
-        isTemporary: true
-      };
-      setHistory(prev => [...prev, tempMessage]);
+  try {
+    // Show temporary message
+    const tempMessage: MessageType = {
+      role: 'user',
+      content: "🎤 Processing voice...",
+      timestamp: new Date().toISOString(),
+      isTemporary: true
+    };
+    setHistory(prev => [...prev, tempMessage]);
 
-      const response = await api.sendVoiceRecording({
-        audioUri,
-        conversationId,
-        tempo,
-        difficulty,
-        nativeLanguage,
-        targetLanguage,
-        learningObjective
-      });
+    const response = await api.sendVoiceRecording({
+      audioUri,
+      conversationId,
+      tempo,
+      difficulty,
+      nativeLanguage,
+      targetLanguage,
+      learningObjective
+    });
 
-      setStatusMessage('Received response from server');
-      console.log("📨 Received response from server:", response);
+    setStatusMessage('Received response from server');
+    console.log("📨 Received response from server:", response);
 
-      // Update conversation
-      setHistory(prev => {
-        const filtered = prev.filter(msg => !msg.isTemporary);
+    // Update conversation, attaching corrections to the user message
+    setHistory(prev => {
+      const filtered = prev.filter(msg => !msg.isTemporary);
 
-        if (response.transcribed_text) {
-          return [
-            ...filtered,
-            {
-              role: 'user',
-              content: response.transcribed_text,
-              timestamp: new Date().toISOString()
-            },
-            {
-              role: 'assistant',
-              content: response.reply,
-              corrected: response.corrected,
-              natural: response.natural,
-              timestamp: new Date().toISOString()
-            }
-          ];
-        }
-        return filtered;
-      });
-
-      if (!conversationId && response.conversation_id) {
-        setConversationId(response.conversation_id);
-      }
-
-      // Play audio using the same approach as text input
-      if (response.has_audio) {
-        setStatusMessage('Streaming audio...');
-        await playAudio(response.conversation_id, response.message_index);
-      }
-
-    } catch (error) {
-      console.error('Error processing voice input:', error);
-      setStatusMessage(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-
-      setHistory(prev => {
-        const filtered = prev.filter(msg => !msg.isTemporary);
+      if (response.transcribed_text) {
         return [
           ...filtered,
+          // User message with corrections attached
           {
-            role: 'system',
-            content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+            role: 'user',
+            content: response.transcribed_text,
+            corrected: response.corrected,
+            natural: response.natural,
+            timestamp: new Date().toISOString()
+          },
+          // AI response (without corrections)
+          {
+            role: 'assistant',
+            content: response.reply,
             timestamp: new Date().toISOString()
           }
         ];
-      });
-    } finally {
-      setIsLoading(false);
-      setIsProcessing(false);
-      resetRecording();
+      }
+      return filtered;
+    });
+
+    if (!conversationId && response.conversation_id) {
+      setConversationId(response.conversation_id);
     }
-  };
+
+    // Play audio using the same approach as text input
+    if (response.has_audio) {
+      setStatusMessage('Streaming audio...');
+      await playAudio(response.conversation_id, response.message_index);
+    }
+
+  } catch (error) {
+    console.error('Error processing voice input:', error);
+    setStatusMessage(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+    setHistory(prev => {
+      const filtered = prev.filter(msg => !msg.isTemporary);
+      return [
+        ...filtered,
+        {
+          role: 'system',
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+          timestamp: new Date().toISOString()
+        }
+      ];
+    });
+  } finally {
+    setIsLoading(false);
+    setIsProcessing(false);
+    resetRecording();
+  }
+};
 
   // UI Handlers
   const toggleVoiceInput = () => {
@@ -903,37 +952,31 @@ const playAudio = async (conversationId, messageIndex = -1) => {
 
   // Render conversation messages
   const renderMessages = () => {
-    if (history.length === 0) {
-      return (
-        <View style={styles.emptyState}>
-          <Text style={styles.welcomeIcon}>👋</Text>
-          <Text style={styles.welcomeTitle}>
-            {targetLanguage === 'es' ? '¡Hola! Soy tu tutor de español.' : 'Hello! I am your English tutor.'}
-          </Text>
-          <Text style={styles.welcomeText}>
-            {targetLanguage === 'es'
-              ? 'Start practicing your Spanish conversation skills!'
-              : 'Start practicing your English conversation skills!'}
-          </Text>
-        </View>
-      );
-    }
+  if (history.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.welcomeIcon}>👋</Text>
+        <Text style={styles.welcomeTitle}>
+          {targetLanguage === 'es' ? '¡Hola! Soy tu tutor de español.' : 'Hello! I am your English tutor.'}
+        </Text>
+        <Text style={styles.welcomeText}>
+          {targetLanguage === 'es'
+            ? 'Start practicing your Spanish conversation skills!'
+            : 'Start practicing your English conversation skills!'}
+        </Text>
+      </View>
+    );
+  }
 
-    return history.map((msg, index) => {
-      // Find the original user message if this is an assistant message
-      const originalUserMessage = msg.role === 'assistant'
-        ? history[index - 1]?.content
-        : null;
-
-      return (
-        <Message
-          key={index}
-          message={msg}
-          originalUserMessage={originalUserMessage}
-        />
-      );
-    });
-  };
+  return history.map((msg, index) => (
+    <Message
+      key={index}
+      message={msg}
+      // No need to pass originalUserMessage anymore since corrections
+      // are attached directly to user messages
+    />
+  ));
+};
 
   return (
     <SafeAreaView style={styles.container}>
