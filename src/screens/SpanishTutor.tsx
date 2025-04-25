@@ -297,7 +297,11 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
     // Unload previous sound
     if (soundRef.current) {
       console.log("🎵 [AUDIO] Unloading previous sound before creating new one");
-      await soundRef.current.unloadAsync();
+      try {
+        await soundRef.current.unloadAsync();
+      } catch (unloadError) {
+        console.warn("🎵 [AUDIO] Error unloading previous sound:", unloadError);
+      }
       soundRef.current = null;
     }
 
@@ -396,9 +400,22 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
           }, 1500); // 1.5 seconds delay
         }
 
+        // Add null check before unloading
         if (soundRef.current) {
-          soundRef.current.unloadAsync().catch(err => console.error("🎵 [AUDIO] Unload failed:", err));
-          soundRef.current = null;
+          try {
+            // Use .then() instead of await since we're in a callback
+            soundRef.current.unloadAsync()
+              .then(() => {
+                soundRef.current = null;
+              })
+              .catch(err => {
+                console.error("🎵 [AUDIO] Unload failed:", err);
+                soundRef.current = null;
+              });
+          } catch (err) {
+            console.error("🎵 [AUDIO] Unload failure:", err);
+            soundRef.current = null;
+          }
         }
       }
     };
@@ -433,49 +450,84 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
         return;
       }
 
-      const status = await soundRef.current.getStatusAsync();
+      try {
+        const status = await soundRef.current.getStatusAsync();
 
-      const likelyFinished =
-        status.isLoaded &&
-        !status.isPlaying &&
-        status.positionMillis > 0 &&
-        (!status.durationMillis || status.positionMillis >= status.durationMillis - 100);
+        const likelyFinished =
+          status.isLoaded &&
+          !status.isPlaying &&
+          status.positionMillis > 0 &&
+          (!status.durationMillis || status.positionMillis >= status.durationMillis - 100);
 
-      if (likelyFinished) {
-        console.log("🎵 [AUDIO] DETECTION: Backup polling mechanism detected playback completion");
-        console.log(`🎵 [AUDIO] DETAILS: isPlaying=${!status.isPlaying}, positionMillis=${status.positionMillis}, durationMillis=${status.durationMillis || 'unknown'}, elapsed=${elapsed}ms`);
+        if (likelyFinished) {
+          console.log("🎵 [AUDIO] DETECTION: Backup polling mechanism detected playback completion");
+          console.log(`🎵 [AUDIO] DETAILS: isPlaying=${!status.isPlaying}, positionMillis=${status.positionMillis}, durationMillis=${status.durationMillis || 'unknown'}, elapsed=${elapsed}ms`);
 
-        setIsPlaying(false);
-        setStatusMessage('Ready'); // Update status when polling detects completion
+          setIsPlaying(false);
+          setStatusMessage('Ready'); // Update status when polling detects completion
 
-        // Also handle auto record here as a backup
-        if (autoRecordEnabled && voiceInputEnabled && !isRecording && !isProcessing) {
-          console.log("🎙️ [AUTO RECORD] Setting up auto record from polling backup");
+          // Also handle auto record here as a backup
+          if (autoRecordEnabled && voiceInputEnabled && !isRecording && !isProcessing) {
+            console.log("🎙️ [AUTO RECORD] Setting up auto record from polling backup");
 
-          // Clear any existing timeout
-          if (autoRecordTimeoutRef.current) {
-            clearTimeout(autoRecordTimeoutRef.current);
+            // Clear any existing timeout
+            if (autoRecordTimeoutRef.current) {
+              clearTimeout(autoRecordTimeoutRef.current);
+            }
+
+            // Set new timeout
+            autoRecordTimeoutRef.current = setTimeout(() => {
+              console.log("🎙️ [AUTO RECORD] Auto record backup timeout triggered");
+              if (!isRecording && !isProcessing) {
+                startRecording();
+                setStatusMessage('Auto-recording started');
+              }
+              autoRecordTimeoutRef.current = null;
+            }, 1500); // 1.5 seconds delay
           }
 
-          // Set new timeout
-          autoRecordTimeoutRef.current = setTimeout(() => {
-            console.log("🎙️ [AUTO RECORD] Auto record backup timeout triggered");
-            if (!isRecording && !isProcessing) {
-              startRecording();
-              setStatusMessage('Auto-recording started');
-            }
-            autoRecordTimeoutRef.current = null;
-          }, 1500); // 1.5 seconds delay
+          // Add null check and use Promise chaining for unloading
+          if (soundRef.current) {
+            soundRef.current.unloadAsync()
+              .then(() => {
+                soundRef.current = null;
+              })
+              .catch(unloadError => {
+                console.warn("🎵 [AUDIO] Error unloading in polling interval:", unloadError);
+                soundRef.current = null;
+              });
+          }
+
+          clearInterval(poll);
         }
 
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-        clearInterval(poll);
-      }
+        if (elapsed >= maxPollTime) {
+          console.warn("🎵 [AUDIO] DETECTION: Polling timed out after 120 seconds without detecting finish");
+          setStatusMessage('Ready'); // Update status even if polling times out
 
-      if (elapsed >= maxPollTime) {
-        console.warn("🎵 [AUDIO] DETECTION: Polling timed out after 120 seconds without detecting finish");
-        setStatusMessage('Ready'); // Update status even if polling times out
+          // Make sure to clean up audio even on timeout
+          if (soundRef.current) {
+            try {
+              await soundRef.current.unloadAsync();
+            } catch (timeoutError) {
+              console.warn("🎵 [AUDIO] Error unloading on timeout:", timeoutError);
+            }
+            soundRef.current = null;
+          }
+
+          clearInterval(poll);
+        }
+      } catch (pollError) {
+        console.error("🎵 [AUDIO] Error during polling:", pollError);
+        // If we get an error during polling, it's safer to clean up
+        if (soundRef.current) {
+          try {
+            await soundRef.current.unloadAsync();
+          } catch (secondaryError) {
+            console.warn("🎵 [AUDIO] Secondary error during cleanup:", secondaryError);
+          }
+          soundRef.current = null;
+        }
         clearInterval(poll);
       }
     }, pollingInterval);
@@ -503,6 +555,16 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
     ]);
     setIsPlaying(false);
     setStatusMessage('Ready'); // Update status on error
+
+    // Clean up if there's an error during playback setup
+    if (soundRef.current) {
+      try {
+        await soundRef.current.unloadAsync();
+      } catch (cleanupError) {
+        console.warn("🎵 [AUDIO] Error during error cleanup:", cleanupError);
+      }
+      soundRef.current = null;
+    }
   }
 };
 
