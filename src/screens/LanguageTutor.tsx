@@ -241,7 +241,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Cleanup function for all recording-related resources
   const cleanup = () => {
-    console.log('Running cleanup...');
+    console.log('Running audio resource cleanup...');
 
     // Stop pre-recording listener if active
     if (preRecordingRef.current) {
@@ -263,6 +263,38 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     if (autoRecordTimeoutRef.current) {
       clearTimeout(autoRecordTimeoutRef.current);
       autoRecordTimeoutRef.current = null;
+    }
+
+    // Clean up sound object if it exists
+    if (soundRef.current) {
+      try {
+        // First remove any status update callbacks
+        if (playbackCallbackRef.current) {
+          try {
+            soundRef.current.setOnPlaybackStatusUpdate(null);
+            playbackCallbackRef.current = null;
+          } catch (error) {
+            console.warn('Error removing status update callback:', error);
+          }
+        }
+
+        // Then check if sound is loaded before unloading
+        soundRef.current.getStatusAsync()
+          .then(status => {
+            if (status.isLoaded) {
+              return soundRef.current.unloadAsync();
+            }
+          })
+          .catch(error => {
+            console.warn('Error during sound cleanup:', error);
+          })
+          .finally(() => {
+            soundRef.current = null;
+          });
+      } catch (error) {
+        console.error('Error during sound cleanup:', error);
+        soundRef.current = null;
+      }
     }
 
     // Reset listening state
@@ -311,12 +343,25 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
     // Cleanup function
     return () => {
+      console.log("🧹 Component unmounting - cleaning up all audio resources");
       isMountedRef.current = false;
 
       if (soundRef.current) {
+        // First remove any status update callbacks to prevent further updates
+        if (playbackCallbackRef.current) {
+          try {
+            soundRef.current.setOnPlaybackStatusUpdate(null);
+            playbackCallbackRef.current = null;
+          } catch (error) {
+            console.error('Error removing status update callback:', error);
+          }
+        }
+
+        // Then unload the sound
         soundRef.current.unloadAsync().catch(error => {
           console.error('Error cleaning up audio:', error);
         });
+        soundRef.current = null;
       }
 
       cleanup();
@@ -596,6 +641,8 @@ const playAudio = async (conversationId, messageIndex = -1) => {
     if (soundRef.current) {
       console.log("🎵 [AUDIO] Unloading previous sound before creating new one");
       try {
+        // First remove the status update callback
+        soundRef.current.setOnPlaybackStatusUpdate(null);
         await soundRef.current.unloadAsync();
       } catch (unloadError) {
         console.warn("🎵 [AUDIO] Error unloading previous sound:", unloadError);
@@ -629,8 +676,15 @@ const playAudio = async (conversationId, messageIndex = -1) => {
     let lastPositionMillis = 0;
     let positionStuckCount = 0;
     let isCompletionHandled = false;
+    let pollIntervalId = null;
 
     const onStatusUpdate = (status: Audio.PlaybackStatus) => {
+      // First check if component is still mounted
+      if (!isMountedRef.current) {
+        console.log("🎵 [AUDIO] Component unmounted, ignoring status update");
+        return;
+      }
+
       console.log("🎵 [AUDIO] Status update triggered:", status);
       statusUpdateCount++;
 
@@ -680,6 +734,12 @@ const playAudio = async (conversationId, messageIndex = -1) => {
         setIsPlaying(false);
         setStatusMessage('Ready'); // Update status when playback completes
 
+        // Clean up polling if it exists
+        if (pollIntervalId) {
+          clearInterval(pollIntervalId);
+          pollIntervalId = null;
+        }
+
         // If auto record is enabled, start listening for speech
         if (autoRecordEnabled && voiceInputEnabled && isMountedRef.current) {
           console.log("🎙️ [AUTO RECORD] Activating smart auto-record listener");
@@ -696,6 +756,9 @@ const playAudio = async (conversationId, messageIndex = -1) => {
         // Add null check before unloading
         if (soundRef.current) {
           try {
+            // First remove the status update callback
+            soundRef.current.setOnPlaybackStatusUpdate(null);
+
             // Use .then() instead of await since we're in a callback
             soundRef.current.unloadAsync()
               .then(() => {
@@ -712,6 +775,9 @@ const playAudio = async (conversationId, messageIndex = -1) => {
         }
       }
     };
+
+    // Save the callback reference for later cleanup
+    playbackCallbackRef.current = onStatusUpdate;
 
     // Create sound with shouldPlay: true
     console.log("🎵 [AUDIO] Creating audio object with streaming");
@@ -735,11 +801,18 @@ const playAudio = async (conversationId, messageIndex = -1) => {
     const maxPollTime = 120000; // 120 seconds (2 minutes) timeout
     let elapsed = 0;
 
-    const poll = setInterval(async () => {
+    pollIntervalId = setInterval(async () => {
+      // First check if component is still mounted
+      if (!isMountedRef.current) {
+        console.log("🎵 [AUDIO] Component unmounted, cleaning up polling interval");
+        clearInterval(pollIntervalId);
+        return;
+      }
+
       elapsed += pollingInterval;
 
       if (!soundRef.current || isCompletionHandled) {
-        clearInterval(poll);
+        clearInterval(pollIntervalId);
         return;
       }
 
@@ -777,6 +850,8 @@ const playAudio = async (conversationId, messageIndex = -1) => {
 
           // Add null check and use Promise chaining for unloading
           if (soundRef.current) {
+            // First remove the status update callback
+            soundRef.current.setOnPlaybackStatusUpdate(null);
             soundRef.current.unloadAsync()
               .then(() => {
                 soundRef.current = null;
@@ -787,7 +862,7 @@ const playAudio = async (conversationId, messageIndex = -1) => {
               });
           }
 
-          clearInterval(poll);
+          clearInterval(pollIntervalId);
         }
 
         if (elapsed >= maxPollTime) {
@@ -797,6 +872,8 @@ const playAudio = async (conversationId, messageIndex = -1) => {
           // Make sure to clean up audio even on timeout
           if (soundRef.current) {
             try {
+              // First remove the status update callback
+              soundRef.current.setOnPlaybackStatusUpdate(null);
               await soundRef.current.unloadAsync();
             } catch (timeoutError) {
               console.warn("🎵 [AUDIO] Error unloading on timeout:", timeoutError);
@@ -804,20 +881,22 @@ const playAudio = async (conversationId, messageIndex = -1) => {
             soundRef.current = null;
           }
 
-          clearInterval(poll);
+          clearInterval(pollIntervalId);
         }
       } catch (pollError) {
         console.error("🎵 [AUDIO] Error during polling:", pollError);
         // If we get an error during polling, it's safer to clean up
         if (soundRef.current) {
           try {
+            // First remove the status update callback
+            soundRef.current.setOnPlaybackStatusUpdate(null);
             await soundRef.current.unloadAsync();
           } catch (secondaryError) {
             console.warn("🎵 [AUDIO] Secondary error during cleanup:", secondaryError);
           }
           soundRef.current = null;
         }
-        clearInterval(poll);
+        clearInterval(pollIntervalId);
       }
     }, pollingInterval);
 
@@ -848,6 +927,8 @@ const playAudio = async (conversationId, messageIndex = -1) => {
     // Clean up if there's an error during playback setup
     if (soundRef.current) {
       try {
+        // First remove the status update callback
+        soundRef.current.setOnPlaybackStatusUpdate(null);
         await soundRef.current.unloadAsync();
       } catch (cleanupError) {
         console.warn("🎵 [AUDIO] Error during error cleanup:", cleanupError);
