@@ -47,33 +47,35 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isSystem = message.role === 'system';
+
+  // Updated tag styles for corrected text - new words in bold red
   const correctedTagsStyles = useMemo(() => ({
     strong: {
       fontWeight: 'bold',
-      textDecorationLine: 'underline',
-      opacity: 0.8,
-      color: isUser ? '#90CAF9' : '#2196F3'
+      color: '#FF0000', // Red for new words
     }
-  }), [isUser]);
+  }), []);
 
+  // Base styles for corrected text - original words in green
   const correctedBaseStyle = useMemo(() => ({
     ...styles.annotationText,
     ...(isUser ? styles.userAnnotationText : {}),
-    ...(isEquivalentToCorrected ? styles.identicalText : {})
+    ...(isEquivalentToCorrected ? styles.identicalText : {color: '#4CAF50'}) // Green for original words
   }), [isUser, isEquivalentToCorrected]);
+
+  // Updated tag styles for native text - new words in bold red
   const nativeTagsStyles = useMemo(() => ({
     strong: {
       fontWeight: 'bold',
-      textDecorationLine: 'underline',
-      opacity: 0.8,
-      color: isUser ? '#E1BEE7' : '#9C27B0'
+      color: '#FF0000', // Red for new words
     }
-  }), [isUser]);
+  }), []);
 
+  // Base styles for native text - original words in green
   const nativeBaseStyle = useMemo(() => ({
     ...styles.annotationText,
     ...(isUser ? styles.userAnnotationText : {}),
-    ...(isEquivalentToNative ? styles.identicalText : {})
+    ...(isEquivalentToNative ? styles.identicalText : {color: '#4CAF50'}) // Green for original words
   }), [isUser, isEquivalentToNative]);
 
   return (
@@ -102,7 +104,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
               isUser ? styles.userAnnotationLabel : null,
               isEquivalentToCorrected && styles.identicalLabel
             ]}>
-              Grammar:
+              📝
             </Text>
 
             <View style={styles.annotationTextContainer}>
@@ -131,7 +133,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
               isUser ? styles.userAnnotationLabel : {},
               isEquivalentToNative && styles.identicalLabel
             ]}>
-              Native:
+              🗣️
             </Text>
 
             <View style={styles.annotationTextContainer}>
@@ -212,7 +214,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 8,
     opacity: 0.7,
-    minWidth: 60,
+    minWidth: 20, // Reduced min width since we're using shorter labels now
     fontSize: 14,
     color: '#2196F3',  // Blue for grammar
   },
@@ -224,7 +226,6 @@ const styles = StyleSheet.create({
   annotationText: {
     flex: 1,
     fontSize: 14,
-    color: '#2196F3',  // Blue for grammar
   },
   userAnnotationLabel: {
     color: 'rgba(255, 255, 255, 0.7)',
