@@ -284,95 +284,170 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
-  const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
-    try {
-      // Ensure we unload any previous sound before creating a new one
-      if (soundRef.current) {
+const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
+  try {
+    // Unload previous sound
+    if (soundRef.current) {
+      console.log("🎵 [AUDIO] Unloading previous sound before creating new one");
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+
+    // Configure audio session for playback
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      interruptionModeIOS: 1, // DoNotMix
+      interruptionModeAndroid: 1, // DoNotMix
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+      staysActiveInBackground: false,
+    });
+    console.log("🎧 Audio session configured for playback");
+
+    // Build streaming URL
+    const audioUrl = api.getAudioStreamUrl(conversationId, messageIndex, tempo, targetLanguage);
+    console.log("🎵 [AUDIO] Audio streaming URL:", audioUrl);
+
+    let statusUpdateCount = 0;
+    let lastPositionMillis = 0;
+    let positionStuckCount = 0;
+
+    const onStatusUpdate = (status: Audio.PlaybackStatus): void => {
+      console.log("🎵 [AUDIO] Status update triggered:", status);
+      statusUpdateCount++;
+
+      if (!status.isLoaded) {
+        if (status.error) {
+          console.error(`🎵 [AUDIO] Playback error: ${status.error}`);
+        }
+        console.log(`🎵 [AUDIO] Status update #${statusUpdateCount}: Not loaded`);
+        return;
+      }
+
+      if (status.positionMillis === lastPositionMillis && status.isPlaying) {
+        positionStuckCount++;
+        if (positionStuckCount > 5) {
+          console.log(`🎵 [AUDIO] WARNING: Position stuck at ${status.positionMillis}ms for ${positionStuckCount} updates`);
+        }
+      } else {
+        positionStuckCount = 0;
+      }
+      lastPositionMillis = status.positionMillis;
+
+      // Check for both explicit finish and our "likely finished" condition
+      const isLikelyFinished =
+        status.isLoaded &&
+        !status.isPlaying &&
+        status.positionMillis > 0 &&
+        (!status.durationMillis || status.positionMillis >= status.durationMillis - 100);
+
+      const nearEnd = status.durationMillis && status.positionMillis > status.durationMillis - 500;
+      if (nearEnd) {
+        console.log(`🎵 [AUDIO] NEAR END: position=${status.positionMillis}ms`);
+      }
+
+      if (status.isPlaying) {
+        setIsPlaying(true);
+      } else if (status.didJustFinish || isLikelyFinished) {
+        // Respond to either didJustFinish OR our likelyFinished condition
+        if (status.didJustFinish) {
+          console.log(`🎵 [AUDIO] DETECTION: didJustFinish event triggered playback completion`);
+        } else if (isLikelyFinished) {
+          console.log(`🎵 [AUDIO] DETECTION: isLikelyFinished condition detected completion in status update handler`);
+        }
+        console.log(`🎵 [AUDIO] DETAILS: didJustFinish=${status.didJustFinish}, isPlaying=${!status.isPlaying}, positionMillis=${status.positionMillis}, durationMillis=${status.durationMillis || 'unknown'}`);
+
+        setIsPlaying(false);
+        setStatusMessage('Ready'); // Update status when playback completes
+        if (soundRef.current) {
+          soundRef.current.unloadAsync().catch(err => console.error("🎵 [AUDIO] Unload failed:", err));
+          soundRef.current = null;
+        }
+      }
+    };
+
+    // Create sound with shouldPlay: true
+    console.log("🎵 [AUDIO] Creating audio object with streaming");
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: audioUrl, isNetwork: true },
+      {
+        shouldPlay: true,
+        rate: 1.0,
+        progressUpdateIntervalMillis: 100,
+        volume: 1.0,
+        isMuted: false,
+        isLooping: false,
+      },
+      onStatusUpdate
+    );
+
+    soundRef.current = sound;
+
+    // 🔁 Fallback polling mechanism - keep this as an additional safety net
+    const pollingInterval = 200;
+    const maxPollTime = 120000; // 120 seconds (2 minutes) timeout
+    let elapsed = 0;
+
+    const poll = setInterval(async () => {
+      elapsed += pollingInterval;
+
+      if (!soundRef.current) {
+        clearInterval(poll);
+        return;
+      }
+
+      const status = await soundRef.current.getStatusAsync();
+
+      const likelyFinished =
+        status.isLoaded &&
+        !status.isPlaying &&
+        status.positionMillis > 0 &&
+        (!status.durationMillis || status.positionMillis >= status.durationMillis - 100);
+
+      if (likelyFinished) {
+        console.log("🎵 [AUDIO] DETECTION: Backup polling mechanism detected playback completion");
+        console.log(`🎵 [AUDIO] DETAILS: isPlaying=${!status.isPlaying}, positionMillis=${status.positionMillis}, durationMillis=${status.durationMillis || 'unknown'}, elapsed=${elapsed}ms`);
+
+        setIsPlaying(false);
+        setStatusMessage('Ready'); // Update status when polling detects completion
         await soundRef.current.unloadAsync();
         soundRef.current = null;
+        clearInterval(poll);
       }
 
-      console.log("Streaming audio from server...");
-
-      // Build the audio URL for direct streaming
-      const audioUrl = api.getAudioStreamUrl(
-        conversationId,
-        messageIndex,
-        tempo,
-        targetLanguage
-      );
-      console.log("Audio streaming URL:", audioUrl);
-
-      const onStatusUpdate = (status: Audio.PlaybackStatus): void => {
-        if (!status.isLoaded) {
-          if (status.error) {
-            console.error(`Audio playback error: ${status.error}`);
-          }
-          return;
-        }
-
-        if (status.isPlaying) {
-          setIsPlaying(true);
-        } else if (status.didJustFinish) {
-          console.log("Audio finished playing.");
-          setIsPlaying(false);
-
-          // Cleanup the sound so pause button disappears
-          if (soundRef.current) {
-            soundRef.current.unloadAsync().catch(err => console.error('Unload failed:', err));
-            soundRef.current = null;
-          }
-        }
-      };
-
-      playbackCallbackRef.current = onStatusUpdate;
-
-      // Create sound object with streaming
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
-        {
-          shouldPlay: false,
-          rate: 1.0,
-          progressUpdateIntervalMillis: 200,
-          positionMillis: 0,
-          volume: 1.0,
-          isMuted: false,
-          isLooping: false,
-          audioPan: 0,
-        },
-        onStatusUpdate
-      );
-
-      // Check if the sound loaded successfully
-      const status = await sound.getStatusAsync();
-      if (status.isLoaded) {
-        console.log("Direct streaming successful");
-        soundRef.current = sound;
-        await sound.playAsync(); // Start playing after we know it loaded
-        setIsPlaying(true);
-        console.log("Setting audio playing");
-      } else {
-        throw new Error("Audio failed to load properly");
+      if (elapsed >= maxPollTime) {
+        console.warn("🎵 [AUDIO] DETECTION: Polling timed out after 120 seconds without detecting finish");
+        setStatusMessage('Ready'); // Update status even if polling times out
+        clearInterval(poll);
       }
-    } catch (error) {
-      console.error('Error playing audio:', error);
+    }, pollingInterval);
 
-      // Show an error message to the user
-      setHistory(prev => [
-        ...prev,
-        {
-          role: 'system',
-          content: "Sorry, I couldn't play the audio response. You can continue with text chat.",
-          timestamp: new Date().toISOString()
-        }
-      ]);
+    // Initial status check
+    const initialStatus = await sound.getStatusAsync();
+    console.log("🎵 [AUDIO] Initial sound status:", {
+      isLoaded: initialStatus.isLoaded,
+      positionMillis: initialStatus.positionMillis,
+      durationMillis: initialStatus.durationMillis,
+      isPlaying: initialStatus.isPlaying,
+      isBuffering: initialStatus.isBuffering
+    });
 
-      setIsPlaying(false);
-    }
-  };
-
-  // Process recorded audio
-  const handleAudioData = async (): Promise<void> => {
+    setIsPlaying(true);
+  } catch (error) {
+    console.error("🎵 [AUDIO] DETECTION: Error during audio playback:", error);
+    setHistory(prev => [
+      ...prev,
+      {
+        role: 'system',
+        content: "Sorry, I couldn't play the audio response. You can continue with text chat.",
+        timestamp: new Date().toISOString()
+      }
+    ]);
+    setIsPlaying(false);
+    setStatusMessage('Ready'); // Update status on error
+  }
+};  const handleAudioData = async (): Promise<void> => {
     const audioUri = getAudioURI();
     console.log("🎧 Audio URI to submit:", audioUri);
     if (!audioUri) {
