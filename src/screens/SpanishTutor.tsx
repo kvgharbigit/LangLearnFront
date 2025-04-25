@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef  } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Platform,
   Animated,
 } from 'react-native';
@@ -59,6 +58,7 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
   const [debugMode, setDebugMode] = useState<boolean>(false);
   const [autoSendEnabled, setAutoSendEnabled] = useState<boolean>(false);
   const [autoRecordEnabled, setAutoRecordEnabled] = useState<boolean>(false);
+  const [isListening, setIsListening] = useState<boolean>(false);
 
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -68,6 +68,9 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
   const soundRef = useRef<Audio.Sound | null>(null);
   const playbackCallbackRef = useRef<((status: Audio.PlaybackStatus) => void) | null>(null);
   const autoRecordTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const preRecordingRef = useRef<Audio.Recording | null>(null);
+  const isMountedRef = useRef<boolean>(true);
+  const preRecordingActiveRef = useRef<boolean>(false);
 
   // Get language display info
   const getLanguageInfo = (code: string): LanguageInfo => {
@@ -138,12 +141,7 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [isRecording, hasSpeech, isProcessing]);
 
-  // NEW AUTO-SEND IMPLEMENTATION
-  // This is a simplified auto-send feature that triggers when:
-  // 1. Auto-send is enabled
-  // 2. We're recording
-  // 3. Speech has been detected
-  // 4. Silence has been detected for the required duration (when silenceCountdown reaches 0)
+  // AUTO-SEND IMPLEMENTATION
   useEffect(() => {
     if (autoSendEnabled && isRecording && hasSpeech && silenceDetected) {
       // If silence countdown has reached 0 or is less than 0, stop recording
@@ -189,8 +187,40 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [targetLanguage, learningObjective]);
 
-  // Cleanup sound on unmount
+  // Cleanup function for all recording-related resources
+  const cleanup = () => {
+    console.log('Running cleanup...');
+
+    // Stop pre-recording listener if active
+    if (preRecordingRef.current) {
+      try {
+        // Only try to unload if it's been prepared
+        if (preRecordingActiveRef.current) {
+          preRecordingRef.current.stopAndUnloadAsync().catch(error => {
+            console.warn('Error stopping pre-recording listener:', error);
+          });
+        }
+        preRecordingRef.current = null;
+        preRecordingActiveRef.current = false;
+      } catch (error) {
+        console.error('Error during pre-recording cleanup:', error);
+      }
+    }
+
+    // Clear any timeout
+    if (autoRecordTimeoutRef.current) {
+      clearTimeout(autoRecordTimeoutRef.current);
+      autoRecordTimeoutRef.current = null;
+    }
+
+    // Reset listening state
+    setIsListening(false);
+  };
+
+  // Set up isMounted and cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
+
     const setupAudio = async () => {
       try {
         // Request audio permissions
@@ -206,7 +236,6 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
           shouldDuckAndroid: true,
           playThroughEarpieceAndroid: false,
           staysActiveInBackground: false,
-          // Use the correct enum values for interruption modes
           interruptionModeIOS: 1, // Audio.InterruptionModeIOS.DoNotMix = 1
           interruptionModeAndroid: 1, // Audio.InterruptionModeAndroid.DoNotMix = 1
         });
@@ -216,7 +245,7 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
         // Clean up any existing sound object
         if (soundRef.current) {
           if (playbackCallbackRef.current) {
-            soundRef.current.setOnPlaybackStatusUpdate(null); // Remove old listener
+            soundRef.current.setOnPlaybackStatusUpdate(null);
           }
           await soundRef.current.unloadAsync();
           soundRef.current = null;
@@ -230,22 +259,180 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
 
     // Cleanup function
     return () => {
+      isMountedRef.current = false;
+
       if (soundRef.current) {
         soundRef.current.unloadAsync().catch(error => {
           console.error('Error cleaning up audio:', error);
         });
       }
 
-      // Clear auto record timeout if it exists
-      if (autoRecordTimeoutRef.current) {
-        clearTimeout(autoRecordTimeoutRef.current);
-        autoRecordTimeoutRef.current = null;
-      }
+      cleanup();
     };
   }, []);
 
+  // Pre-recording listener for smart auto-record
+  // Pre-recording listener for smart auto-record
+const startPreRecordingListener = async () => {
+  // Don't start if we're already in recording, processing, or pre-recording state
+  if (isRecording || isProcessing || preRecordingActiveRef.current) {
+    console.log("🎙️ [PRE-RECORD] Already in recording state, ignoring listener request");
+    return;
+  }
+
+  try {
+    console.log("🎙️ [PRE-RECORD] Starting pre-recording listener");
+
+    // First, make sure we're in the correct audio mode
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+      interruptionModeIOS: 1,
+      interruptionModeAndroid: 1,
+      shouldDuckAndroid: false,
+      playThroughEarpieceAndroid: false,
+      staysActiveInBackground: false,
+    });
+
+    // Update UI state
+    setIsListening(true);
+
+    // Create a temporary recording to access microphone levels without saving
+    const tempRecording = new Audio.Recording();
+    preRecordingRef.current = tempRecording;
+
+    // Start preparing the recording
+    await tempRecording.prepareToRecordAsync({
+      ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+      android: {
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY.android,
+        meteringEnabled: true,
+      },
+      ios: {
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,
+        meteringEnabled: true,
+      },
+      web: {
+        mimeType: 'audio/webm',
+        bitsPerSecond: 128000,
+      }
+    });
+
+    // Mark as active since we've successfully prepared
+    preRecordingActiveRef.current = true;
+
+    // Set up a status listener to detect speech
+    tempRecording.setOnRecordingStatusUpdate((status) => {
+      if (!isMountedRef.current) return;
+
+      if (status.isRecording) {
+        // Convert dB to normalized level (0-100)
+        const db = status.metering !== undefined ? status.metering : -160;
+        const normalizedLevel = Math.max(0, (db + 160) / 160 * 100);
+
+        // Check if user has started speaking
+        if (normalizedLevel > voiceRecorder.settings.speechThreshold) {
+          console.log(`🎙️ [PRE-RECORD] Speech detected at level: ${normalizedLevel.toFixed(1)}`);
+
+          // First, mark the pre-recording as inactive to prevent race conditions
+          preRecordingActiveRef.current = false;
+
+          // Cancel any timeout
+          if (autoRecordTimeoutRef.current) {
+            clearTimeout(autoRecordTimeoutRef.current);
+            autoRecordTimeoutRef.current = null;
+          }
+
+          // Store reference to current recording to clean up
+          const currentRecording = preRecordingRef.current;
+          preRecordingRef.current = null;
+
+          // Update UI immediately
+          setIsListening(false);
+
+          // Stop and unload the temporary recording COMPLETELY before starting a new one
+          // Use a Promise chain to ensure proper sequence
+          Promise.resolve()
+            .then(() => {
+              if (currentRecording) {
+                return currentRecording.stopAndUnloadAsync()
+                  .catch(err => {
+                    console.warn("🎙️ [PRE-RECORD] Error stopping listener:", err);
+                    // Continue even if there's an error
+                  });
+              }
+            })
+            .then(() => {
+              // Small delay to ensure complete cleanup
+              return new Promise(resolve => setTimeout(resolve, 5));
+            })
+            .then(() => {
+              // Finally start the actual recording once cleanup is done
+              if (!isRecording && !isProcessing && isMountedRef.current) {
+                startRecording();
+                setStatusMessage('Speech detected - recording started');
+              }
+            })
+            .catch(error => {
+              console.error("Error in speech detection sequence:", error);
+              setStatusMessage('Ready');
+            });
+        }
+      }
+    });
+
+    // Start the temporary recording
+    await tempRecording.startAsync();
+
+    // Set a 30-second timeout to avoid keeping microphone active indefinitely
+    autoRecordTimeoutRef.current = setTimeout(() => {
+      console.log("🎙️ [PRE-RECORD] Auto-listener timeout after 30 seconds of no speech");
+
+      if (preRecordingRef.current && preRecordingActiveRef.current) {
+        preRecordingRef.current.stopAndUnloadAsync().catch(err => {
+          console.warn("🎙️ [PRE-RECORD] Error stopping listener on timeout:", err);
+        });
+        preRecordingRef.current = null;
+        preRecordingActiveRef.current = false;
+      }
+
+      if (isMountedRef.current) {
+        setStatusMessage('Ready');
+        setIsListening(false);
+      }
+
+      autoRecordTimeoutRef.current = null;
+    }, 30000); // 30 seconds timeout
+
+  } catch (error) {
+    console.error("🎙️ [PRE-RECORD] Error in pre-recording listener:", error);
+
+    if (isMountedRef.current) {
+      setStatusMessage('Ready');
+      setIsListening(false);
+    }
+
+    // Clean up resources on error
+    if (preRecordingRef.current && preRecordingActiveRef.current) {
+      try {
+        await preRecordingRef.current.stopAndUnloadAsync();
+      } catch (cleanupError) {
+        console.warn('Error during pre-recording cleanup:', cleanupError);
+      }
+    }
+
+    preRecordingRef.current = null;
+    preRecordingActiveRef.current = false;
+
+    if (autoRecordTimeoutRef.current) {
+      clearTimeout(autoRecordTimeoutRef.current);
+      autoRecordTimeoutRef.current = null;
+    }
+  }
+};
+
   // Text chat handler
-  const handleSubmit = async (inputMessage: string): Promise<void> => {
+  const handleSubmit = async (inputMessage: string) => {
     if (!inputMessage.trim() || isLoading) return;
 
     const userMessage: MessageType = {
@@ -292,8 +479,22 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
-const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
+const playAudio = async (conversationId, messageIndex = -1) => {
   try {
+    // Stop any pre-recording listener first
+    if (preRecordingRef.current && preRecordingActiveRef.current) {
+      try {
+        await preRecordingRef.current.stopAndUnloadAsync();
+      } catch (error) {
+        console.warn("Error stopping pre-recording before playback:", error);
+      }
+      preRecordingRef.current = null;
+      preRecordingActiveRef.current = false;
+    }
+
+    // Update UI state
+    setIsListening(false);
+
     // Unload previous sound
     if (soundRef.current) {
       console.log("🎵 [AUDIO] Unloading previous sound before creating new one");
@@ -330,8 +531,9 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
     let statusUpdateCount = 0;
     let lastPositionMillis = 0;
     let positionStuckCount = 0;
+    let isCompletionHandled = false;
 
-    const onStatusUpdate = (status: Audio.PlaybackStatus): void => {
+    const onStatusUpdate = (status: Audio.PlaybackStatus) => {
       console.log("🎵 [AUDIO] Status update triggered:", status);
       statusUpdateCount++;
 
@@ -367,8 +569,10 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
 
       if (status.isPlaying) {
         setIsPlaying(true);
-      } else if (status.didJustFinish || isLikelyFinished) {
-        // Respond to either didJustFinish OR our likelyFinished condition
+      } else if ((status.didJustFinish || isLikelyFinished) && !isCompletionHandled) {
+        // Set flag to ensure we only handle completion once
+        isCompletionHandled = true;
+
         if (status.didJustFinish) {
           console.log(`🎵 [AUDIO] DETECTION: didJustFinish event triggered playback completion`);
         } else if (isLikelyFinished) {
@@ -379,25 +583,17 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
         setIsPlaying(false);
         setStatusMessage('Ready'); // Update status when playback completes
 
-        // If auto record is enabled, set up a timeout to start recording automatically
-        if (autoRecordEnabled && voiceInputEnabled) {
-          console.log("🎙️ [AUTO RECORD] Setting up auto record to trigger in 1.5 seconds");
+        // If auto record is enabled, start listening for speech
+        if (autoRecordEnabled && voiceInputEnabled && isMountedRef.current) {
+          console.log("🎙️ [AUTO RECORD] Activating smart auto-record listener");
 
-          // Clear any existing timeout
-          if (autoRecordTimeoutRef.current) {
-            clearTimeout(autoRecordTimeoutRef.current);
-          }
-
-          // Set new timeout to start recording after 1.5 seconds
-          autoRecordTimeoutRef.current = setTimeout(() => {
-            console.log("🎙️ [AUTO RECORD] Auto record timeout triggered, starting recording");
-            // Only start if we're not already recording or processing
-            if (!isRecording && !isProcessing) {
-              startRecording();
-              setStatusMessage('Auto-recording started');
+          // Use setTimeout to ensure we don't start recording while still handling audio completion
+          setTimeout(() => {
+            if (isMountedRef.current && !isRecording && !isProcessing && !preRecordingActiveRef.current) {
+              // Start a pre-recording listener mode
+              startPreRecordingListener();
             }
-            autoRecordTimeoutRef.current = null;
-          }, 1500); // 1.5 seconds delay
+          }, 500);
         }
 
         // Add null check before unloading
@@ -445,7 +641,7 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
     const poll = setInterval(async () => {
       elapsed += pollingInterval;
 
-      if (!soundRef.current) {
+      if (!soundRef.current || isCompletionHandled) {
         clearInterval(poll);
         return;
       }
@@ -459,7 +655,10 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
           status.positionMillis > 0 &&
           (!status.durationMillis || status.positionMillis >= status.durationMillis - 100);
 
-        if (likelyFinished) {
+        if (likelyFinished && !isCompletionHandled) {
+          // Set flag to ensure we only handle completion once
+          isCompletionHandled = true;
+
           console.log("🎵 [AUDIO] DETECTION: Backup polling mechanism detected playback completion");
           console.log(`🎵 [AUDIO] DETAILS: isPlaying=${!status.isPlaying}, positionMillis=${status.positionMillis}, durationMillis=${status.durationMillis || 'unknown'}, elapsed=${elapsed}ms`);
 
@@ -467,23 +666,16 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
           setStatusMessage('Ready'); // Update status when polling detects completion
 
           // Also handle auto record here as a backup
-          if (autoRecordEnabled && voiceInputEnabled && !isRecording && !isProcessing) {
-            console.log("🎙️ [AUTO RECORD] Setting up auto record from polling backup");
+          if (autoRecordEnabled && voiceInputEnabled && !isRecording && !isProcessing
+              && !isListening && isMountedRef.current && !preRecordingActiveRef.current) {
+            console.log("🎙️ [AUTO RECORD] Starting smart auto-record from polling backup");
 
-            // Clear any existing timeout
-            if (autoRecordTimeoutRef.current) {
-              clearTimeout(autoRecordTimeoutRef.current);
-            }
-
-            // Set new timeout
-            autoRecordTimeoutRef.current = setTimeout(() => {
-              console.log("🎙️ [AUTO RECORD] Auto record backup timeout triggered");
-              if (!isRecording && !isProcessing) {
-                startRecording();
-                setStatusMessage('Auto-recording started');
+            // Use setTimeout to ensure we're not in the middle of any other operation
+            setTimeout(() => {
+              if (isMountedRef.current && !isRecording && !isProcessing && !preRecordingActiveRef.current) {
+                startPreRecordingListener();
               }
-              autoRecordTimeoutRef.current = null;
-            }, 1500); // 1.5 seconds delay
+            }, 500);
           }
 
           // Add null check and use Promise chaining for unloading
@@ -568,7 +760,7 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
   }
 };
 
-  const handleAudioData = async (): Promise<void> => {
+  const handleAudioData = async () => {
     const audioUri = getAudioURI();
     console.log("🎧 Audio URI to submit:", audioUri);
     if (!audioUri) {
@@ -660,31 +852,26 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
   };
 
   // UI Handlers
-  const toggleVoiceInput = (): void => {
+  const toggleVoiceInput = () => {
     if (isRecording) {
       stopRecording();
     }
 
-    // If turning off voice input, also turn off auto-record
+    // If turning off voice input, also turn off auto-record and listening mode
     if (voiceInputEnabled) {
       setAutoRecordEnabled(false);
-      // Clear any pending auto record timeout
-      if (autoRecordTimeoutRef.current) {
-        clearTimeout(autoRecordTimeoutRef.current);
-        autoRecordTimeoutRef.current = null;
-      }
+
+      // Clean up any active pre-recording or timeouts
+      cleanup();
     }
 
     setVoiceInputEnabled(!voiceInputEnabled);
     setStatusMessage(`Voice input ${!voiceInputEnabled ? 'enabled' : 'disabled'}`);
   };
 
-  const handleVoiceButtonClick = async (): Promise<void> => {
-    // Clear any pending auto record timeout when manually clicking the button
-    if (autoRecordTimeoutRef.current) {
-      clearTimeout(autoRecordTimeoutRef.current);
-      autoRecordTimeoutRef.current = null;
-    }
+  const handleVoiceButtonClick = async () => {
+    // Clean up any active pre-recording or timeouts
+    cleanup();
 
     if (isRecording) {
       stopRecording();
@@ -801,6 +988,11 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
                 label="Silence"
               />
               <StatusPill
+                active={isListening}
+                icon="👂"
+                label="Listening"
+              />
+              <StatusPill
                 active={autoRecordEnabled}
                 icon="🔄"
                 label="Auto Record"
@@ -846,7 +1038,8 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
               style={[
                 styles.voiceButton,
                 isRecording && styles.recordingButton,
-                isProcessing && styles.processingButton
+                isProcessing && styles.processingButton,
+                isListening && styles.listeningButton
               ]}
               onPress={handleVoiceButtonClick}
               disabled={isProcessing}
@@ -867,12 +1060,17 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
                   <Text style={styles.processingIcon}>⏳</Text>
                   <Text style={styles.buttonText}>Processing...</Text>
                 </>
+              ) : isListening ? (
+                <>
+                  <Text style={styles.listeningIcon}>👂</Text>
+                  <Text style={styles.buttonText}>Listening for speech...</Text>
+                </>
               ) : (
                 <>
                   <Text style={styles.micIcon}>🎙️</Text>
                   <Text style={styles.buttonText}>
-                    {autoRecordEnabled && autoRecordTimeoutRef.current
-                      ? 'Auto-recording soon...'
+                    {autoRecordEnabled
+                      ? 'Start Recording (auto after AI)'
                       : 'Start Recording'}
                   </Text>
                 </>
@@ -912,10 +1110,10 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
               </View>
             )}
 
-            {!isRecording && autoRecordEnabled && autoRecordTimeoutRef.current && (
-              <View style={styles.autoRecordStatus}>
-                <Text style={styles.statusIcon}>🔄</Text>
-                <Text style={styles.statusText}>Auto-recording will start in a moment...</Text>
+            {!isRecording && !isProcessing && isListening && (
+              <View style={styles.listeningStatus}>
+                <Text style={styles.statusIcon}>👂</Text>
+                <Text style={styles.statusText}>Listening for speech...</Text>
               </View>
             )}
           </View>
@@ -1019,6 +1217,9 @@ const styles = StyleSheet.create({
   processingButton: {
     backgroundColor: colors.warning,
   },
+  listeningButton: {
+    backgroundColor: colors.info,
+  },
   pulse: {
     position: 'absolute',
     width: '100%',
@@ -1031,6 +1232,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   processingIcon: {
+    fontSize: 20,
+  },
+  listeningIcon: {
     fontSize: 20,
   },
   buttonText: {
@@ -1061,7 +1265,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 152, 0, 0.1)',
     borderColor: 'rgba(255, 152, 0, 0.3)',
   },
-  autoRecordStatus: {
+  listeningStatus: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
