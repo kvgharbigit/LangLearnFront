@@ -8,13 +8,27 @@
 //   };
 // };
 
+// export type RootStackParamList = {
+//   LanguageLanding: undefined;
+//   SpanishTutor: {
+//     nativeLanguage: string;
+//     targetLanguage: string;
+//     difficulty: string;
+//     learningObjective: string;
+//   };
+//   AudioTest: undefined; // Add this new route
+// };
+
+// types/navigation.ts
 export type RootStackParamList = {
+  Home: undefined;
   LanguageLanding: undefined;
-  SpanishTutor: {
+  LanguageTutor: {
     nativeLanguage: string;
     targetLanguage: string;
     difficulty: string;
-    learningObjective: string;
+    learningObjective?: string;
   };
-  AudioTest: undefined; // Add this new route
+  AudioTest: undefined;
+  // Keep other screen types if you have any
 };

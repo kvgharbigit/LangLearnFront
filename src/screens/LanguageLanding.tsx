@@ -39,7 +39,9 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   // Language options
   const languages: Language[] = [
     { code: 'en', name: 'English', flag: '🇬🇧' },
-    { code: 'es', name: 'Spanish', flag: '🇪🇸' }
+    { code: 'es', name: 'Spanish', flag: '🇪🇸' },
+    { code: 'fr', name: 'French', flag: '🇫🇷' },
+    { code: 'it', name: 'Italian', flag: '🇮🇹' }
   ];
 
   // Handle start learning button press
@@ -52,7 +54,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
 
     // Simulate loading for a better UX
     setTimeout(() => {
-      navigation.navigate('SpanishTutor', {
+      navigation.navigate('LanguageTutor', {
         nativeLanguage,
         targetLanguage,
         difficulty,

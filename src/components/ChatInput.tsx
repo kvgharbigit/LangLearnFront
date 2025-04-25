@@ -21,13 +21,33 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setMessage('');
   };
 
+  // Get placeholder text based on target language
+  const getPlaceholder = (lang: string): string => {
+    switch(lang) {
+      case 'es': return "Escribe tu mensaje aquí...";
+      case 'fr': return "Écrivez votre message ici...";
+      case 'it': return "Scrivi il tuo messaggio qui...";
+      default: return "Type your message here...";  // en
+    }
+  };
+
+  // Get send button text based on target language
+  const getSendButtonText = (lang: string): string => {
+    switch(lang) {
+      case 'es': return "Enviar";
+      case 'fr': return "Envoyer";
+      case 'it': return "Invia";
+      default: return "Send";  // en
+    }
+  };
+
   return (
     <View style={styles.inputContainer}>
       <TextInput
         style={styles.textInput}
         value={message}
         onChangeText={setMessage}
-        placeholder={targetLanguage === 'es' ? "Escribe tu mensaje aquí..." : "Type your message here..."}
+        placeholder={getPlaceholder(targetLanguage)}
         editable={!disabled}
         placeholderTextColor="#adb5bd"
         onSubmitEditing={handleSubmit}
@@ -42,7 +62,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         disabled={disabled || !message.trim()}
       >
         <Text style={styles.sendButtonText}>
-          {targetLanguage === 'es' ? 'Enviar' : 'Send'}
+          {getSendButtonText(targetLanguage)}
         </Text>
       </TouchableOpacity>
     </View>

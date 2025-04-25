@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 
 // Import screens
 import LanguageLanding from './src/screens/LanguageLanding';
-import SpanishTutor from './src/screens/SpanishTutor';
+import LanguageTutor from './src/screens/LanguageTutor'; // Change this import
 import AudioTestScreen from './src/screens/AudioTestScreen';
 
 // Import types
@@ -20,20 +20,20 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <NavigationContainer>
-        <Stack.Navigator 
+        <Stack.Navigator
           initialRouteName="LanguageLanding"
           screenOptions={{
             headerShown: false,
             animation: 'slide_from_right',
           }}
         >
-          <Stack.Screen 
-            name="LanguageLanding" 
-            component={LanguageLanding} 
+          <Stack.Screen
+            name="LanguageLanding"
+            component={LanguageLanding}
           />
-          <Stack.Screen 
-            name="SpanishTutor" 
-            component={SpanishTutor} 
+          <Stack.Screen
+            name="LanguageTutor" // Change this screen name
+            component={LanguageTutor}
           />
           <Stack.Screen 
             name="AudioTest" 
