@@ -58,6 +58,7 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
   const [voiceInputEnabled, setVoiceInputEnabled] = useState<boolean>(false);
   const [debugMode, setDebugMode] = useState<boolean>(false);
   const [autoSendEnabled, setAutoSendEnabled] = useState<boolean>(false);
+  const [autoRecordEnabled, setAutoRecordEnabled] = useState<boolean>(false);
 
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -66,6 +67,7 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const playbackCallbackRef = useRef<((status: Audio.PlaybackStatus) => void) | null>(null);
+  const autoRecordTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get language display info
   const getLanguageInfo = (code: string): LanguageInfo => {
@@ -233,6 +235,12 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
           console.error('Error cleaning up audio:', error);
         });
       }
+
+      // Clear auto record timeout if it exists
+      if (autoRecordTimeoutRef.current) {
+        clearTimeout(autoRecordTimeoutRef.current);
+        autoRecordTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -291,6 +299,12 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
       console.log("🎵 [AUDIO] Unloading previous sound before creating new one");
       await soundRef.current.unloadAsync();
       soundRef.current = null;
+    }
+
+    // Clear any existing auto record timeout
+    if (autoRecordTimeoutRef.current) {
+      clearTimeout(autoRecordTimeoutRef.current);
+      autoRecordTimeoutRef.current = null;
     }
 
     // Configure audio session for playback
@@ -360,6 +374,28 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
 
         setIsPlaying(false);
         setStatusMessage('Ready'); // Update status when playback completes
+
+        // If auto record is enabled, set up a timeout to start recording automatically
+        if (autoRecordEnabled && voiceInputEnabled) {
+          console.log("🎙️ [AUTO RECORD] Setting up auto record to trigger in 1.5 seconds");
+
+          // Clear any existing timeout
+          if (autoRecordTimeoutRef.current) {
+            clearTimeout(autoRecordTimeoutRef.current);
+          }
+
+          // Set new timeout to start recording after 1.5 seconds
+          autoRecordTimeoutRef.current = setTimeout(() => {
+            console.log("🎙️ [AUTO RECORD] Auto record timeout triggered, starting recording");
+            // Only start if we're not already recording or processing
+            if (!isRecording && !isProcessing) {
+              startRecording();
+              setStatusMessage('Auto-recording started');
+            }
+            autoRecordTimeoutRef.current = null;
+          }, 1500); // 1.5 seconds delay
+        }
+
         if (soundRef.current) {
           soundRef.current.unloadAsync().catch(err => console.error("🎵 [AUDIO] Unload failed:", err));
           soundRef.current = null;
@@ -411,6 +447,27 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
 
         setIsPlaying(false);
         setStatusMessage('Ready'); // Update status when polling detects completion
+
+        // Also handle auto record here as a backup
+        if (autoRecordEnabled && voiceInputEnabled && !isRecording && !isProcessing) {
+          console.log("🎙️ [AUTO RECORD] Setting up auto record from polling backup");
+
+          // Clear any existing timeout
+          if (autoRecordTimeoutRef.current) {
+            clearTimeout(autoRecordTimeoutRef.current);
+          }
+
+          // Set new timeout
+          autoRecordTimeoutRef.current = setTimeout(() => {
+            console.log("🎙️ [AUTO RECORD] Auto record backup timeout triggered");
+            if (!isRecording && !isProcessing) {
+              startRecording();
+              setStatusMessage('Auto-recording started');
+            }
+            autoRecordTimeoutRef.current = null;
+          }, 1500); // 1.5 seconds delay
+        }
+
         await soundRef.current.unloadAsync();
         soundRef.current = null;
         clearInterval(poll);
@@ -447,7 +504,9 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
     setIsPlaying(false);
     setStatusMessage('Ready'); // Update status on error
   }
-};  const handleAudioData = async (): Promise<void> => {
+};
+
+  const handleAudioData = async (): Promise<void> => {
     const audioUri = getAudioURI();
     console.log("🎧 Audio URI to submit:", audioUri);
     if (!audioUri) {
@@ -543,11 +602,28 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
     if (isRecording) {
       stopRecording();
     }
+
+    // If turning off voice input, also turn off auto-record
+    if (voiceInputEnabled) {
+      setAutoRecordEnabled(false);
+      // Clear any pending auto record timeout
+      if (autoRecordTimeoutRef.current) {
+        clearTimeout(autoRecordTimeoutRef.current);
+        autoRecordTimeoutRef.current = null;
+      }
+    }
+
     setVoiceInputEnabled(!voiceInputEnabled);
     setStatusMessage(`Voice input ${!voiceInputEnabled ? 'enabled' : 'disabled'}`);
   };
 
   const handleVoiceButtonClick = async (): Promise<void> => {
+    // Clear any pending auto record timeout when manually clicking the button
+    if (autoRecordTimeoutRef.current) {
+      clearTimeout(autoRecordTimeoutRef.current);
+      autoRecordTimeoutRef.current = null;
+    }
+
     if (isRecording) {
       stopRecording();
     } else {
@@ -621,8 +697,8 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
         toggleVoiceInput={toggleVoiceInput}
         autoSendEnabled={autoSendEnabled}
         setAutoSendEnabled={setAutoSendEnabled}
-        autoRecordEnabled={false} // Removed this feature
-        setAutoRecordEnabled={() => {}} // Empty function
+        autoRecordEnabled={autoRecordEnabled}
+        setAutoRecordEnabled={setAutoRecordEnabled}
         debugMode={debugMode}
         setDebugMode={setDebugMode}
         navigation={navigation}
@@ -661,6 +737,11 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
                 active={silenceDetected}
                 icon="🔇"
                 label="Silence"
+              />
+              <StatusPill
+                active={autoRecordEnabled}
+                icon="🔄"
+                label="Auto Record"
               />
               {silenceDetected && silenceCountdown !== null && (
                 <View style={styles.countdownTimer}>
@@ -727,7 +808,11 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
               ) : (
                 <>
                   <Text style={styles.micIcon}>🎙️</Text>
-                  <Text style={styles.buttonText}>Start Recording</Text>
+                  <Text style={styles.buttonText}>
+                    {autoRecordEnabled && autoRecordTimeoutRef.current
+                      ? 'Auto-recording soon...'
+                      : 'Start Recording'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -762,6 +847,13 @@ const playAudio = async (conversationId, messageIndex = -1): Promise<void> => {
                     <Text style={styles.statusText}>Waiting for speech...</Text>
                   </>
                 )}
+              </View>
+            )}
+
+            {!isRecording && autoRecordEnabled && autoRecordTimeoutRef.current && (
+              <View style={styles.autoRecordStatus}>
+                <Text style={styles.statusIcon}>🔄</Text>
+                <Text style={styles.statusText}>Auto-recording will start in a moment...</Text>
               </View>
             )}
           </View>
@@ -906,6 +998,19 @@ const styles = StyleSheet.create({
   silenceStatus: {
     backgroundColor: 'rgba(255, 152, 0, 0.1)',
     borderColor: 'rgba(255, 152, 0, 0.3)',
+  },
+  autoRecordStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 50,
+    borderWidth: 1,
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+    borderColor: 'rgba(33, 150, 243, 0.3)',
+    minWidth: 280,
   },
   statusIcon: {
     fontSize: 16,
