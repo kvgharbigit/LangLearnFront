@@ -195,7 +195,8 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
           // Regular text display for messages without corrections
           <Text style={[
             styles.mainText,
-            isUser && styles.userMainText
+            isUser && styles.userMainText,
+            isAssistant && styles.assistantMainText
           ]}>
             {message.content}
           </Text>
@@ -286,14 +287,16 @@ const styles = StyleSheet.create({
     width: 'auto', // Allow container to adjust based on content
   },
   userMessage: {
-    backgroundColor: 'white', // Changed from blue to white
+    backgroundColor: 'white',
     alignSelf: 'flex-end',
     borderBottomRightRadius: 4,
   },
   assistantMessage: {
-    backgroundColor: '#8c95ff', // Changed from white to blue
+    backgroundColor: '#f0f4ff', // Lighter blue background for better readability
     alignSelf: 'flex-start',
     borderBottomLeftRadius: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#5d6af8', // Accent border on the left
   },
   systemMessage: {
     backgroundColor: '#e9ecef', // gray-200
@@ -320,7 +323,10 @@ const styles = StyleSheet.create({
     color: '#212529', // dark
   },
   userMainText: {
-    color: '#212529', // Changed to dark text since user bubble is now white
+    color: '#212529', // Dark text for user messages (on white background)
+  },
+  assistantMainText: {
+    color: '#212529', // Dark text for assistant (on light blue background)
   },
   messageAnnotation: {
     marginTop: 6,

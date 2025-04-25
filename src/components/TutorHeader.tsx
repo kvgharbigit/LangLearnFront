@@ -113,56 +113,6 @@ const TutorHeader: React.FC<Props> = ({
               </View>
 
               <View style={styles.settingSection}>
-                <Text style={styles.settingSectionTitle}>Input Mode</Text>
-
-                <View style={styles.settingItem}>
-                  <View style={styles.settingLabelContainer}>
-                    <Text style={styles.settingLabel}>Voice Input</Text>
-                    <Text style={styles.settingDescription}>Use microphone for spoken conversation</Text>
-                  </View>
-                  <Switch
-                    value={voiceInputEnabled}
-                    onValueChange={toggleVoiceInput}
-                    trackColor={{ false: '#d1d1d1', true: colors.primaryLight }}
-                    thumbColor={voiceInputEnabled ? colors.primary : '#f4f3f4'}
-                    ios_backgroundColor="#d1d1d1"
-                  />
-                </View>
-
-                {voiceInputEnabled && (
-                  <>
-                    <View style={styles.settingItem}>
-                      <View style={styles.settingLabelContainer}>
-                        <Text style={styles.settingLabel}>Auto-submit on Silence</Text>
-                        <Text style={styles.settingDescription}>Automatically send after detected pause</Text>
-                      </View>
-                      <Switch
-                        value={autoSendEnabled}
-                        onValueChange={setAutoSendEnabled}
-                        trackColor={{ false: '#d1d1d1', true: colors.primaryLight }}
-                        thumbColor={autoSendEnabled ? colors.primary : '#f4f3f4'}
-                        ios_backgroundColor="#d1d1d1"
-                      />
-                    </View>
-
-                    <View style={styles.settingItem}>
-                      <View style={styles.settingLabelContainer}>
-                        <Text style={styles.settingLabel}>Auto-record after AI</Text>
-                        <Text style={styles.settingDescription}>Start recording 1.5s after AI response</Text>
-                      </View>
-                      <Switch
-                        value={autoRecordEnabled}
-                        onValueChange={setAutoRecordEnabled}
-                        trackColor={{ false: '#d1d1d1', true: colors.primaryLight }}
-                        thumbColor={autoRecordEnabled ? colors.primary : '#f4f3f4'}
-                        ios_backgroundColor="#d1d1d1"
-                      />
-                    </View>
-                  </>
-                )}
-              </View>
-
-              <View style={styles.settingSection}>
                 <Text style={styles.settingSectionTitle}>Advanced</Text>
 
                 <View style={styles.settingItem}>

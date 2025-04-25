@@ -111,6 +111,24 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
     setStatusMessage
   } = voiceRecorder;
 
+  // Toggle voice input
+  const toggleVoiceInput = () => {
+    if (isRecording) {
+      stopRecording();
+    }
+
+    // If turning off voice input, also turn off auto-record and listening mode
+    if (voiceInputEnabled) {
+      setAutoRecordEnabled(false);
+
+      // Clean up any active pre-recording or timeouts
+      cleanup();
+    }
+
+    setVoiceInputEnabled(!voiceInputEnabled);
+    setStatusMessage(`Voice input ${!voiceInputEnabled ? 'enabled' : 'disabled'}`);
+  };
+
   // Start pulse animation when recording
   useEffect(() => {
     if (isRecording) {
@@ -272,8 +290,7 @@ const SpanishTutor: React.FC<Props> = ({ route, navigation }) => {
   }, []);
 
   // Pre-recording listener for smart auto-record
-  // Pre-recording listener for smart auto-record
-const startPreRecordingListener = async () => {
+  const startPreRecordingListener = async () => {
   // Don't start if we're already in recording, processing, or pre-recording state
   if (isRecording || isProcessing || preRecordingActiveRef.current) {
     console.log("🎙️ [PRE-RECORD] Already in recording state, ignoring listener request");
@@ -431,7 +448,6 @@ const startPreRecordingListener = async () => {
   }
 };
 
-  // Text chat handler
   // Text chat handler
 const handleSubmit = async (inputMessage: string) => {
   if (!inputMessage.trim() || isLoading) return;
@@ -901,23 +917,6 @@ const playAudio = async (conversationId, messageIndex = -1) => {
 };
 
   // UI Handlers
-  const toggleVoiceInput = () => {
-    if (isRecording) {
-      stopRecording();
-    }
-
-    // If turning off voice input, also turn off auto-record and listening mode
-    if (voiceInputEnabled) {
-      setAutoRecordEnabled(false);
-
-      // Clean up any active pre-recording or timeouts
-      cleanup();
-    }
-
-    setVoiceInputEnabled(!voiceInputEnabled);
-    setStatusMessage(`Voice input ${!voiceInputEnabled ? 'enabled' : 'disabled'}`);
-  };
-
   const handleVoiceButtonClick = async () => {
     // Clean up any active pre-recording or timeouts
     cleanup();
@@ -995,6 +994,59 @@ const playAudio = async (conversationId, messageIndex = -1) => {
         setDebugMode={setDebugMode}
         navigation={navigation}
       />
+
+      {/* Voice Input Toggle Bar */}
+      <View style={styles.voiceToggleBar}>
+        <TouchableOpacity
+          style={[
+            styles.voiceToggleButton,
+            voiceInputEnabled && styles.voiceToggleButtonActive
+          ]}
+          onPress={toggleVoiceInput}
+        >
+          <Text style={styles.voiceToggleIcon}>🎙️</Text>
+          <Text style={[
+            styles.voiceToggleText,
+            voiceInputEnabled && styles.voiceToggleTextActive
+          ]}>
+            {voiceInputEnabled ? 'Voice Mode: ON' : 'Voice Mode: OFF'}
+          </Text>
+        </TouchableOpacity>
+
+        {voiceInputEnabled && (
+          <View style={styles.voiceOptionsContainer}>
+            <TouchableOpacity
+              style={[
+                styles.voiceOptionButton,
+                autoSendEnabled && styles.voiceOptionButtonActive
+              ]}
+              onPress={() => setAutoSendEnabled(!autoSendEnabled)}
+            >
+              <Text style={[
+                styles.voiceOptionText,
+                autoSendEnabled && styles.voiceOptionTextActive
+              ]}>
+                Auto-send
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.voiceOptionButton,
+                autoRecordEnabled && styles.voiceOptionButtonActive
+              ]}
+              onPress={() => setAutoRecordEnabled(!autoRecordEnabled)}
+            >
+              <Text style={[
+                styles.voiceOptionText,
+                autoRecordEnabled && styles.voiceOptionTextActive
+              ]}>
+                Auto-record
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
       {debugMode && (
         <View style={styles.debugPanel}>
@@ -1184,6 +1236,62 @@ const styles = StyleSheet.create({
   conversationContent: {
     padding: 16,
     paddingBottom: 24,
+  },
+  // Voice toggle bar - NEW
+  voiceToggleBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  voiceToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e9ecef',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  voiceToggleButtonActive: {
+    backgroundColor: '#5d6af8',
+  },
+  voiceToggleIcon: {
+    marginRight: 6,
+    fontSize: 16,
+  },
+  voiceToggleText: {
+    fontWeight: '500',
+    fontSize: 14,
+    color: '#495057',
+  },
+  voiceToggleTextActive: {
+    color: 'white',
+  },
+  voiceOptionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  voiceOptionButton: {
+    backgroundColor: '#e9ecef',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  voiceOptionButtonActive: {
+    backgroundColor: '#5d6af8',
+  },
+  voiceOptionText: {
+    fontSize: 12,
+    color: '#495057',
+  },
+  voiceOptionTextActive: {
+    color: 'white',
   },
   emptyState: {
     alignItems: 'center',
