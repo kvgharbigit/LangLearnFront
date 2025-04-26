@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
+import { useAuth } from '../contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
 
 // Get screen dimensions for responsive design
@@ -30,6 +32,9 @@ interface Language {
 type Props = NativeStackScreenProps<RootStackParamList, 'LanguageLanding'>;
 
 const LanguageLanding: React.FC<Props> = ({ navigation }) => {
+  // Auth state
+  const { user } = useAuth();
+
   // State
   const [nativeLanguage, setNativeLanguage] = useState<string>('');
   const [targetLanguage, setTargetLanguage] = useState<string>('');
@@ -47,6 +52,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
 
   // Handle start learning button press
   const handleStartLearning = (): void => {
+    // Basic validation
     if (!nativeLanguage || !targetLanguage) {
       return;
     }
@@ -76,6 +82,21 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
+
+      {/* Profile Button - Only shown when user is authenticated */}
+      {user && (
+        <TouchableOpacity
+          style={styles.profileButton}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatarText}>
+              {user.displayName ? user.displayName.charAt(0).toUpperCase() : '👤'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <View style={styles.logoContainer}>
@@ -516,7 +537,32 @@ const styles = StyleSheet.create({
     color: colors.gray500,
     fontSize: 12,
     textAlign: 'center',
-  }
+  },
+  // Profile button styles
+  profileButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  avatarContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
+  },
 });
 
 export default LanguageLanding;

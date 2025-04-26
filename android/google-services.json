@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "205296109732",
+    "project_id": "languageapp-472c1",
+    "storage_bucket": "languageapp-472c1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:205296109732:android:ea506239b5d29bc6f53e31",
+        "android_client_info": {
+          "package_name": "io.github.kvgharbigit.langlearn"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFgF0241aFjzmgGRl70AicSJQ0HlCzSeY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
