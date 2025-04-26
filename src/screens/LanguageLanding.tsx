@@ -1,3 +1,4 @@
+// Enhanced LanguageLanding.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -17,7 +18,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../styles/colors';
 
 // Get screen dimensions for responsive design
 const { width } = Dimensions.get('window');
@@ -97,17 +97,28 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
       )}
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Text style={styles.logoIcon}>🌎</Text>
+            <View style={styles.logoIconBackground}>
+              <Text style={styles.logoIcon}>🌎</Text>
+            </View>
             <Text style={styles.title}>LangLearn</Text>
           </View>
           <Text style={styles.tagline}>Your AI-powered language learning companion</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Choose Your Languages</Text>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardHeaderLine}>
+              <View style={styles.lineDecoration}></View>
+              <Text style={styles.cardTitle}>Choose Your Languages</Text>
+              <View style={styles.lineDecoration}></View>
+            </View>
+          </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>I speak:</Text>
@@ -121,13 +132,21 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
                   ]}
                   onPress={() => setNativeLanguage(lang.code)}
                 >
-                  <Text style={styles.languageFlag}>{lang.flag}</Text>
+                  <View style={styles.flagContainer}>
+                    <Text style={styles.languageFlag}>{lang.flag}</Text>
+                  </View>
                   <Text style={[
                     styles.languageName,
                     nativeLanguage === lang.code && styles.selectedText
                   ]}>
                     {lang.name}
                   </Text>
+
+                  {nativeLanguage === lang.code && (
+                    <View style={styles.checkmark}>
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -147,13 +166,22 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
                   disabled={nativeLanguage === lang.code}
                   onPress={() => nativeLanguage !== lang.code && setTargetLanguage(lang.code)}
                 >
-                  <Text style={styles.languageFlag}>{lang.flag}</Text>
+                  <View style={styles.flagContainer}>
+                    <Text style={styles.languageFlag}>{lang.flag}</Text>
+                  </View>
                   <Text style={[
                     styles.languageName,
                     targetLanguage === lang.code && styles.selectedText
                   ]}>
                     {lang.name}
                   </Text>
+
+                  {targetLanguage === lang.code && (
+                    <View style={styles.checkmark}>
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </View>
+                  )}
+
                   {nativeLanguage === lang.code && (
                     <View style={styles.disabledOverlay}>
                       <Text style={styles.disabledText}>Already speak</Text>
@@ -166,22 +194,27 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>My level:</Text>
-            <View style={styles.languageOptions}>
+            <View style={styles.difficultyContainer}>
               {['beginner', 'intermediate', 'advanced'].map(level => (
                 <TouchableOpacity
                   key={level}
                   style={[
-                    styles.languageOption,
-                    difficulty === level && styles.selectedOption
+                    styles.difficultyOption,
+                    difficulty === level && styles.selectedDifficulty
                   ]}
                   onPress={() => setDifficulty(level)}
                 >
-                  <Text style={styles.difficultyIcon}>
-                    {level === 'beginner' ? '🌱' : level === 'intermediate' ? '🌿' : '🌳'}
-                  </Text>
+                  <View style={[
+                    styles.difficultyIconContainer,
+                    difficulty === level && styles.selectedDifficultyIcon
+                  ]}>
+                    <Text style={styles.difficultyIcon}>
+                      {level === 'beginner' ? '🌱' : level === 'intermediate' ? '🌿' : '🌳'}
+                    </Text>
+                  </View>
                   <Text style={[
-                    styles.languageName,
-                    difficulty === level && styles.selectedText
+                    styles.difficultyText,
+                    difficulty === level && styles.selectedDifficultyText
                   ]}>
                     {level.charAt(0).toUpperCase() + level.slice(1)}
                   </Text>
@@ -220,18 +253,24 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
             disabled={!nativeLanguage || !targetLanguage || isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="#fff" size="small" />
             ) : (
               <>
-                <Text style={styles.startButtonIcon}>🚀</Text>
                 <Text style={styles.startButtonText}>Start Learning</Text>
+                <View style={styles.rocketContainer}>
+                  <Text style={styles.startButtonIcon}>🚀</Text>
+                </View>
               </>
             )}
           </TouchableOpacity>
         </View>
 
         <View style={styles.features}>
-          <Text style={styles.featuresTitle}>Key Features</Text>
+          <View style={styles.featureHeaderLine}>
+            <View style={styles.lineDecoration}></View>
+            <Text style={styles.featuresTitle}>Key Features</Text>
+            <View style={styles.lineDecoration}></View>
+          </View>
 
           <View style={styles.feature}>
             <View style={styles.featureIconContainer}>
@@ -244,7 +283,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
           </View>
 
           <View style={styles.feature}>
-            <View style={styles.featureIconContainer}>
+            <View style={[styles.featureIconContainer, styles.featureIconGrammar]}>
               <Text style={styles.featureIcon}>✍️</Text>
             </View>
             <View style={styles.featureContent}>
@@ -254,7 +293,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
           </View>
 
           <View style={styles.feature}>
-            <View style={styles.featureIconContainer}>
+            <View style={[styles.featureIconContainer, styles.featureIconNatural]}>
               <Text style={styles.featureIcon}>🔄</Text>
             </View>
             <View style={styles.featureContent}>
@@ -280,6 +319,29 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   );
 };
 
+// Enhanced color palette
+const colors = {
+  primary: '#5D6AF8',
+  primaryLight: '#E8EAFF',
+  primaryDark: '#3A46CF',
+  secondary: '#FF6B6B',
+  accent: '#FFD166',
+  success: '#06D6A0',
+  gray50: '#f8f9fa',
+  gray100: '#f1f3f5',
+  gray200: '#e9ecef',
+  gray300: '#dee2e6',
+  gray400: '#ced4da',
+  gray500: '#adb5bd',
+  gray600: '#868e96',
+  gray700: '#495057',
+  gray800: '#343a40',
+  gray900: '#212529',
+  white: '#ffffff',
+  background: '#f8f9fa',
+  cardBackground: '#ffffff',
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -287,49 +349,82 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 30,
+    paddingTop: 24,
+    paddingBottom: 32,
   },
   header: {
     alignItems: 'center',
-    marginVertical: 28,
+    marginBottom: 32,
+    marginTop: 8,
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
+  logoIconBackground: {
+    width: 54,
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   logoIcon: {
-    fontSize: 36,
-    marginRight: 10,
+    fontSize: 30,
   },
   title: {
     fontSize: 38,
     fontWeight: '800',
     color: colors.primary,
+    letterSpacing: -0.5,
+    textShadowColor: 'rgba(93, 106, 248, 0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   tagline: {
     fontSize: 16,
     color: colors.gray600,
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   card: {
     backgroundColor: colors.cardBackground,
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: colors.gray800,
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-    marginBottom: 32,
+    shadowRadius: 16,
+    elevation: 6,
+    marginBottom: 30,
+  },
+  cardHeader: {
+    marginBottom: 20,
+  },
+  cardHeaderLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  lineDecoration: {
+    height: 1,
+    flex: 1,
+    backgroundColor: colors.gray200,
+    marginHorizontal: 12,
   },
   cardTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: colors.gray800,
     textAlign: 'center',
-    marginBottom: 28,
   },
   section: {
     marginBottom: 24,
@@ -337,49 +432,86 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     color: colors.gray700,
-    marginBottom: 14,
+    marginBottom: 16,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   languageOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
   },
   languageOption: {
-    backgroundColor: colors.gray100,
+    backgroundColor: colors.gray50,
     borderWidth: 2,
-    borderColor: colors.gray300,
-    borderRadius: 10,
-    padding: 10,
+    borderColor: colors.gray200,
+    borderRadius: 16,
+    padding: 14,
     alignItems: 'center',
-    height: 85,
     justifyContent: 'center',
-    aspectRatio: 1, // Makes the buttons perfectly square
+    width: '48%',
+    aspectRatio: 1.2,
+    position: 'relative',
+    shadowColor: colors.gray400,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   selectedOption: {
     borderColor: colors.primary,
-    backgroundColor: 'rgba(93, 106, 248, 0.08)',
+    backgroundColor: colors.primaryLight,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  disabledOption: {
-    opacity: 0.6,
+  flagContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    shadowColor: colors.gray800,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   languageFlag: {
     fontSize: 28,
-    marginBottom: 6,
-  },
-  difficultyIcon: {
-    fontSize: 28,
-    marginBottom: 6,
   },
   languageName: {
     fontWeight: '600',
     color: colors.gray800,
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: 14,
   },
   selectedText: {
     color: colors.primary,
+    fontWeight: '700',
+  },
+  checkmark: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkmarkText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  disabledOption: {
+    opacity: 0.6,
   },
   disabledOverlay: {
     position: 'absolute',
@@ -390,16 +522,74 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 16,
   },
   disabledText: {
     color: colors.gray700,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '500',
     backgroundColor: 'rgba(248, 249, 250, 0.9)',
-    paddingVertical: 3,
-    paddingHorizontal: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: 4,
+  },
+  difficultyContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  difficultyOption: {
+    backgroundColor: colors.gray50,
+    borderWidth: 2,
+    borderColor: colors.gray200,
+    borderRadius: 16,
+    padding: 12,
+    alignItems: 'center',
+    width: '31%',
+    shadowColor: colors.gray400,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  selectedDifficulty: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  difficultyIconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: colors.gray800,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  selectedDifficultyIcon: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  difficultyIcon: {
+    fontSize: 20,
+  },
+  difficultyText: {
+    fontWeight: '600',
+    color: colors.gray800,
+    textAlign: 'center',
+    fontSize: 13,
+  },
+  selectedDifficultyText: {
+    color: colors.primary,
+    fontWeight: '700',
   },
   textAreaContainer: {
     width: '100%',
@@ -407,38 +597,42 @@ const styles = StyleSheet.create({
   },
   textArea: {
     width: '100%',
-    minHeight: 130,
-    maxHeight: 130,
+    minHeight: 120,
+    maxHeight: 120,
     borderWidth: 2,
     borderColor: colors.gray300,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
-    fontSize: Platform.OS === 'ios' ? 15 : 14,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 22,
     textAlignVertical: 'top',
     color: colors.gray800,
+    backgroundColor: colors.white,
   },
   startButton: {
     backgroundColor: colors.primary,
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 50,
-    marginTop: 28,
+    marginTop: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 4,
-    minWidth: 220,
+    elevation: 5,
     alignSelf: 'center',
+    minWidth: 220,
     flexDirection: 'row',
+  },
+  rocketContainer: {
+    marginLeft: 8,
+    marginBottom: -2,
   },
   startButtonIcon: {
     fontSize: 18,
     color: 'white',
-    marginRight: 8,
   },
   disabledButton: {
     backgroundColor: colors.gray400,
@@ -452,50 +646,62 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 17,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   features: {
     marginBottom: 32,
   },
+  featureHeaderLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
   featuresTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: colors.gray800,
-    marginBottom: 20,
     textAlign: 'center',
   },
   feature: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+    backgroundColor: colors.white,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 14,
-    shadowColor: '#000',
+    shadowColor: colors.gray800,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
     flexDirection: 'row',
     alignItems: 'center',
   },
   featureIconContainer: {
     width: 56,
     height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(93, 106, 248, 0.1)',
+    borderRadius: 16,
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
+  featureIconGrammar: {
+    backgroundColor: `rgba(255, 107, 107, 0.1)`,
+  },
+  featureIconNatural: {
+    backgroundColor: `rgba(6, 214, 160, 0.1)`,
+  },
   featureIcon: {
-    fontSize: 28,
+    fontSize: 24,
   },
   featureContent: {
     flex: 1,
   },
   featureTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.primary,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   featureText: {
     color: colors.gray600,
@@ -503,9 +709,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   testButton: {
-    backgroundColor: colors.gray100,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    backgroundColor: colors.white,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 50,
     alignItems: 'center',
     marginBottom: 40,
@@ -513,11 +719,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray300,
     flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowColor: colors.gray800,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   testButtonIcon: {
     fontSize: 16,
@@ -527,7 +733,7 @@ const styles = StyleSheet.create({
   testButtonText: {
     color: colors.gray700,
     fontWeight: '500',
-    fontSize: 15,
+    fontSize: 14,
   },
   footer: {
     paddingVertical: 20,
@@ -538,7 +744,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  // Profile button styles
   profileButton: {
     position: 'absolute',
     top: 16,
@@ -552,16 +757,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 2,
   },
   avatarText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: 'white',
+    color: colors.white,
   },
 });
 
