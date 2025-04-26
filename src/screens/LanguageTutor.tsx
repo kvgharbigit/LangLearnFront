@@ -645,7 +645,8 @@ const handleSubmit = async (inputMessage: string) => {
 
     if (response.has_audio) {
       setStatusMessage('Streaming audio...');
-      await playAudio(response.conversation_id, response.message_index);
+      // MODIFIED: Always use -1 to get the latest message's audio
+      await playAudio(response.conversation_id, -1);
     }
   } catch (error) {
     console.error('Error sending message:', error);
@@ -660,6 +661,7 @@ const handleSubmit = async (inputMessage: string) => {
     setIsLoading(false);
   }
 };
+
 
 // Updated implementation for reliable auto-recording after audio playback
 const playAudio = async (conversationId, messageIndex = -1) => {
@@ -1056,7 +1058,8 @@ const playAudio = async (conversationId, messageIndex = -1) => {
     // Play audio using the same approach as text input
     if (response.has_audio) {
       setStatusMessage('Streaming audio...');
-      await playAudio(response.conversation_id, response.message_index);
+      // MODIFIED: Always use -1 to get the latest message's audio
+      await playAudio(response.conversation_id, -1);
     }
 
   } catch (error) {
@@ -1434,6 +1437,7 @@ const playAudio = async (conversationId, messageIndex = -1) => {
             <ChatInput
               onSubmit={handleSubmit}
               disabled={isLoading}
+              isPlaying={isPlaying} // Pass the isPlaying state
               targetLanguage={getTargetLanguage()}
             />
           )}

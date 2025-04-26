@@ -1,7 +1,12 @@
+// This is the updated Message.tsx with improved text container sizing
+
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import HTML from 'react-native-render-html';
 import { normalizeText, areMessagesEquivalent, highlightDifferences } from '../utils/text';
+
+// Get screen width for dynamic sizing
+const screenWidth = Dimensions.get('window').width;
 
 // Define message interface
 export interface MessageData {
@@ -120,7 +125,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
     ...(isUser ? styles.userAnnotationText : {}),
     ...(isEquivalentToCorrected ? styles.identicalText : {color: '#4CAF50'}), // Green for unchanged words
     flexShrink: 1,
-    width: '100%',
+    flexWrap: 'wrap',
   }), [isUser, isEquivalentToCorrected]);
 
   const nativeBaseStyle = useMemo(() => ({
@@ -128,7 +133,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
     ...(isUser ? styles.userAnnotationText : {}),
     ...(isEquivalentToNative ? styles.identicalText : {color: '#4CAF50'}), // Green for unchanged words
     flexShrink: 1,
-    width: '100%',
+    flexWrap: 'wrap',
   }), [isUser, isEquivalentToNative]);
 
   // Toggle translation function
@@ -149,7 +154,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
         {isUser && bothCorrectionsMatch ? (
           // NEW CASE: When both corrections match the user input, show only one message in green with both emoji indicators
           <View style={styles.perfectMatchContainer}>
-            <Text style={styles.perfectMatchText} numberOfLines={3} ellipsizeMode="tail">
+            <Text style={styles.perfectMatchText}>
               {message.corrected} {/* Use the corrected version with proper punctuation */}
             </Text>
             <View style={styles.emojiContainer}>
@@ -180,7 +185,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
                   <View style={styles.annotationTextContainer}>
                     <HTML
                       source={{ html: highlightedNative }}
-                      contentWidth={300}
+                      contentWidth={screenWidth * 0.7} // Increase available width
                       tagsStyles={nativeTagsStyles}
                       baseStyle={nativeBaseStyle}
                     />
@@ -194,7 +199,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
           <View style={styles.mainTextContainer}>
             <HTML
               source={{ html: highlightIncorrectWords }}
-              contentWidth={300}
+              contentWidth={screenWidth * 0.7} // Increase available width
               tagsStyles={correctedTagsStyles}
               baseStyle={[
                 styles.mainText,
@@ -251,7 +256,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
                   <View style={styles.annotationTextContainer}>
                     <HTML
                       source={{ html: highlightedCorrected }}
-                      contentWidth={300}
+                      contentWidth={screenWidth * 0.7} // Increase available width
                       tagsStyles={correctedTagsStyles}
                       baseStyle={correctedBaseStyle}
                     />
@@ -282,7 +287,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
                   <View style={styles.annotationTextContainer}>
                     <HTML
                       source={{ html: highlightedNative }}
-                      contentWidth={300}
+                      contentWidth={screenWidth * 0.7} // Increase available width
                       tagsStyles={nativeTagsStyles}
                       baseStyle={nativeBaseStyle}
                     />
@@ -338,6 +343,8 @@ const styles = StyleSheet.create({
   },
   mainTextContainer: {
     marginBottom: 4,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   annotationsContainer: {
     marginTop: 8,
@@ -350,6 +357,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     color: '#212529', // dark
+    flexWrap: 'wrap',
   },
   userMainText: {
     color: '#212529', // Dark text for user messages (on white background)
@@ -372,25 +380,26 @@ const styles = StyleSheet.create({
   },
   annotationRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start', // Align to top instead of center
   },
   annotationLabel: {
     fontWeight: '600',
     fontSize: 13,
     color: '#2196F3',  // Blue for grammar
     marginRight: 4,
+    marginTop: 3, // Add a small top margin to align with text
   },
   annotationTextContainer: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start', // Align to top
     flexWrap: 'wrap', // Allow text to wrap
-    overflow: 'hidden', // Ensure content doesn't overflow
   },
   annotationText: {
     fontSize: 14,
     lineHeight: 20,
     flexShrink: 1, // Allow text to shrink if needed
+    flexWrap: 'wrap',
   },
   userAnnotationLabel: {
     color: '#2196F3', // Blue for grammar in user message (now on white background)
@@ -416,20 +425,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start', // Align items to the top instead of center
     justifyContent: 'space-between',
-    flexWrap: 'wrap',
+    width: '100%',
   },
   perfectMatchText: {
-    flexShrink: 1, // Allow text to shrink if needed
+    flex: 1, // Take available space
     fontSize: 16,
     lineHeight: 24,
     color: '#4CAF50', // Green text to indicate correctness
     fontWeight: 'bold',
     marginRight: 8, // Add some space between text and emojis
-    width: '85%', // Limit width to ensure space for emojis
+    flexWrap: 'wrap', // Allow text to wrap
   },
   emojiContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 4,
     marginLeft: 'auto', // Push to the right
   },
