@@ -42,14 +42,6 @@ interface LanguageInfo {
 type Props = NativeStackScreenProps<RootStackParamList, 'LanguageTutor'>;
 
 const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
-  // Get params from navigation
-  const {
-    nativeLanguage = 'en',
-    targetLanguage = 'es',
-    difficulty = 'beginner',
-    learningObjective = ''
-  } = route.params;
-
   // Core state
   const [history, setHistory] = useState<MessageType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -73,6 +65,12 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const autoRecordTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef<boolean>(true);
 
+  // Helper functions to get the current language parameters
+  const getTargetLanguage = () => route.params.targetLanguage || 'es';
+  const getNativeLanguage = () => route.params.nativeLanguage || 'en';
+  const getDifficulty = () => route.params.difficulty || 'beginner';
+  const getLearningObjective = () => route.params.learningObjective || '';
+
   // Get language display info
   const getLanguageInfo = (code: string): LanguageInfo => {
     const languages: Record<string, LanguageInfo> = {
@@ -84,7 +82,10 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     return languages[code] || { name: 'Unknown', flag: '🏳️' };
   };
 
-  const targetInfo = getLanguageInfo(targetLanguage);
+  // Get current language info
+  const getTargetInfo = () => {
+    return getLanguageInfo(getTargetLanguage());
+  };
 
   // Use our custom voice recorder hook with pre-buffer options
   const voiceRecorder = useVoiceRecorder({
@@ -117,55 +118,83 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     startPreBuffering
   } = voiceRecorder;
 
+  // Reset everything when component mounts or route params change
+  useEffect(() => {
+    // Reset all conversation state
+    setHistory([]);
+    setConversationId(null);
+    setIsLoading(false);
+    setTempo(0.75); // Reset to default tempo
+    setIsPlaying(false);
+    setVoiceInputEnabled(false);
+    setAutoSendEnabled(false);
+    setAutoRecordEnabled(false);
+    setIsListening(false);
+    setKeyboardVisible(false);
+
+    // Reset recorder state
+    resetRecording();
+
+    // Clean up any audio resources
+    cleanup();
+
+    console.log("🔄 Conversation state reset due to route params change:", {
+      targetLanguage: getTargetLanguage(),
+      nativeLanguage: getNativeLanguage(),
+      difficulty: getDifficulty(),
+      learningObjective: getLearningObjective()
+    });
+  }, [route.params]); // This effect depends on route.params
+
   // Add keyboard event listeners
   useEffect(() => {
-  const keyboardWillShowListener = Keyboard.addListener(
-    Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-    (event) => {
-      // Immediately set keyboard visible state to trigger UI update
-      setKeyboardVisible(true);
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (event) => {
+        // Immediately set keyboard visible state to trigger UI update
+        setKeyboardVisible(true);
 
-      // For iOS, we can access the keyboard height and animation duration
-      if (Platform.OS === 'ios') {
-        // Use a small delay to ensure the keyboard is visible and screen layout has updated
+        // For iOS, we can access the keyboard height and animation duration
+        if (Platform.OS === 'ios') {
+          // Use a small delay to ensure the keyboard is visible and screen layout has updated
+          setTimeout(() => {
+            if (scrollViewRef.current) {
+              // Force the scroll view to calculate its new content size first
+              scrollViewRef.current.flashScrollIndicators();
+              // Then scroll to the bottom
+              scrollViewRef.current.scrollToEnd({ animated: true });
+            }
+          }, 50);
+        } else {
+          // For Android, use a slightly longer delay
+          setTimeout(() => {
+            if (scrollViewRef.current) {
+              scrollViewRef.current.scrollToEnd({ animated: true });
+            }
+          }, 150);
+        }
+      }
+    );
+
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+
+        // Also scroll to bottom when keyboard hides
         setTimeout(() => {
           if (scrollViewRef.current) {
-            // Force the scroll view to calculate its new content size first
-            scrollViewRef.current.flashScrollIndicators();
-            // Then scroll to the bottom
             scrollViewRef.current.scrollToEnd({ animated: true });
           }
         }, 50);
-      } else {
-        // For Android, use a slightly longer delay
-        setTimeout(() => {
-          if (scrollViewRef.current) {
-            scrollViewRef.current.scrollToEnd({ animated: true });
-          }
-        }, 150);
       }
-    }
-  );
+    );
 
-  const keyboardWillHideListener = Keyboard.addListener(
-    Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-    () => {
-      setKeyboardVisible(false);
-
-      // Also scroll to bottom when keyboard hides
-      setTimeout(() => {
-        if (scrollViewRef.current) {
-          scrollViewRef.current.scrollToEnd({ animated: true });
-        }
-      }, 50);
-    }
-  );
-
-  return () => {
-    keyboardWillShowListener.remove();
-    keyboardWillHideListener.remove();
-  };
-}, []);
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
 
   // Toggle voice input
   const toggleVoiceInput = () => {
@@ -229,54 +258,56 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Scroll to bottom when messages change
   useEffect(() => {
-  if (history.length > 0) {
-    // First attempt to scroll immediately
-    if (scrollViewRef.current) {
-      scrollViewRef.current.scrollToEnd({ animated: false });
-    }
-
-    // Then use a delay to ensure messages have rendered
-    setTimeout(() => {
+    if (history.length > 0) {
+      // First attempt to scroll immediately
       if (scrollViewRef.current) {
-        scrollViewRef.current.scrollToEnd({ animated: true });
+        scrollViewRef.current.scrollToEnd({ animated: false });
       }
-    }, 100);
 
-    // For keyboard case, add extra delay to handle both rendering and keyboard animation
-    if (keyboardVisible) {
-      setTimeout(() => {
-        if (scrollViewRef.current) {
-          scrollViewRef.current.scrollToEnd({ animated: true });
-        }
-      }, 300);
-    }
-  }
-}, [history, keyboardVisible]);
-
-  // Add an extra helper function to scroll to bottom (can be called from other places if needed)
-  const scrollToBottom = (immediate = false) => {
-  if (scrollViewRef.current) {
-    // First try immediate scroll
-    scrollViewRef.current.scrollToEnd({ animated: false });
-
-    if (!immediate) {
-      // Then try animated scroll after a short delay
+      // Then use a delay to ensure messages have rendered
       setTimeout(() => {
         if (scrollViewRef.current) {
           scrollViewRef.current.scrollToEnd({ animated: true });
         }
       }, 100);
+
+      // For keyboard case, add extra delay to handle both rendering and keyboard animation
+      if (keyboardVisible) {
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollToEnd({ animated: true });
+          }
+        }, 300);
+      }
     }
-  }
-};
+  }, [history, keyboardVisible]);
+
+  // Enhanced scrollToBottom function that's more reliable
+  const scrollToBottom = (immediate = false) => {
+    if (scrollViewRef.current) {
+      // First try immediate scroll
+      scrollViewRef.current.scrollToEnd({ animated: false });
+
+      if (!immediate) {
+        // Then try animated scroll after a short delay
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollToEnd({ animated: true });
+          }
+        }, 100);
+      }
+    }
+  };
 
   // Welcome message when the component mounts
   useEffect(() => {
     if (history.length === 0) {
       let welcomeMessage: MessageType;
+      const currentTargetLanguage = getTargetLanguage();
+      const currentLearningObjective = getLearningObjective();
 
       // Select appropriate welcome message based on target language
-      switch(targetLanguage) {
+      switch(currentTargetLanguage) {
         case 'es':
           welcomeMessage = {
             role: 'assistant',
@@ -307,25 +338,25 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       }
 
       // Add learning objective to welcome message if provided
-      if (learningObjective) {
-        switch(targetLanguage) {
+      if (currentLearningObjective) {
+        switch(currentTargetLanguage) {
           case 'es':
-            welcomeMessage.content = `¡Hola! Veo que quieres practicar: "${learningObjective}". ¡Empecemos!`;
+            welcomeMessage.content = `¡Hola! Veo que quieres practicar: "${currentLearningObjective}". ¡Empecemos!`;
             break;
           case 'fr':
-            welcomeMessage.content = `Bonjour! Je vois que vous voulez pratiquer: "${learningObjective}". Commençons!`;
+            welcomeMessage.content = `Bonjour! Je vois que vous voulez pratiquer: "${currentLearningObjective}". Commençons!`;
             break;
           case 'it':
-            welcomeMessage.content = `Ciao! Vedo che vuoi praticare: "${learningObjective}". Iniziamo!`;
+            welcomeMessage.content = `Ciao! Vedo che vuoi praticare: "${currentLearningObjective}". Iniziamo!`;
             break;
           default: // en
-            welcomeMessage.content = `Hello! I see you want to practice: "${learningObjective}". Let's begin!`;
+            welcomeMessage.content = `Hello! I see you want to practice: "${currentLearningObjective}". Let's begin!`;
         }
       }
 
       setHistory([welcomeMessage]);
     }
-  }, [targetLanguage, learningObjective, history.length]);
+  }, [history.length, route.params]); // Add route.params dependency
 
   // Cleanup function for all recording-related resources
   const cleanup = () => {
@@ -547,10 +578,10 @@ const handleSubmit = async (inputMessage: string) => {
       inputMessage,
       conversationId,
       tempo,
-      difficulty,
-      nativeLanguage,
-      targetLanguage,
-      learningObjective
+      getDifficulty(),
+      getNativeLanguage(),
+      getTargetLanguage(),
+      getLearningObjective()
     );
 
     if (!conversationId && response.conversation_id) {
@@ -677,7 +708,12 @@ const playAudio = async (conversationId, messageIndex = -1) => {
     console.log("🎧 Audio session configured for playback");
 
     // Build streaming URL
-    const audioUrl = api.getAudioStreamUrl(conversationId, messageIndex, tempo, targetLanguage);
+    const audioUrl = api.getAudioStreamUrl(
+      conversationId,
+      messageIndex,
+      tempo,
+      getTargetLanguage() // Use current target language
+    );
     console.log("🎵 [AUDIO] Audio streaming URL:", audioUrl);
 
     let statusUpdateCount = 0;
@@ -977,10 +1013,10 @@ const playAudio = async (conversationId, messageIndex = -1) => {
       audioUri,
       conversationId,
       tempo,
-      difficulty,
-      nativeLanguage,
-      targetLanguage,
-      learningObjective
+      difficulty: getDifficulty(),
+      nativeLanguage: getNativeLanguage(),
+      targetLanguage: getTargetLanguage(),
+      learningObjective: getLearningObjective()
     });
 
     setStatusMessage('Received response from server');
@@ -1088,10 +1124,10 @@ const playAudio = async (conversationId, messageIndex = -1) => {
         <View style={styles.emptyState}>
           <Text style={styles.welcomeIcon}>👋</Text>
           <Text style={styles.welcomeTitle}>
-            {getWelcomeTitle(targetLanguage)}
+            {getWelcomeTitle(getTargetLanguage())}
           </Text>
           <Text style={styles.welcomeText}>
-            {getWelcomeSubtitle(targetLanguage)}
+            {getWelcomeSubtitle(getTargetLanguage())}
           </Text>
         </View>
       );
@@ -1129,8 +1165,8 @@ const playAudio = async (conversationId, messageIndex = -1) => {
   return (
     <SafeAreaView style={styles.container}>
       <TutorHeader
-        targetLanguage={targetLanguage}
-        targetInfo={targetInfo}
+        targetLanguage={getTargetLanguage()}
+        targetInfo={getTargetInfo()}
         tempo={tempo}
         setTempo={setTempo}
         voiceInputEnabled={voiceInputEnabled}
@@ -1398,7 +1434,7 @@ const playAudio = async (conversationId, messageIndex = -1) => {
             <ChatInput
               onSubmit={handleSubmit}
               disabled={isLoading}
-              targetLanguage={targetLanguage}
+              targetLanguage={getTargetLanguage()}
             />
           )}
         </View>
