@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Platform,
   Animated,
+  KeyboardAvoidingView,
+  Keyboard,
 } from 'react-native';
 import { Audio } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -59,6 +61,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const [autoSendEnabled, setAutoSendEnabled] = useState<boolean>(false);
   const [autoRecordEnabled, setAutoRecordEnabled] = useState<boolean>(false);
   const [isListening, setIsListening] = useState<boolean>(false);
+  const [keyboardVisible, setKeyboardVisible] = useState<boolean>(false);
 
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -113,6 +116,56 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     setStatusMessage,
     startPreBuffering
   } = voiceRecorder;
+
+  // Add keyboard event listeners
+  useEffect(() => {
+  const keyboardWillShowListener = Keyboard.addListener(
+    Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+    (event) => {
+      // Immediately set keyboard visible state to trigger UI update
+      setKeyboardVisible(true);
+
+      // For iOS, we can access the keyboard height and animation duration
+      if (Platform.OS === 'ios') {
+        // Use a small delay to ensure the keyboard is visible and screen layout has updated
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            // Force the scroll view to calculate its new content size first
+            scrollViewRef.current.flashScrollIndicators();
+            // Then scroll to the bottom
+            scrollViewRef.current.scrollToEnd({ animated: true });
+          }
+        }, 50);
+      } else {
+        // For Android, use a slightly longer delay
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollToEnd({ animated: true });
+          }
+        }, 150);
+      }
+    }
+  );
+
+  const keyboardWillHideListener = Keyboard.addListener(
+    Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+    () => {
+      setKeyboardVisible(false);
+
+      // Also scroll to bottom when keyboard hides
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollToEnd({ animated: true });
+        }
+      }, 50);
+    }
+  );
+
+  return () => {
+    keyboardWillShowListener.remove();
+    keyboardWillHideListener.remove();
+  };
+}, []);
 
   // Toggle voice input
   const toggleVoiceInput = () => {
@@ -176,12 +229,46 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Scroll to bottom when messages change
   useEffect(() => {
+  if (history.length > 0) {
+    // First attempt to scroll immediately
     if (scrollViewRef.current) {
+      scrollViewRef.current.scrollToEnd({ animated: false });
+    }
+
+    // Then use a delay to ensure messages have rendered
+    setTimeout(() => {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+    }, 100);
+
+    // For keyboard case, add extra delay to handle both rendering and keyboard animation
+    if (keyboardVisible) {
       setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollToEnd({ animated: true });
+        }
+      }, 300);
+    }
+  }
+}, [history, keyboardVisible]);
+
+  // Add an extra helper function to scroll to bottom (can be called from other places if needed)
+  const scrollToBottom = (immediate = false) => {
+  if (scrollViewRef.current) {
+    // First try immediate scroll
+    scrollViewRef.current.scrollToEnd({ animated: false });
+
+    if (!immediate) {
+      // Then try animated scroll after a short delay
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollToEnd({ animated: true });
+        }
       }, 100);
     }
-  }, [history]);
+  }
+};
 
   // Welcome message when the component mounts
   useEffect(() => {
@@ -442,7 +529,6 @@ const startSmartPreBuffering = async () => {
 };
 
   // Text chat handler
-// Text chat handler
 const handleSubmit = async (inputMessage: string) => {
   if (!inputMessage.trim() || isLoading) return;
 
@@ -1176,135 +1262,147 @@ const playAudio = async (conversationId, messageIndex = -1) => {
         </View>
       )}
 
-      <ScrollView
-        style={styles.conversationContainer}
-        ref={scrollViewRef}
-        contentContainerStyle={styles.conversationContent}
+      {/* Use KeyboardAvoidingView to handle keyboard appearance */}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingContainer}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
+        enabled={true}
       >
-        {renderMessages()}
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.conversationContainer}
+          contentContainerStyle={styles.conversationContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          onContentSizeChange={() => scrollToBottom(false)}
+          onLayout={() => scrollToBottom(false)}
+        >
+          {renderMessages()}
 
-        {isLoading && (
-          <View style={styles.loadingMessage}>
-            <View style={styles.typingIndicator}>
-              <View style={styles.typingDot} />
-              <View style={styles.typingDot} />
-              <View style={styles.typingDot} />
+          {isLoading && (
+            <View style={styles.loadingMessage}>
+              <View style={styles.typingIndicator}>
+                <View style={styles.typingDot} />
+                <View style={styles.typingDot} />
+                <View style={styles.typingDot} />
+              </View>
             </View>
-          </View>
-        )}
-      </ScrollView>
+          )}
+        </ScrollView>
 
-      <View style={styles.inputContainer}>
-        {voiceInputEnabled ? (
-          <View style={styles.voiceInputControls}>
-            <TouchableOpacity
-              style={[
-                styles.voiceButton,
-                (isRecording || isPreBuffering) && styles.recordingButton,
-                isProcessing && styles.processingButton,
-                isListening && styles.listeningButton
-              ]}
-              onPress={handleVoiceButtonClick}
-              disabled={isProcessing}
-            >
-              {isRecording ? (
-                <>
-                  <Animated.View
-                    style={[
-                      styles.pulse,
-                      { transform: [{ scale: pulseAnim }] }
-                    ]}
-                  />
-                  <Text style={styles.micIcon}>🎙️</Text>
-                  <Text style={styles.buttonText}>Stop Recording</Text>
-                </>
-              ) : isPreBuffering ? (
-                <>
-                  <Animated.View
-                    style={[
-                      styles.pulse,
-                      { transform: [{ scale: pulseAnim }] }
-                    ]}
-                  />
-                  <Text style={styles.micIcon}>⏱️</Text>
-                  <Text style={styles.buttonText}>Pre-buffering...</Text>
-                </>
-              ) : isProcessing ? (
-                <>
-                  <Text style={styles.processingIcon}>⏳</Text>
-                  <Text style={styles.buttonText}>Processing...</Text>
-                </>
-              ) : isListening ? (
-                <>
-                  <Text style={styles.listeningIcon}>👂</Text>
-                  <Text style={styles.buttonText}>Listening for speech...</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.micIcon}>🎙️</Text>
-                  <Text style={styles.buttonText}>
-                    {autoRecordEnabled
-                      ? 'Start Recording (auto after AI)'
-                      : 'Start Recording'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {(isRecording || isPreBuffering) && (
-              <View style={[
-                styles.recordingStatus,
-                silenceDetected ? styles.silenceStatus :
-                hasSpeech ? styles.speechStatus :
-                isPreBuffering ? styles.preBufferingStatus : styles.waitingStatus
-              ]}>
-                {silenceDetected ? (
+        <View style={styles.inputContainer}>
+          {voiceInputEnabled ? (
+            <View style={styles.voiceInputControls}>
+              <TouchableOpacity
+                style={[
+                  styles.voiceButton,
+                  (isRecording || isPreBuffering) && styles.recordingButton,
+                  isProcessing && styles.processingButton,
+                  isListening && styles.listeningButton
+                ]}
+                onPress={handleVoiceButtonClick}
+                disabled={isProcessing}
+              >
+                {isRecording ? (
                   <>
-                    <Text style={styles.statusIcon}>🔇</Text>
-                    <Text style={styles.statusText}>
-                      {autoSendEnabled
-                        ? `Silence detected - will auto-submit ${silenceCountdown ? `in ${silenceCountdown}s` : 'shortly'}`
-                        : 'Silence detected - press Stop when finished'}
-                    </Text>
-                  </>
-                ) : hasSpeech ? (
-                  <>
-                    <Text style={styles.statusIcon}>🗣️</Text>
-                    <Text style={styles.statusText}>
-                      {autoSendEnabled
-                        ? 'Recording your speech... Pause to auto-submit'
-                        : 'Recording your speech...'}
-                    </Text>
+                    <Animated.View
+                      style={[
+                        styles.pulse,
+                        { transform: [{ scale: pulseAnim }] }
+                      ]}
+                    />
+                    <Text style={styles.micIcon}>🎙️</Text>
+                    <Text style={styles.buttonText}>Stop Recording</Text>
                   </>
                 ) : isPreBuffering ? (
                   <>
-                    <Text style={styles.statusIcon}>⏱️</Text>
-                    <Text style={styles.statusText}>Pre-buffering... start speaking anytime</Text>
+                    <Animated.View
+                      style={[
+                        styles.pulse,
+                        { transform: [{ scale: pulseAnim }] }
+                      ]}
+                    />
+                    <Text style={styles.micIcon}>⏱️</Text>
+                    <Text style={styles.buttonText}>Pre-buffering...</Text>
+                  </>
+                ) : isProcessing ? (
+                  <>
+                    <Text style={styles.processingIcon}>⏳</Text>
+                    <Text style={styles.buttonText}>Processing...</Text>
+                  </>
+                ) : isListening ? (
+                  <>
+                    <Text style={styles.listeningIcon}>👂</Text>
+                    <Text style={styles.buttonText}>Listening for speech...</Text>
                   </>
                 ) : (
                   <>
-                    <Text style={styles.statusIcon}>👂</Text>
-                    <Text style={styles.statusText}>Waiting for speech...</Text>
+                    <Text style={styles.micIcon}>🎙️</Text>
+                    <Text style={styles.buttonText}>
+                      {autoRecordEnabled
+                        ? 'Start Recording (auto after AI)'
+                        : 'Start Recording'}
+                    </Text>
                   </>
                 )}
-              </View>
-            )}
+              </TouchableOpacity>
 
-            {!isRecording && !isProcessing && !isPreBuffering && isListening && (
-              <View style={styles.listeningStatus}>
-                <Text style={styles.statusIcon}>👂</Text>
-                <Text style={styles.statusText}>Listening for speech...</Text>
-              </View>
-            )}
-          </View>
-        ) : (
-          <ChatInput
-            onSubmit={handleSubmit}
-            disabled={isLoading}
-            targetLanguage={targetLanguage}
-          />
-        )}
-      </View>
+              {(isRecording || isPreBuffering) && (
+                <View style={[
+                  styles.recordingStatus,
+                  silenceDetected ? styles.silenceStatus :
+                  hasSpeech ? styles.speechStatus :
+                  isPreBuffering ? styles.preBufferingStatus : styles.waitingStatus
+                ]}>
+                  {silenceDetected ? (
+                    <>
+                      <Text style={styles.statusIcon}>🔇</Text>
+                      <Text style={styles.statusText}>
+                        {autoSendEnabled
+                          ? `Silence detected - will auto-submit ${silenceCountdown ? `in ${silenceCountdown}s` : 'shortly'}`
+                          : 'Silence detected - press Stop when finished'}
+                      </Text>
+                    </>
+                  ) : hasSpeech ? (
+                    <>
+                      <Text style={styles.statusIcon}>🗣️</Text>
+                      <Text style={styles.statusText}>
+                        {autoSendEnabled
+                          ? 'Recording your speech... Pause to auto-submit'
+                          : 'Recording your speech...'}
+                      </Text>
+                    </>
+                  ) : isPreBuffering ? (
+                    <>
+                      <Text style={styles.statusIcon}>⏱️</Text>
+                      <Text style={styles.statusText}>Pre-buffering... start speaking anytime</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.statusIcon}>👂</Text>
+                      <Text style={styles.statusText}>Waiting for speech...</Text>
+                    </>
+                  )}
+                </View>
+              )}
+
+              {!isRecording && !isProcessing && !isPreBuffering && isListening && (
+                <View style={styles.listeningStatus}>
+                  <Text style={styles.statusIcon}>👂</Text>
+                  <Text style={styles.statusText}>Listening for speech...</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <ChatInput
+              onSubmit={handleSubmit}
+              disabled={isLoading}
+              targetLanguage={targetLanguage}
+            />
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -1313,6 +1411,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
+  },
+  keyboardAvoidingContainer: {
+    flex: 1,
   },
   conversationContainer: {
     flex: 1,
