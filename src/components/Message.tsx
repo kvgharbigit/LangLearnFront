@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import HTML from 'react-native-render-html';
 import { normalizeText, areMessagesEquivalent, highlightDifferences } from '../utils/text';
 
@@ -9,6 +9,7 @@ export interface MessageData {
   content: string;
   corrected?: string;
   natural?: string;
+  translation?: string;  // Added translation field
   timestamp: string;
   isTemporary?: boolean;
 }
@@ -20,6 +21,9 @@ interface MessageProps {
 }
 
 const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
+  // Add state for tracking if we're showing the translation
+  const [isShowingTranslation, setIsShowingTranslation] = useState<boolean>(false);
+
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isSystem = message.role === 'system';
@@ -127,6 +131,13 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
     width: '100%',
   }), [isUser, isEquivalentToNative]);
 
+  // Toggle translation function
+  const toggleTranslation = () => {
+    if (message.translation) {
+      setIsShowingTranslation(!isShowingTranslation);
+    }
+  };
+
   return (
     <View style={[
       styles.messageContainer,
@@ -191,8 +202,26 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
               ]}
             />
           </View>
+        ) : isAssistant && message.translation ? (
+          // NEW CASE: Assistant message with translation available - add touchable to toggle
+          <TouchableOpacity
+            onPress={toggleTranslation}
+            activeOpacity={0.6}
+            style={styles.translationTouchable}
+          >
+            <Text style={[
+              styles.mainText,
+              styles.assistantMainText,
+              isShowingTranslation && styles.translationText
+            ]}>
+              {isShowingTranslation ? message.translation : message.content}
+            </Text>
+            <Text style={styles.translationHint}>
+              {isShowingTranslation ? "Tap to see original" : "Tap to see translation"}
+            </Text>
+          </TouchableOpacity>
         ) : (
-          // Regular text display for messages without corrections
+          // Regular text display for messages without corrections or translation
           <Text style={[
             styles.mainText,
             isUser && styles.userMainText,
@@ -408,6 +437,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#4CAF50',
   },
+  // New styles for translation feature
+  translationTouchable: {
+    width: '100%',
+  },
+  translationText: {
+    fontStyle: 'italic',
+    color: '#555',
+  },
+  translationHint: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
 });
 
 export default React.memo(Message, (prev, next) => {
@@ -415,6 +458,7 @@ export default React.memo(Message, (prev, next) => {
     prev.message.content === next.message.content &&
     prev.message.corrected === next.message.corrected &&
     prev.message.natural === next.message.natural &&
+    prev.message.translation === next.message.translation &&
     prev.originalUserMessage === next.originalUserMessage
   );
 });

@@ -442,6 +442,7 @@ const startSmartPreBuffering = async () => {
 };
 
   // Text chat handler
+// Text chat handler
 const handleSubmit = async (inputMessage: string) => {
   if (!inputMessage.trim() || isLoading) return;
 
@@ -493,11 +494,12 @@ const handleSubmit = async (inputMessage: string) => {
               natural: nextMsg.natural
             });
 
-            // Add assistant message without the corrections
+            // Add assistant message without the corrections but WITH translation
             if (nextMsg) {
               newHistory.push({
                 role: nextMsg.role,
                 content: nextMsg.content,
+                translation: nextMsg.translation, // Include translation
                 timestamp: nextMsg.timestamp
               });
             }
@@ -509,8 +511,15 @@ const handleSubmit = async (inputMessage: string) => {
             newHistory.push(currentMsg);
           }
         } else if (currentMsg.role === 'assistant' || currentMsg.role === 'system') {
-          // Regular assistant or system message
-          newHistory.push(currentMsg);
+          // Regular assistant or system message (include translation for assistant)
+          if (currentMsg.role === 'assistant') {
+            newHistory.push({
+              ...currentMsg,
+              translation: currentMsg.translation // Include translation if present
+            });
+          } else {
+            newHistory.push(currentMsg);
+          }
         }
       }
 
@@ -906,10 +915,11 @@ const playAudio = async (conversationId, messageIndex = -1) => {
             natural: response.natural,
             timestamp: new Date().toISOString()
           },
-          // AI response (without corrections)
+          // AI response (without corrections but WITH translation)
           {
             role: 'assistant',
             content: response.reply,
+            translation: response.translation, // Include translation
             timestamp: new Date().toISOString()
           }
         ];

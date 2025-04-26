@@ -6,6 +6,7 @@ export interface Message {
   timestamp: string;
   corrected?: string;
   natural?: string;
+  translation?: string; // Added translation field
   isTemporary?: boolean;
 }
 
