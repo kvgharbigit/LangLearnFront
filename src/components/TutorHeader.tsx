@@ -40,6 +40,9 @@ interface Props {
   setSilenceThreshold: (value: number) => void;
   silenceDuration: number;
   setSilenceDuration: (value: number) => void;
+  // New prop for mute functionality
+  isMuted: boolean;
+  setIsMuted: (muted: boolean) => void;
   navigation: any;
 }
 
@@ -63,6 +66,9 @@ const TutorHeader: React.FC<Props> = ({
   setSilenceThreshold,
   silenceDuration,
   setSilenceDuration,
+  // New mute props
+  isMuted,
+  setIsMuted,
   navigation,
 }) => {
   // State
@@ -70,7 +76,7 @@ const TutorHeader: React.FC<Props> = ({
   const [helpModalVisible, setHelpModalVisible] = useState<boolean>(false);
   const [audioInfoVisible, setAudioInfoVisible] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'audio' | 'advanced'>('audio');
-  const [showMicTest, setShowMicTest] = useState<boolean>(false); // New state for mic test
+  const [showMicTest, setShowMicTest] = useState<boolean>(false);
 
   // State for text input values
   const [speechThresholdText, setSpeechThresholdText] = useState<string>(speechThreshold.toString());
@@ -120,6 +126,11 @@ const TutorHeader: React.FC<Props> = ({
   // Toggle microphone test section
   const toggleMicTest = () => {
     setShowMicTest(!showMicTest);
+  };
+
+  // Toggle mute function
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
   };
 
   const goBack = () => {
@@ -261,6 +272,15 @@ const TutorHeader: React.FC<Props> = ({
           <Text style={styles.titleText}>{targetInfo.name} Tutor</Text>
         </View>
 
+        {/* New mute button */}
+        <TouchableOpacity style={styles.muteButton} onPress={toggleMute}>
+          <Ionicons
+            name={isMuted ? "volume-mute" : "volume-medium"}
+            size={22}
+            color={isMuted ? colors.danger : colors.gray700}
+          />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.settingsButton} onPress={toggleSettingsModal}>
           <Ionicons name="settings-outline" size={22} color={colors.gray700} />
         </TouchableOpacity>
@@ -327,14 +347,52 @@ const TutorHeader: React.FC<Props> = ({
             <ScrollView style={styles.tabContent}>
               {activeTab === 'audio' ? (
                 <>
-                  {/* Voice Speed */}
-                  <View style={styles.settingBlock}>
+                  {/* Mute Toggle - NEW */}
+                  <View style={styles.switchSetting}>
+                    <View style={styles.switchTextContainer}>
+                      <View style={[
+                        styles.settingIconContainer,
+                        isMuted ? styles.mutedIconContainer : null
+                      ]}>
+                        <Ionicons
+                          name={isMuted ? "volume-mute" : "volume-medium"}
+                          size={16}
+                          color={isMuted ? "#F44336" : colors.primary}
+                        />
+                      </View>
+                      <View>
+                        <Text style={styles.switchLabel}>Mute Audio</Text>
+                        <Text style={styles.switchDescription}>
+                          Disable AI voice responses
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={isMuted}
+                      onValueChange={toggleMute}
+                      trackColor={{ false: colors.gray300, true: colors.primaryLight }}
+                      thumbColor={isMuted ? colors.danger : colors.primary}
+                      ios_backgroundColor={colors.gray300}
+                    />
+                  </View>
+
+                  {/* Voice Speed - make this disabled if muted */}
+                  <View style={[
+                    styles.settingBlock,
+                    isMuted && styles.disabledSettingBlock
+                  ]}>
                     <View style={styles.settingHeader}>
                       <View style={styles.settingIconContainer}>
-                        <Ionicons name="speedometer" size={16} color={colors.primary} />
+                        <Ionicons name="speedometer" size={16} color={isMuted ? colors.gray400 : colors.primary} />
                       </View>
-                      <Text style={styles.settingTitle}>Voice Speed</Text>
-                      <Text style={styles.speedValue}>{Math.round(tempo * 100)}%</Text>
+                      <Text style={[
+                        styles.settingTitle,
+                        isMuted && styles.disabledText
+                      ]}>Voice Speed</Text>
+                      <Text style={[
+                        styles.speedValue,
+                        isMuted && styles.disabledSpeedValue
+                      ]}>{Math.round(tempo * 100)}%</Text>
                     </View>
 
                     {/* Speed buttons in a scrollable row */}
@@ -348,14 +406,17 @@ const TutorHeader: React.FC<Props> = ({
                           key={option.label}
                           style={[
                             styles.speedButton,
-                            isSpeedActive(option.value) && styles.activeSpeedButton
+                            isSpeedActive(option.value) && styles.activeSpeedButton,
+                            isMuted && styles.disabledSpeedButton
                           ]}
-                          onPress={() => setTempo(option.value)}
+                          onPress={() => !isMuted && setTempo(option.value)}
+                          disabled={isMuted}
                         >
                           <Text
                             style={[
                               styles.speedButtonText,
-                              isSpeedActive(option.value) && styles.activeSpeedButtonText
+                              isSpeedActive(option.value) && styles.activeSpeedButtonText,
+                              isMuted && styles.disabledText
                             ]}
                           >
                             {option.label}
@@ -904,6 +965,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1, // Allow title to take up available space
+    justifyContent: 'center', // Center the title
   },
   flagIcon: {
     fontSize: 20,
@@ -912,6 +975,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.gray800,
+  },
+  // New mute button style
+  muteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
   settingsButton: {
     width: 36,
@@ -998,6 +1071,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray200,
   },
+  // New style for disabled setting block
+  disabledSettingBlock: {
+    opacity: 0.7,
+    backgroundColor: colors.gray100,
+  },
   settingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1011,6 +1089,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
+  },
+  // New style for muted icon container
+  mutedIconContainer: {
+    backgroundColor: 'rgba(244, 67, 54, 0.1)', // Light red background
   },
   disabledIcon: {
     backgroundColor: colors.gray100,
@@ -1030,6 +1112,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
+  // New style for disabled speed value
+  disabledSpeedValue: {
+    color: colors.gray600,
+    backgroundColor: colors.gray200,
+  },
   speedButtonsScrollContainer: {
     paddingRight: 8,
     paddingBottom: 4,
@@ -1048,6 +1135,11 @@ const styles = StyleSheet.create({
   activeSpeedButton: {
     backgroundColor: colors.primaryLight,
     borderColor: colors.primary,
+  },
+  // New style for disabled speed button
+  disabledSpeedButton: {
+    backgroundColor: colors.gray200,
+    borderColor: colors.gray300,
   },
   speedButtonText: {
     fontSize: 12,
@@ -1310,6 +1402,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontSize: 14,
   },
+  danger: "#F44336", // Define this color for the mute button
 });
 
 export default TutorHeader;

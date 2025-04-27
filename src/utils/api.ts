@@ -5,9 +5,7 @@ import * as FileSystem from 'expo-file-system';
 //const API_URL = 'https://language-tutor-984417336702.asia-east1.run.app';
 const API_URL = 'http://192.168.86.26:8004';
 
-
-
-
+// Update the ChatParams interface to include isMuted
 interface ChatParams {
   message: string;
   conversation_id?: string | null;
@@ -16,8 +14,10 @@ interface ChatParams {
   native_language: string;
   target_language: string;
   learning_objective?: string;
+  is_muted?: boolean; // Add this parameter
 }
 
+// Update the VoiceParams interface to include isMuted
 interface VoiceParams {
   audioUri: string;
   conversationId?: string | null;
@@ -26,6 +26,7 @@ interface VoiceParams {
   nativeLanguage: string;
   targetLanguage: string;
   learningObjective?: string;
+  isMuted?: boolean; // Add this parameter
 }
 
 /**
@@ -38,7 +39,8 @@ export const sendTextMessage = async (
   difficulty: string = 'beginner',
   nativeLanguage: string = 'en',
   targetLanguage: string = 'es',
-  learningObjective: string = ''
+  learningObjective: string = '',
+  isMuted: boolean = false // Add this parameter with default value
 ) => {
   try {
     const params: ChatParams = {
@@ -48,7 +50,8 @@ export const sendTextMessage = async (
       difficulty,
       native_language: nativeLanguage,
       target_language: targetLanguage,
-      learning_objective: learningObjective
+      learning_objective: learningObjective,
+      is_muted: isMuted // Add this field
     };
 
     const response = await fetch(`${API_URL}/chat`, {
@@ -97,7 +100,8 @@ export const sendVoiceRecording = async ({
   difficulty = 'beginner',
   nativeLanguage = 'en',
   targetLanguage = 'es',
-  learningObjective = ''
+  learningObjective = '',
+  isMuted = false // Add this parameter with default value
 }: VoiceParams) => {
   try {
     // Get file info
@@ -125,6 +129,7 @@ export const sendVoiceRecording = async ({
     formData.append('native_language', nativeLanguage);
     formData.append('target_language', targetLanguage);
     formData.append('learning_objective', learningObjective);
+    formData.append('is_muted', isMuted.toString()); // Add this field
 
     const response = await fetch(`${API_URL}/voice-input`, {
       method: 'POST',
@@ -225,12 +230,6 @@ export const downloadAudio = async (audioUrl: string): Promise<string> => {
   }
 };
 
-export default {
-  sendTextMessage,
-  sendVoiceRecording,
-  downloadAudio
-};
-
 /**
  * Create a new conversation with an AI welcome message that acknowledges the learning objective
  */
@@ -239,13 +238,15 @@ export const createConversation = async ({
   nativeLanguage,
   targetLanguage,
   learningObjective,
-  tempo
+  tempo,
+  isMuted = false // Add this parameter with default value
 }: {
   difficulty: string;
   nativeLanguage: string;
   targetLanguage: string;
   learningObjective?: string;
   tempo?: number;
+  isMuted?: boolean; // Add this parameter
 }) => {
   try {
     // Import API_CONFIG from your constants if you haven't already
@@ -260,7 +261,8 @@ export const createConversation = async ({
         native_language: nativeLanguage,
         target_language: targetLanguage,
         learning_objective: learningObjective || '',
-        tempo: tempo || 0.75
+        tempo: tempo || 0.75,
+        is_muted: isMuted // Add this field
       })
     });
 
@@ -275,4 +277,12 @@ export const createConversation = async ({
     console.error('Create conversation error:', error);
     throw error;
   }
+};
+
+export default {
+  sendTextMessage,
+  sendVoiceRecording,
+  downloadAudio,
+  createConversation,
+  getAudioStreamUrl
 };

@@ -16,6 +16,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Message as MessageType } from '../types/messages';
 import { AUDIO_SETTINGS, PLAYER_SETTINGS, API_CONFIG, loadAudioSettings, saveAudioSettings } from '../constants/settings';
+import MuteInfoModal from '../components/MuteInfoModal';
 
 // Import components
 import Message from '../components/Message';
@@ -58,6 +59,10 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const [speechThreshold, setSpeechThreshold] = useState<number>(AUDIO_SETTINGS.SPEECH_THRESHOLD);
   const [silenceThreshold, setSilenceThreshold] = useState<number>(AUDIO_SETTINGS.SILENCE_THRESHOLD);
   const [silenceDuration, setSilenceDuration] = useState<number>(AUDIO_SETTINGS.SILENCE_DURATION);
+
+  //state vars for muting
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [showMuteInfoModal, setShowMuteInfoModal] = useState<boolean>(false);
 
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -240,6 +245,29 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     };
   }, []);
 
+  // 3. Add toggle mute function
+  const toggleMute = (muted: boolean) => {
+    // Update mute state
+    setIsMuted(muted);
+
+    // Show info modal when muting for the first time
+    if (muted && !showMuteInfoModal) {
+      setShowMuteInfoModal(true);
+    }
+
+    // If there's currently audio playing, stop it
+    if (muted && isPlaying && soundRef.current) {
+      try {
+        soundRef.current.stopAsync().catch(error => {
+          console.warn('Error stopping audio when muting:', error);
+        });
+        setIsPlaying(false);
+        setStatusMessage('Audio muted');
+      } catch (error) {
+        console.warn('Error in mute toggle:', error);
+      }
+    }
+  };
   // Toggle voice input
   const toggleVoiceInput = () => {
     if (isRecording || isPreBuffering) {
@@ -484,7 +512,9 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         nativeLanguage: getNativeLanguage(),
         targetLanguage: getTargetLanguage(),
         learningObjective: getLearningObjective(),
-        tempo: tempo
+        tempo: tempo,
+        isMuted: isMuted // Add the muted parameter
+
       });
 
       // Update state with the response data
@@ -661,7 +691,8 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         getDifficulty(),
         getNativeLanguage(),
         getTargetLanguage(),
-        getLearningObjective()
+        getLearningObjective(),
+          isMuted
       );
 
       if (!conversationId && response.conversation_id) {
@@ -744,6 +775,12 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Updated implementation for reliable auto-recording after audio playback
   const playAudio = async (conversationId, messageIndex = -1) => {
+    // Skip playing audio if muted
+    if (isMuted) {
+      console.log("🔇 Audio muted, skipping playback");
+      setStatusMessage('Audio muted');
+      return;
+    }
     try {
       // Make sure we're not already pre-buffering or recording
       if (isPreBuffering || isRecording) {
@@ -1097,7 +1134,8 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         difficulty: getDifficulty(),
         nativeLanguage: getNativeLanguage(),
         targetLanguage: getTargetLanguage(),
-        learningObjective: getLearningObjective()
+        learningObjective: getLearningObjective(),
+        isMuted: isMuted
       });
 
       setStatusMessage('Received response from server');
@@ -1252,26 +1290,33 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <TutorHeader
-        targetLanguage={getTargetLanguage()}
-        targetInfo={getTargetInfo()}
-        tempo={tempo}
-        setTempo={setTempo}
-        voiceInputEnabled={voiceInputEnabled}
-        toggleVoiceInput={toggleVoiceInput}
-        autoSendEnabled={autoSendEnabled}
-        setAutoSendEnabled={setAutoSendEnabled}
-        autoRecordEnabled={autoRecordEnabled}
-        setAutoRecordEnabled={setAutoRecordEnabled}
-        debugMode={debugMode}
-        setDebugMode={setDebugMode}
-        // New props for audio parameters
-        speechThreshold={speechThreshold}
-        setSpeechThreshold={setSpeechThreshold}
-        silenceThreshold={silenceThreshold}
-        setSilenceThreshold={setSilenceThreshold}
-        silenceDuration={silenceDuration}
-        setSilenceDuration={setSilenceDuration}
-        navigation={navigation}
+      targetLanguage={getTargetLanguage()}
+      targetInfo={getTargetInfo()}
+      tempo={tempo}
+      setTempo={setTempo}
+      voiceInputEnabled={voiceInputEnabled}
+      toggleVoiceInput={toggleVoiceInput}
+      autoSendEnabled={autoSendEnabled}
+      setAutoSendEnabled={setAutoSendEnabled}
+      autoRecordEnabled={autoRecordEnabled}
+      setAutoRecordEnabled={setAutoRecordEnabled}
+      debugMode={debugMode}
+      setDebugMode={setDebugMode}
+      // Audio parameters
+      speechThreshold={speechThreshold}
+      setSpeechThreshold={setSpeechThreshold}
+      silenceThreshold={silenceThreshold}
+      setSilenceThreshold={setSilenceThreshold}
+      silenceDuration={silenceDuration}
+      setSilenceDuration={setSilenceDuration}
+      // Mute functionality
+      isMuted={isMuted}
+      setIsMuted={toggleMute}
+      navigation={navigation}
+    />
+      <MuteInfoModal
+        visible={showMuteInfoModal}
+        onClose={() => setShowMuteInfoModal(false)}
       />
 
       {/* Voice Input Toggle Bar */}
