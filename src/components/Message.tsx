@@ -67,39 +67,36 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
       : '';
 
   // Function to highlight incorrect words in red in the original message
-  const highlightIncorrectWords = useMemo(() => {
-    if (!isUser || !message.corrected || isEquivalentToCorrected) {
-      // If there's no correction or the correction is the same, return unchanged
-      return message.content;
+  // Replace the current highlightIncorrectWords function with this simpler version
+const highlightIncorrectWords = useMemo(() => {
+  if (!isUser || !message.corrected || isEquivalentToCorrected) {
+    // If there's no correction or the correction is the same, return unchanged
+    return message.content;
+  }
+
+  // Split the texts into words
+  const originalWords = message.content.split(/\s+/);
+  const correctedWords = message.corrected.split(/\s+/);
+
+  // Create a normalized set of corrected words for faster lookup
+  const normalizedCorrectedWords = new Set(
+    correctedWords.map(word => normalizeText(word))
+  );
+
+  // Mark words that don't appear in the corrected text as incorrect
+  const result = originalWords.map(word => {
+    const normalizedWord = normalizeText(word);
+
+    // If the normalized word is not in the corrected text, highlight it
+    if (!normalizedCorrectedWords.has(normalizedWord)) {
+      return `<span style="color: #FF0000">${word}</span>`;
     }
 
-    // Split the original and corrected texts into words
-    const originalWords = message.content.split(/\s+/);
-    const correctedWords = message.corrected.split(/\s+/);
+    return word;
+  });
 
-    // Create a normalized version for comparison (without punctuation, lowercase)
-    const normalizedOriginal = originalWords.map(word => normalizeText(word));
-    const normalizedCorrected = correctedWords.map(word => normalizeText(word));
-
-    // Mark words that differ as incorrect
-    const result = originalWords.map((word, index) => {
-      const normalizedWord = normalizeText(word);
-
-      // Simple case: direct comparison of the word at the same position
-      if (index < normalizedCorrected.length && normalizedWord !== normalizedCorrected[index]) {
-        return `<span style="color: #FF0000">${word}</span>`;
-      }
-
-      // Check if this word exists anywhere in the corrected text
-      if (!normalizedCorrected.includes(normalizedWord)) {
-        return `<span style="color: #FF0000">${word}</span>`;
-      }
-
-      return word;
-    });
-
-    return result.join(' ');
-  }, [isUser, message.content, message.corrected, isEquivalentToCorrected]);
+  return result.join(' ');
+}, [isUser, message.content, message.corrected, isEquivalentToCorrected]);
 
   // Styles for HTML rendering
   const correctedTagsStyles = useMemo(() => ({
