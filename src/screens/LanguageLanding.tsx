@@ -768,6 +768,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.white,
   },
+   // Add these new styles for the learning objective section:
+  objectiveDescription: {
+    fontSize: 14,
+    color: colors.gray600,
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  objectiveConfirmation: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 214, 160, 0.1)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  objectiveConfirmationText: {
+    marginLeft: 8,
+    fontSize: 13,
+    color: colors.success,
+    flex: 1,
+  },
 });
 
 export default LanguageLanding;

@@ -230,3 +230,49 @@ export default {
   sendVoiceRecording,
   downloadAudio
 };
+
+/**
+ * Create a new conversation with an AI welcome message that acknowledges the learning objective
+ */
+export const createConversation = async ({
+  difficulty,
+  nativeLanguage,
+  targetLanguage,
+  learningObjective,
+  tempo
+}: {
+  difficulty: string;
+  nativeLanguage: string;
+  targetLanguage: string;
+  learningObjective?: string;
+  tempo?: number;
+}) => {
+  try {
+    // Import API_CONFIG from your constants if you haven't already
+    // Replace with your actual API URL if needed
+    const response = await fetch(`${API_URL}/create-conversation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        difficulty,
+        native_language: nativeLanguage,
+        target_language: targetLanguage,
+        learning_objective: learningObjective || '',
+        tempo: tempo || 0.75
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error creating conversation:', errorData);
+      throw new Error(errorData.detail || 'Failed to create conversation');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Create conversation error:', error);
+    throw error;
+  }
+};

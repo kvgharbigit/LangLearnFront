@@ -17,6 +17,8 @@ import { RootStackParamList } from '../types/navigation';
 import { Message as MessageType } from '../types/messages';
 import { AUDIO_SETTINGS, PLAYER_SETTINGS, API_CONFIG } from '../constants/settings';
 
+
+
 // Import components
 import Message from '../components/Message';
 import ChatInput from '../components/ChatInput';
@@ -314,63 +316,89 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Welcome message when the component mounts
   useEffect(() => {
-    if (history.length === 0) {
-      let welcomeMessage: MessageType;
-      const currentTargetLanguage = getTargetLanguage();
-      const currentLearningObjective = getLearningObjective();
+  if (history.length === 0) {
+    // Start a new conversation with the given parameters
+    initializeConversation();
+  }
+}, [route.params]); // Add route.params dependency to re-initialize if params change
 
-      // Select appropriate welcome message based on target language
-      switch(currentTargetLanguage) {
-        case 'es':
-          welcomeMessage = {
-            role: 'assistant',
-            content: '¡Hola! Soy tu tutor de español. ¿Cómo puedo ayudarte hoy?',
-            timestamp: new Date().toISOString()
-          };
-          break;
-        case 'fr':
-          welcomeMessage = {
-            role: 'assistant',
-            content: 'Bonjour! Je suis votre tuteur de français. Comment puis-je vous aider aujourd\'hui?',
-            timestamp: new Date().toISOString()
-          };
-          break;
-        case 'it':
-          welcomeMessage = {
-            role: 'assistant',
-            content: 'Ciao! Sono il tuo tutor di italiano. Come posso aiutarti oggi?',
-            timestamp: new Date().toISOString()
-          };
-          break;
-        default: // en
-          welcomeMessage = {
-            role: 'assistant',
-            content: 'Hello! I\'m your English tutor. How can I help you today?',
-            timestamp: new Date().toISOString()
-          };
+
+  // Add this new function to handle initializing conversations
+const initializeConversation = async () => {
+  try {
+    setIsLoading(true);
+
+    // Call the new API endpoint to create a conversation
+    const response = await api.createConversation({
+      difficulty: getDifficulty(),
+      nativeLanguage: getNativeLanguage(),
+      targetLanguage: getTargetLanguage(),
+      learningObjective: getLearningObjective(),
+      tempo: tempo
+    });
+
+    // Update state with the response data
+    if (response) {
+      // Set conversation ID
+      setConversationId(response.conversation_id);
+
+      // Set initial message
+      setHistory(response.history || []);
+
+      // Play audio for the welcome message
+      if (response.has_audio) {
+        setStatusMessage('Streaming welcome audio...');
+        await playAudio(response.conversation_id, 0); // Play the first message (welcome)
       }
-
-      // Add learning objective to welcome message if provided
-      if (currentLearningObjective) {
-        switch(currentTargetLanguage) {
-          case 'es':
-            welcomeMessage.content = `¡Hola! Veo que quieres practicar: "${currentLearningObjective}". ¡Empecemos!`;
-            break;
-          case 'fr':
-            welcomeMessage.content = `Bonjour! Je vois que vous voulez pratiquer: "${currentLearningObjective}". Commençons!`;
-            break;
-          case 'it':
-            welcomeMessage.content = `Ciao! Vedo che vuoi praticare: "${currentLearningObjective}". Iniziamo!`;
-            break;
-          default: // en
-            welcomeMessage.content = `Hello! I see you want to practice: "${currentLearningObjective}". Let's begin!`;
-        }
-      }
-
-      setHistory([welcomeMessage]);
     }
-  }, [history.length, route.params]); // Add route.params dependency
+  } catch (error) {
+    console.error('Error initializing conversation:', error);
 
+    // Fallback if the API call fails
+    const currentTargetLanguage = getTargetLanguage();
+    const currentLearningObjective = getLearningObjective();
+
+    // Create a fallback welcome message
+    let welcomeMessage = {
+      role: 'assistant',
+      content: getWelcomeMessage(currentTargetLanguage, currentLearningObjective),
+      timestamp: new Date().toISOString(),
+      translation: ''
+    };
+
+    setHistory([welcomeMessage]);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+// Helper function to get welcome message based on language
+const getWelcomeMessage = (language: string, learningObjective?: string): string => {
+  const welcomeMessages: Record<string, { basic: string, withObjective: string }> = {
+    'es': {
+      basic: '¡Hola! Soy tu tutor de español. ¿Cómo estás hoy?',
+      withObjective: `¡Hola! Veo que quieres practicar: "${learningObjective}". ¡Empecemos!`
+    },
+    'fr': {
+      basic: 'Bonjour! Je suis votre tuteur de français. Comment allez-vous aujourd\'hui?',
+      withObjective: `Bonjour! Je vois que vous voulez pratiquer: "${learningObjective}". Commençons!`
+    },
+    'it': {
+      basic: 'Ciao! Sono il tuo tutor di italiano. Come stai oggi?',
+      withObjective: `Ciao! Vedo che vuoi praticare: "${learningObjective}". Iniziamo!`
+    },
+    'en': {
+      basic: 'Hello! I\'m your English tutor. How can I help you today?',
+      withObjective: `Hello! I see you want to practice: "${learningObjective}". Let's begin!`
+    }
+  };
+
+  // Get messages for the current language, fallback to English if not found
+  const messages = welcomeMessages[language] || welcomeMessages['en'];
+
+  // Return message with or without learning objective
+  return learningObjective ? messages.withObjective : messages.basic;
+};
   // Cleanup function for all recording-related resources
   const cleanup = () => {
     console.log('Running audio resource cleanup...');
