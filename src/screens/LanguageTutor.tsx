@@ -17,6 +17,7 @@ import { RootStackParamList } from '../types/navigation';
 import { Message as MessageType } from '../types/messages';
 import { AUDIO_SETTINGS, PLAYER_SETTINGS, API_CONFIG, loadAudioSettings, saveAudioSettings } from '../constants/settings';
 import MuteInfoModal from '../components/MuteInfoModal';
+import ReplayButton from '../components/ReplayButton';
 
 // Import components
 import Message from '../components/Message';
@@ -54,6 +55,10 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const [autoRecordEnabled, setAutoRecordEnabled] = useState<boolean>(false);
   const [isListening, setIsListening] = useState<boolean>(false);
   const [keyboardVisible, setKeyboardVisible] = useState<boolean>(false);
+  const [canReplayLastMessage, setCanReplayLastMessage] = useState<boolean>(false);
+const [lastAudioConversationId, setLastAudioConversationId] = useState<string | null>(null);
+const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null>(null);
+
 
   // New state for customizable audio parameters
   const [speechThreshold, setSpeechThreshold] = useState<number>(AUDIO_SETTINGS.SPEECH_THRESHOLD);
@@ -434,6 +439,23 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     setIsListening(false);
   };
 
+  //Replay
+  const handleReplayLastMessage = async () => {
+    if (!lastAudioConversationId || lastAudioMessageIndex === null || isMuted || isPlaying) {
+      return;
+    }
+
+    try {
+      setStatusMessage('Replaying last message...');
+
+      // Use the existing playAudio function with the saved conversation ID and message index
+      await playAudio(lastAudioConversationId, lastAudioMessageIndex);
+    } catch (error) {
+      console.error('Error replaying audio:', error);
+      setStatusMessage('Failed to replay message');
+    }
+  };
+
   // Set up isMounted and cleanup on unmount
   useEffect(() => {
     isMountedRef.current = true;
@@ -775,6 +797,10 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Updated implementation for reliable auto-recording after audio playback
   const playAudio = async (conversationId, messageIndex = -1) => {
+    // Save these values for replay functionality
+    setLastAudioConversationId(conversationId);
+    setLastAudioMessageIndex(messageIndex);
+    setCanReplayLastMessage(true);
     // Skip playing audio if muted
     if (isMuted) {
       console.log("🔇 Audio muted, skipping playback");
@@ -1465,7 +1491,16 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
             </View>
           )}
         </ScrollView>
-
+        {canReplayLastMessage && (
+        <View style={styles.replayButtonContainer}>
+          <ReplayButton
+            onPress={handleReplayLastMessage}
+            isPlaying={isPlaying}
+            isMuted={isMuted}
+            disabled={isLoading || isProcessing}
+          />
+        </View>
+      )}
         <View style={styles.inputContainer}>
           {voiceInputEnabled ? (
             <View style={styles.voiceInputControls}>
@@ -1897,6 +1932,12 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
   },
+  replayButtonContainer: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 8,
+  backgroundColor: 'white',
+},
 });
 
 export default LanguageTutor;
