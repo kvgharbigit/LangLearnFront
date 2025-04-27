@@ -71,6 +71,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const getNativeLanguage = () => route.params.nativeLanguage || 'en';
   const getDifficulty = () => route.params.difficulty || 'beginner';
   const getLearningObjective = () => route.params.learningObjective || '';
+  const hasProcessedCurrentRecordingRef = useRef<boolean>(false);
 
   // Get language display info
   const getLanguageInfo = (code: string): LanguageInfo => {
@@ -241,11 +242,20 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Handle media recorder stop event - improved to handle pre-buffering
   useEffect(() => {
-    if (!isRecording && !isPreBuffering && hasSpeech && !isProcessing) {
-      console.log("🟢 handleAudioData() TRIGGERED");
-      handleAudioData();
-    }
-  }, [isRecording, isPreBuffering, hasSpeech, isProcessing]);
+      if (!isRecording && !isPreBuffering && hasSpeech && !isProcessing) {
+        // Only proceed if we haven't processed this recording yet
+        if (!hasProcessedCurrentRecordingRef.current) {
+          console.log("🟢 handleAudioData() TRIGGERED (first time)");
+          hasProcessedCurrentRecordingRef.current = true;
+          handleAudioData();
+        } else {
+          console.log("🔵 Skipping duplicate handleAudioData() call");
+        }
+      } else if (isRecording || isPreBuffering) {
+        // Reset the flag when a new recording starts
+        hasProcessedCurrentRecordingRef.current = false;
+      }
+    }, [isRecording, isPreBuffering, hasSpeech, isProcessing]);
 
   // AUTO-SEND IMPLEMENTATION
   useEffect(() => {
@@ -364,7 +374,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   // Cleanup function for all recording-related resources
   const cleanup = () => {
     console.log('Running audio resource cleanup...');
-
+    hasProcessedCurrentRecordingRef.current = false;
     // Clear any timeout
     if (autoRecordTimeoutRef.current) {
       clearTimeout(autoRecordTimeoutRef.current);
@@ -564,6 +574,7 @@ const startSmartPreBuffering = async () => {
 
   // Text chat handler
 const handleSubmit = async (inputMessage: string) => {
+  hasProcessedCurrentRecordingRef.current = false;
   if (!inputMessage.trim() || isLoading) return;
 
   // Add user message to history immediately
