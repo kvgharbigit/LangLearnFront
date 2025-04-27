@@ -152,31 +152,43 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Reset everything when component mounts or route params change
   useEffect(() => {
-    // Reset all conversation state
-    setHistory([]);
-    setConversationId(null);
-    setIsLoading(false);
-    setTempo(0.75); // Reset to default tempo
-    setIsPlaying(false);
-    setVoiceInputEnabled(false);
-    setAutoSendEnabled(false);
-    setAutoRecordEnabled(false);
-    setIsListening(false);
-    setKeyboardVisible(false);
+  // Store current audio parameter values so we can restore them
+  const currentSpeechThreshold = speechThreshold;
+  const currentSilenceThreshold = silenceThreshold;
+  const currentSilenceDuration = silenceDuration;
 
-    // Reset recorder state
-    resetRecording();
+  // Reset conversation and UI state
+  setHistory([]);
+  setConversationId(null);
+  setIsLoading(false);
+  setTempo(0.75); // Reset to default tempo
+  setIsPlaying(false);
+  setVoiceInputEnabled(false);
+  setAutoSendEnabled(false);
+  setAutoRecordEnabled(false);
+  setIsListening(false);
+  setKeyboardVisible(false);
 
-    // Clean up any audio resources
-    cleanup();
+  // Reset recorder state
+  resetRecording();
 
-    console.log("🔄 Conversation state reset due to route params change:", {
-      targetLanguage: getTargetLanguage(),
-      nativeLanguage: getNativeLanguage(),
-      difficulty: getDifficulty(),
-      learningObjective: getLearningObjective()
-    });
-  }, [route.params]); // This effect depends on route.params
+  // Clean up any audio resources
+  cleanup();
+
+  // Restore audio parameters to their current values
+  // This ensures they persist between conversations
+  setSpeechThreshold(currentSpeechThreshold);
+  setSilenceThreshold(currentSilenceThreshold);
+  setSilenceDuration(currentSilenceDuration);
+
+  console.log("🔄 Conversation state reset with preserved audio parameters:", {
+    preservedAudioParams: {
+      speechThreshold: currentSpeechThreshold,
+      silenceThreshold: currentSilenceThreshold,
+      silenceDuration: currentSilenceDuration
+    }
+  });
+}, [route.params]); // This effect depends on route.params
 
   // Add keyboard event listeners
   useEffect(() => {
