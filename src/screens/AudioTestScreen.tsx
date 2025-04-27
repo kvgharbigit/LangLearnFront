@@ -5,6 +5,7 @@ import {Audio, InterruptionModeAndroid, InterruptionModeIOS} from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../types/navigation';
+import {AUDIO_SETTINGS} from '../constants/settings';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AudioTest'>;
 
@@ -16,6 +17,7 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [logs, setLogs] = useState<Array<{message: string, timestamp: string, isError: boolean}>>([]);
   const [permissionStatus, setPermissionStatus] = useState<string | null>(null);
+  const [currentLevel, setCurrentLevel] = useState<number>(0);
 
   // Initialize and request permissions
   useEffect(() => {
@@ -38,6 +40,8 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
             staysActiveInBackground: false,
           });
           addLog('Audio session initialized');
+          addLog(`Using SILENCE_THRESHOLD: ${AUDIO_SETTINGS.SILENCE_THRESHOLD}`);
+          addLog(`Using SPEECH_THRESHOLD: ${AUDIO_SETTINGS.SPEECH_THRESHOLD}`);
         } else {
           addLog('Permission not granted!', true);
         }
@@ -65,6 +69,13 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
       ...prevLogs
     ]);
     console.log(`${timestamp}: ${message}`);
+  };
+
+  // Normalize audio level function - consistent with useVoiceRecorder.ts
+  const normalizeAudioLevel = (db: number): number => {
+    // Convert from dB scale to 0-100 linear scale consistently
+    // dB is typically negative, with -160 being silence and 0 being loudest
+    return Math.max(0, Math.min(100, (db + 160) / 160 * 100));
   };
 
   // Start recording function
@@ -136,14 +147,21 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
           },
         },
         (status) => {
-          // Log every 5th status update to avoid flooding
-          if (Math.random() < 0.2) {
-            if (status.isRecording) {
-              const metering = status.metering;
-              if (metering !== undefined) {
-                addLog(`Recording level: ${metering.toFixed(2)} dB`);
+          // Process all status updates but log only occasionally
+          if (status.isRecording) {
+            const db = status.metering !== undefined ? status.metering : -160;
+            const normalizedLevel = normalizeAudioLevel(db);
+            setCurrentLevel(normalizedLevel);
+
+            // Log every 5th status update to avoid flooding
+            if (Math.random() < 0.2) {
+              // Categorize audio level based on thresholds from settings
+              if (normalizedLevel > AUDIO_SETTINGS.SPEECH_THRESHOLD) {
+                addLog(`Speech detected! Level: ${normalizedLevel.toFixed(2)} (${db.toFixed(2)} dB)`);
+              } else if (normalizedLevel > AUDIO_SETTINGS.SILENCE_THRESHOLD) {
+                addLog(`Medium audio level: ${normalizedLevel.toFixed(2)} (${db.toFixed(2)} dB)`);
               } else {
-                addLog('Recording (no metering data)');
+                addLog(`Low level/silence: ${normalizedLevel.toFixed(2)} (${db.toFixed(2)} dB)`);
               }
             }
           }
@@ -192,6 +210,7 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
 
       const uri = recording.getURI();
       setRecordingUri(uri);
+      setCurrentLevel(0);
 
       if (uri) {
         addLog(`Recording saved to: ${uri}`);
@@ -259,6 +278,17 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  // Get audio level display color
+  const getAudioLevelColor = () => {
+    if (currentLevel > AUDIO_SETTINGS.SPEECH_THRESHOLD) {
+      return '#4caf50'; // Green for speech
+    } else if (currentLevel > AUDIO_SETTINGS.SILENCE_THRESHOLD) {
+      return '#ff9800'; // Orange for medium
+    } else {
+      return '#aaaaaa'; // Gray for low/silence
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
@@ -276,6 +306,52 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
       <Text style={styles.status}>
         Permission: {permissionStatus || 'Checking...'}
       </Text>
+
+      {isRecording && (
+        <View style={styles.levelIndicator}>
+          <Text style={styles.levelLabel}>Current Level:</Text>
+          <View style={styles.levelBarContainer}>
+            <View
+              style={[
+                styles.levelBar,
+                {
+                  width: `${currentLevel}%`,
+                  backgroundColor: getAudioLevelColor()
+                }
+              ]}
+            />
+          </View>
+          <View style={styles.thresholdMarkers}>
+            <View
+              style={[
+                styles.thresholdMarker,
+                {
+                  left: `${AUDIO_SETTINGS.SILENCE_THRESHOLD}%`,
+                  backgroundColor: '#ff9800'
+                }
+              ]}
+            />
+            <View
+              style={[
+                styles.thresholdMarker,
+                {
+                  left: `${AUDIO_SETTINGS.SPEECH_THRESHOLD}%`,
+                  backgroundColor: '#4caf50'
+                }
+              ]}
+            />
+          </View>
+          <View style={styles.thresholdLabels}>
+            <Text style={[styles.thresholdLabel, {left: `${AUDIO_SETTINGS.SILENCE_THRESHOLD}%`}]}>
+              Silence
+            </Text>
+            <Text style={[styles.thresholdLabel, {left: `${AUDIO_SETTINGS.SPEECH_THRESHOLD}%`}]}>
+              Speech
+            </Text>
+          </View>
+          <Text style={styles.levelValue}>{currentLevel.toFixed(1)}</Text>
+        </View>
+      )}
 
       <View style={styles.controls}>
         {isRecording ? (
@@ -356,6 +432,57 @@ const styles = StyleSheet.create({
     margin: 24,
     textAlign: 'center',
     color: '#555',
+  },
+  levelIndicator: {
+    margin: 20,
+    padding: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  levelLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+    color: '#555',
+  },
+  levelBarContainer: {
+    height: 24,
+    backgroundColor: '#eeeeee',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  levelBar: {
+    height: '100%',
+    backgroundColor: '#4caf50',
+  },
+  levelValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  thresholdMarkers: {
+    position: 'relative',
+    height: 16,
+    marginTop: 4,
+  },
+  thresholdMarker: {
+    position: 'absolute',
+    height: 16,
+    width: 2,
+    backgroundColor: '#ff0000',
+  },
+  thresholdLabels: {
+    position: 'relative',
+    height: 20,
+    marginTop: 2,
+  },
+  thresholdLabel: {
+    position: 'absolute',
+    fontSize: 10,
+    color: '#555',
+    transform: [{ translateX: -20 }],
   },
   controls: {
     flexDirection: 'row',

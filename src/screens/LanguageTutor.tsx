@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Message as MessageType } from '../types/messages';
+import { AUDIO_SETTINGS, PLAYER_SETTINGS, API_CONFIG } from '../constants/settings';
 
 // Import components
 import Message from '../components/Message';
@@ -30,7 +31,7 @@ import useVoiceRecorder from '../hooks/useVoiceRecorder';
 import * as api from '../utils/api';
 
 // Import constants
-import { AUDIO_SETTINGS, API_CONFIG } from '../constants/settings';
+
 import colors from '../styles/colors';
 
 // Interface for language info
@@ -88,6 +89,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   };
 
   // Use our custom voice recorder hook with pre-buffer options
+  // Use our custom voice recorder hook with settings from constants
   const voiceRecorder = useVoiceRecorder({
     silenceThreshold: AUDIO_SETTINGS.SILENCE_THRESHOLD,
     speechThreshold: AUDIO_SETTINGS.SPEECH_THRESHOLD,
@@ -96,6 +98,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     checkInterval: AUDIO_SETTINGS.CHECK_INTERVAL,
     preBufferDuration: 1000, // 1 second pre-buffer
   });
+
 
   // Destructure values from the hook
   const {

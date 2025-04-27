@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
+import { AUDIO_SETTINGS } from '../constants/settings'; // Import settings directly
 
 // Types
 interface VoiceRecorderOptions {
@@ -60,14 +61,15 @@ interface VoiceRecorderResult extends VoiceRecorderState {
  * @returns Recording state and control functions
  */
 const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResult => {
-  // Default settings with adjusted values for better sensitivity
+  // Use settings from the imported AUDIO_SETTINGS and override with options if provided
+  // Maintain consistent 0-100 scale for all audio levels and thresholds
   const settings: VoiceRecorderSettings = {
-    silenceThreshold: options.silenceThreshold || 5,
-    speechThreshold: options.speechThreshold || 15,
-    silenceDuration: options.silenceDuration || 2000,
-    minRecordingTime: options.minRecordingTime || 500,
-    checkInterval: options.checkInterval || 50,
-    preBufferDuration: options.preBufferDuration || 1000, // Default 1 second pre-buffer
+    silenceThreshold: options.silenceThreshold || AUDIO_SETTINGS.SILENCE_THRESHOLD,
+    speechThreshold: options.speechThreshold || AUDIO_SETTINGS.SPEECH_THRESHOLD,
+    silenceDuration: options.silenceDuration || AUDIO_SETTINGS.SILENCE_DURATION,
+    minRecordingTime: options.minRecordingTime || AUDIO_SETTINGS.MIN_RECORDING_TIME,
+    checkInterval: options.checkInterval || AUDIO_SETTINGS.CHECK_INTERVAL,
+    preBufferDuration: options.preBufferDuration || 1000,
   };
 
   // State
@@ -211,6 +213,13 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
     return () => clearInterval(interval);
   }, []);
 
+  // Convert dB level to normalized 0-100 scale
+  const normalizeAudioLevel = (db: number): number => {
+    // Convert from dB scale to 0-100 linear scale consistently
+    // dB is typically negative, with -160 being silence and 0 being loudest
+    return Math.max(0, Math.min(100, (db + 160) / 160 * 100));
+  };
+
   // Start pre-buffering function
   const startPreBuffering = useCallback(async (): Promise<void> => {
     if (isRecording || isProcessing) {
@@ -289,9 +298,9 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
         if (!mountedRef.current) return;
 
         if (status.isRecording) {
-          // Get the metering level (dB) and convert to a 0-100 scale
+          // Get the metering level (dB) and normalize to 0-100 scale
           const db = status.metering !== undefined ? status.metering : -160;
-          const normalizedLevel = Math.max(0, (db + 160) / 160 * 100);
+          const normalizedLevel = normalizeAudioLevel(db);
 
           // Only log occasionally to reduce console noise
           if (Math.random() < 0.05) {
@@ -491,9 +500,9 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
         if (!mountedRef.current) return;
 
         if (status.isRecording) {
-          // Get the metering level (dB) and convert to a 0-100 scale
+          // Get the metering level (dB) and normalize to 0-100 scale
           const db = status.metering !== undefined ? status.metering : -160;
-          const normalizedLevel = Math.max(0, (db + 160) / 160 * 100);
+          const normalizedLevel = normalizeAudioLevel(db);
 
           // Only log occasionally to reduce console noise
           if (Math.random() < 0.05) {

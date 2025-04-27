@@ -19,34 +19,34 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Threshold Lines */}
+      {/* Threshold Lines - Using 0-100 scale consistently */}
       <View
         style={[
           styles.thresholdLine,
           styles.speechLine,
-          { bottom: `${speechThreshold * 100 / 120}%` }
+          { bottom: `${speechThreshold}%` }
         ]}
       />
       <View
         style={[
           styles.thresholdLine,
           styles.silenceLine,
-          { bottom: `${silenceThreshold * 100 / 120}%` }
+          { bottom: `${silenceThreshold}%` }
         ]}
       />
 
       {/* Audio Bars */}
       <View style={styles.barsContainer}>
         {samples.map((level, index) => {
-          // Determine bar color based on audio level
+          // Determine bar color based on audio level - using 0-100 scale consistently
           const barStyle = level > speechThreshold
             ? styles.speechBar
             : level > silenceThreshold
               ? styles.mediumBar
               : styles.lowBar;
 
-          // Calculate height percentage based on audio level, max at 100%
-          const heightPercent = Math.min(level * 100 / 120, 100);
+          // Calculate height percentage based on audio level - on 0-100 scale
+          const heightPercent = Math.min(level, 100);
 
           return (
             <View
