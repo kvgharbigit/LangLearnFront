@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
 import TempoSlider from './TempoSlider';
+import { AUDIO_SETTINGS } from '../constants/settings';
 
 interface Props {
   targetLanguage: string;
@@ -50,6 +51,7 @@ const TutorHeader: React.FC<Props> = ({
 }) => {
   const [settingsModalVisible, setSettingsModalVisible] = useState<boolean>(false);
   const [debugModalVisible, setDebugModalVisible] = useState<boolean>(false);
+  const [audioInfoVisible, setAudioInfoVisible] = useState<boolean>(false);
 
   const toggleSettingsModal = () => {
     setSettingsModalVisible(!settingsModalVisible);
@@ -57,6 +59,10 @@ const TutorHeader: React.FC<Props> = ({
 
   const toggleDebugModal = () => {
     setDebugModalVisible(!debugModalVisible);
+  };
+
+  const toggleAudioInfo = () => {
+    setAudioInfoVisible(!audioInfoVisible);
   };
 
   const goBack = () => {
@@ -110,6 +116,44 @@ const TutorHeader: React.FC<Props> = ({
                     setTempo={setTempo}
                   />
                 </View>
+
+                <TouchableOpacity
+                  style={[styles.infoButton, audioInfoVisible && styles.infoButtonActive]}
+                  onPress={toggleAudioInfo}
+                >
+                  <Text style={[styles.infoButtonText, audioInfoVisible && styles.infoButtonTextActive]}>
+                    {audioInfoVisible ? 'Hide Audio Thresholds' : 'Show Audio Thresholds'}
+                  </Text>
+                </TouchableOpacity>
+
+                {audioInfoVisible && (
+                  <View style={styles.audioThresholds}>
+                    <View style={styles.audioPlatformLabel}>
+                      <Text style={styles.audioPlatformText}>
+                        {Platform.OS === 'ios' ? 'iOS' : 'Android'} Audio Settings
+                      </Text>
+                    </View>
+
+                    <View style={styles.audioInfoRow}>
+                      <Text style={styles.audioInfoLabel}>Speech Threshold:</Text>
+                      <Text style={styles.audioInfoValue}>{AUDIO_SETTINGS.SPEECH_THRESHOLD}</Text>
+                    </View>
+
+                    <View style={styles.audioInfoRow}>
+                      <Text style={styles.audioInfoLabel}>Silence Threshold:</Text>
+                      <Text style={styles.audioInfoValue}>{AUDIO_SETTINGS.SILENCE_THRESHOLD}</Text>
+                    </View>
+
+                    <View style={styles.audioInfoRow}>
+                      <Text style={styles.audioInfoLabel}>Silence Duration:</Text>
+                      <Text style={styles.audioInfoValue}>{AUDIO_SETTINGS.SILENCE_DURATION}ms</Text>
+                    </View>
+
+                    <Text style={styles.audioInfoDescription}>
+                      These thresholds are optimized for {Platform.OS === 'ios' ? 'iOS' : 'Android'} devices to provide the best speech detection and silence handling experience.
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.settingSection}>
@@ -167,6 +211,9 @@ const TutorHeader: React.FC<Props> = ({
 
               <Text style={styles.helpSectionTitle}>Auto-record Feature</Text>
               <Text style={styles.helpParagraph}>When enabled, the app will automatically start recording 1.5 seconds after the AI's audio response finishes playing. This allows for more natural back-and-forth conversation.</Text>
+
+              <Text style={styles.helpSectionTitle}>Device-Specific Settings</Text>
+              <Text style={styles.helpParagraph}>The app uses different audio sensitivity settings on iOS and Android devices to compensate for hardware and software differences. These settings are automatically applied based on your device.</Text>
 
               <Text style={styles.helpSectionTitle}>Troubleshooting</Text>
               <Text style={styles.helpItem}>• If recording isn't starting, check microphone permissions in your device settings</Text>
@@ -286,6 +333,67 @@ const styles = StyleSheet.create({
   helpButtonText: {
     color: colors.primary,
     fontWeight: '500',
+  },
+  infoButton: {
+    backgroundColor: colors.gray100,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  infoButtonActive: {
+    backgroundColor: colors.primaryLight,
+  },
+  infoButtonText: {
+    color: colors.gray700,
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  infoButtonTextActive: {
+    color: colors.primary,
+  },
+  audioThresholds: {
+    backgroundColor: colors.gray50,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  audioPlatformLabel: {
+    backgroundColor: colors.primaryLight,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  audioPlatformText: {
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  audioInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+  },
+  audioInfoLabel: {
+    fontSize: 14,
+    color: colors.gray700,
+  },
+  audioInfoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray800,
+  },
+  audioInfoDescription: {
+    fontSize: 12,
+    color: colors.gray600,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   helpSectionTitle: {
     fontSize: 16,

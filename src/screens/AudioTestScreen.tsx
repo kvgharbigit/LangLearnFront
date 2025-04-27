@@ -40,8 +40,10 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
             staysActiveInBackground: false,
           });
           addLog('Audio session initialized');
+          addLog(`Platform: ${Platform.OS.toUpperCase()}`);
           addLog(`Using SILENCE_THRESHOLD: ${AUDIO_SETTINGS.SILENCE_THRESHOLD}`);
           addLog(`Using SPEECH_THRESHOLD: ${AUDIO_SETTINGS.SPEECH_THRESHOLD}`);
+          addLog(`Using SILENCE_DURATION: ${AUDIO_SETTINGS.SILENCE_DURATION}ms`);
         } else {
           addLog('Permission not granted!', true);
         }
@@ -307,6 +309,21 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
         Permission: {permissionStatus || 'Checking...'}
       </Text>
 
+      <View style={styles.platformInfo}>
+        <Text style={styles.platformText}>
+          Platform: <Text style={styles.platformValue}>{Platform.OS.toUpperCase()}</Text>
+        </Text>
+        <Text style={styles.platformText}>
+          Silence Threshold: <Text style={styles.platformValue}>{AUDIO_SETTINGS.SILENCE_THRESHOLD}</Text>
+        </Text>
+        <Text style={styles.platformText}>
+          Speech Threshold: <Text style={styles.platformValue}>{AUDIO_SETTINGS.SPEECH_THRESHOLD}</Text>
+        </Text>
+        <Text style={styles.platformText}>
+          Silence Duration: <Text style={styles.platformValue}>{AUDIO_SETTINGS.SILENCE_DURATION}ms</Text>
+        </Text>
+      </View>
+
       {isRecording && (
         <View style={styles.levelIndicator}>
           <Text style={styles.levelLabel}>Current Level:</Text>
@@ -429,9 +446,27 @@ const styles = StyleSheet.create({
   },
   status: {
     fontSize: 16,
-    margin: 24,
+    margin: 16,
+    marginBottom: 0,
     textAlign: 'center',
     color: '#555',
+  },
+  platformInfo: {
+    margin: 16,
+    padding: 12,
+    backgroundColor: '#f0f7ff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d0e1f9',
+  },
+  platformText: {
+    fontSize: 14,
+    marginBottom: 4,
+    color: '#333',
+  },
+  platformValue: {
+    fontWeight: 'bold',
+    color: '#0066cc',
   },
   levelIndicator: {
     margin: 20,
