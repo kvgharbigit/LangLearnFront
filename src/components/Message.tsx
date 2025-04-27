@@ -1,4 +1,4 @@
-// This is the updated Message.tsx with improved text container sizing
+// Updated Message.tsx with improved dynamic sizing for user message bubbles
 
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
@@ -67,36 +67,35 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
       : '';
 
   // Function to highlight incorrect words in red in the original message
-  // Replace the current highlightIncorrectWords function with this simpler version
-const highlightIncorrectWords = useMemo(() => {
-  if (!isUser || !message.corrected || isEquivalentToCorrected) {
-    // If there's no correction or the correction is the same, return unchanged
-    return message.content;
-  }
-
-  // Split the texts into words
-  const originalWords = message.content.split(/\s+/);
-  const correctedWords = message.corrected.split(/\s+/);
-
-  // Create a normalized set of corrected words for faster lookup
-  const normalizedCorrectedWords = new Set(
-    correctedWords.map(word => normalizeText(word))
-  );
-
-  // Mark words that don't appear in the corrected text as incorrect
-  const result = originalWords.map(word => {
-    const normalizedWord = normalizeText(word);
-
-    // If the normalized word is not in the corrected text, highlight it
-    if (!normalizedCorrectedWords.has(normalizedWord)) {
-      return `<span style="color: #FF0000">${word}</span>`;
+  const highlightIncorrectWords = useMemo(() => {
+    if (!isUser || !message.corrected || isEquivalentToCorrected) {
+      // If there's no correction or the correction is the same, return unchanged
+      return message.content;
     }
 
-    return word;
-  });
+    // Split the texts into words
+    const originalWords = message.content.split(/\s+/);
+    const correctedWords = message.corrected.split(/\s+/);
 
-  return result.join(' ');
-}, [isUser, message.content, message.corrected, isEquivalentToCorrected]);
+    // Create a normalized set of corrected words for faster lookup
+    const normalizedCorrectedWords = new Set(
+      correctedWords.map(word => normalizeText(word))
+    );
+
+    // Mark words that don't appear in the corrected text as incorrect
+    const result = originalWords.map(word => {
+      const normalizedWord = normalizeText(word);
+
+      // If the normalized word is not in the corrected text, highlight it
+      if (!normalizedCorrectedWords.has(normalizedWord)) {
+        return `<span style="color: #FF0000">${word}</span>`;
+      }
+
+      return word;
+    });
+
+    return result.join(' ');
+  }, [isUser, message.content, message.corrected, isEquivalentToCorrected]);
 
   // Styles for HTML rendering
   const correctedTagsStyles = useMemo(() => ({
@@ -145,7 +144,9 @@ const highlightIncorrectWords = useMemo(() => {
       styles.messageContainer,
       isUser && styles.userMessage,
       isAssistant && styles.assistantMessage,
-      isSystem && styles.systemMessage
+      isSystem && styles.systemMessage,
+      // Add dynamic width for user messages with corrections
+      (isUser && showCorrections) && styles.wideUserMessage
     ]}>
       <View style={styles.messageContent}>
         {isUser && bothCorrectionsMatch ? (
@@ -182,7 +183,7 @@ const highlightIncorrectWords = useMemo(() => {
                   <View style={styles.annotationTextContainer}>
                     <HTML
                       source={{ html: highlightedNative }}
-                      contentWidth={screenWidth * 0.7} // Increase available width
+                      contentWidth={screenWidth * 0.75} // Increased available width
                       tagsStyles={nativeTagsStyles}
                       baseStyle={nativeBaseStyle}
                     />
@@ -196,7 +197,7 @@ const highlightIncorrectWords = useMemo(() => {
           <View style={styles.mainTextContainer}>
             <HTML
               source={{ html: highlightIncorrectWords }}
-              contentWidth={screenWidth * 0.7} // Increase available width
+              contentWidth={screenWidth * 0.75} // Increased available width
               tagsStyles={correctedTagsStyles}
               baseStyle={[
                 styles.mainText,
@@ -253,7 +254,7 @@ const highlightIncorrectWords = useMemo(() => {
                   <View style={styles.annotationTextContainer}>
                     <HTML
                       source={{ html: highlightedCorrected }}
-                      contentWidth={screenWidth * 0.7} // Increase available width
+                      contentWidth={screenWidth * 0.75} // Increased available width for annotations
                       tagsStyles={correctedTagsStyles}
                       baseStyle={correctedBaseStyle}
                     />
@@ -284,7 +285,7 @@ const highlightIncorrectWords = useMemo(() => {
                   <View style={styles.annotationTextContainer}>
                     <HTML
                       source={{ html: highlightedNative }}
-                      contentWidth={screenWidth * 0.7} // Increase available width
+                      contentWidth={screenWidth * 0.75} // Increased available width
                       tagsStyles={nativeTagsStyles}
                       baseStyle={nativeBaseStyle}
                     />
@@ -321,6 +322,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     alignSelf: 'flex-end',
     borderBottomRightRadius: 4,
+    // Removed fixed width to allow dynamic sizing
+  },
+  // New style for user messages with corrections - make them wider
+  wideUserMessage: {
+    width: '90%', // Use a wider fixed width for messages with corrections
+    maxWidth: screenWidth * 0.9, // But not wider than 90% of screen
   },
   assistantMessage: {
     backgroundColor: '#f0f4ff', // Lighter blue background for better readability
@@ -337,17 +344,20 @@ const styles = StyleSheet.create({
   },
   messageContent: {
     flexDirection: 'column',
+    width: '100%', // Ensure content takes full width of container
   },
   mainTextContainer: {
     marginBottom: 4,
     flexDirection: 'row',
     flexWrap: 'wrap',
+    width: '100%', // Ensure container takes full width
   },
   annotationsContainer: {
     marginTop: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.1)',
     paddingTop: 8,
+    width: '100%', // Ensure container takes full width
   },
   mainText: {
     marginBottom: 4,
@@ -365,6 +375,7 @@ const styles = StyleSheet.create({
   messageAnnotation: {
     marginTop: 6,
     paddingVertical: 4,
+    width: '100%', // Ensure annotation takes full width
   },
   grammarHint: {
     marginBottom: 6,
@@ -378,6 +389,7 @@ const styles = StyleSheet.create({
   annotationRow: {
     flexDirection: 'row',
     alignItems: 'flex-start', // Align to top instead of center
+    width: '100%', // Ensure row takes full width
   },
   annotationLabel: {
     fontWeight: '600',
