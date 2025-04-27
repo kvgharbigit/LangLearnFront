@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
 import { AUDIO_SETTINGS } from '../constants/settings';
+import MicrophoneTest from './MicrophoneTest'; // Import the new component
 
 interface Props {
   targetLanguage: string;
@@ -69,6 +70,7 @@ const TutorHeader: React.FC<Props> = ({
   const [helpModalVisible, setHelpModalVisible] = useState<boolean>(false);
   const [audioInfoVisible, setAudioInfoVisible] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'audio' | 'advanced'>('audio');
+  const [showMicTest, setShowMicTest] = useState<boolean>(false); // New state for mic test
 
   // State for text input values
   const [speechThresholdText, setSpeechThresholdText] = useState<string>(speechThreshold.toString());
@@ -113,6 +115,11 @@ const TutorHeader: React.FC<Props> = ({
         useNativeDriver: true,
       }).start();
     }
+  };
+
+  // Toggle microphone test section
+  const toggleMicTest = () => {
+    setShowMicTest(!showMicTest);
   };
 
   const goBack = () => {
@@ -500,6 +507,25 @@ const TutorHeader: React.FC<Props> = ({
                         <Text style={styles.visualizerLabelText}>Speech</Text>
                       </View>
                     </View>
+
+                    {/* NEW: Microphone test toggle button */}
+                    <TouchableOpacity
+                      style={styles.testToggleButton}
+                      onPress={toggleMicTest}
+                    >
+                      <Ionicons name={showMicTest ? "chevron-up" : "mic-circle"} size={18} color="white" />
+                      <Text style={styles.testToggleText}>
+                        {showMicTest ? "Hide Microphone Test" : "Test Your Microphone"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* NEW: Microphone test section */}
+                    {showMicTest && (
+                      <MicrophoneTest
+                        speechThreshold={speechThreshold}
+                        silenceThreshold={silenceThreshold}
+                      />
+                    )}
 
                     {/* Reset Button */}
                     <TouchableOpacity
@@ -1249,6 +1275,23 @@ const styles = StyleSheet.create({
   visualizerLabelText: {
     fontSize: 12,
     color: colors.gray600,
+  },
+  // New styles for microphone test toggle
+  testToggleButton: {
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginVertical: 16,
+    gap: 8,
+  },
+  testToggleText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
   },
   resetButton: {
     backgroundColor: colors.primary,
