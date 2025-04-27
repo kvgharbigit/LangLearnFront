@@ -94,6 +94,7 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
   const preBufferStartTimeRef = useRef<number | null>(null);
   const speechDetectedTimeRef = useRef<number | null>(null);
   const cleanupInProgressRef = useRef<boolean>(false);
+  const preBufferTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Added ref for pre-buffer timeout
 
   // Tracking refs
   const hasSpeechRef = useRef<boolean>(false);
@@ -140,6 +141,12 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
     cleanupInProgressRef.current = true;
 
     try {
+      // Clear any pre-buffer timeout
+      if (preBufferTimeoutRef.current) {
+        clearTimeout(preBufferTimeoutRef.current);
+        preBufferTimeoutRef.current = null;
+      }
+
       // Clear silence detector interval
       if (silenceDetectorRef.current) {
         clearInterval(silenceDetectorRef.current);
@@ -227,6 +234,19 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       return;
     }
 
+    // Check if audio is currently playing and exit if it is
+    try {
+      const audioMode = await Audio.getAudioModeAsync();
+      if (!audioMode.allowsRecordingIOS && audioMode.playsInSilentModeIOS) {
+        console.log('Audio appears to be playing, ignoring pre-buffer request');
+        setStatusMessage('Please wait for audio to finish playing');
+        return;
+      }
+    } catch (error) {
+      console.log('Error checking audio mode:', error);
+      // Continue anyway since this is just a precaution
+    }
+
     try {
       // Reset state for pre-buffering
       setAudioLevel(0);
@@ -240,6 +260,12 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       silenceStartRef.current = null;
       recordingUriRef.current = null;
       speechDetectedTimeRef.current = null;
+
+      // Clear any existing pre-buffer timeout
+      if (preBufferTimeoutRef.current) {
+        clearTimeout(preBufferTimeoutRef.current);
+        preBufferTimeoutRef.current = null;
+      }
 
       // Run cleanup to make sure we don't have any lingering recordings
       console.log('Running cleanup before pre-buffering');
@@ -318,6 +344,13 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
 
             // Mark the time when speech was detected
             speechDetectedTimeRef.current = Date.now();
+
+            // Clear the pre-buffer timeout since we've detected speech
+            if (preBufferTimeoutRef.current) {
+              clearTimeout(preBufferTimeoutRef.current);
+              preBufferTimeoutRef.current = null;
+              console.log('Cleared pre-buffer timeout due to speech detection');
+            }
 
             // Transition from pre-buffer to active recording
             isPreBufferingRef.current = false;
@@ -399,7 +432,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       setStatusMessage('Pre-buffering active - waiting for speech...');
 
       // Set up a timeout to auto-stop pre-buffering if no speech is detected
-      setTimeout(() => {
+      // Store the timeout ID so we can cancel it later if needed
+      const preBufferTimeoutId = setTimeout(() => {
         // Only stop if we're still in pre-buffer mode (no speech detected)
         if (isPreBufferingRef.current && mountedRef.current) {
           console.log("Pre-buffer timeout reached with no speech detected");
@@ -417,6 +451,9 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
         }
       }, 30000); // 30-second timeout for pre-buffer mode
 
+      // Store the timeout ID in our ref
+      preBufferTimeoutRef.current = preBufferTimeoutId;
+
     } catch (error) {
       console.error('Error starting pre-buffer recording:', error);
       setStatusMessage(`Microphone error: ${error instanceof Error ? error.message : String(error)}`);
@@ -433,6 +470,19 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       return;
     }
 
+    // Check if audio is currently playing and exit if it is
+    try {
+      const audioMode = await Audio.getAudioModeAsync();
+      if (!audioMode.allowsRecordingIOS && audioMode.playsInSilentModeIOS) {
+        console.log('Audio appears to be playing, ignoring recording request');
+        setStatusMessage('Please wait for audio to finish playing');
+        return;
+      }
+    } catch (error) {
+      console.log('Error checking audio mode:', error);
+      // Continue anyway since this is just a precaution
+    }
+
     try {
       // Reset state
       setAudioLevel(0);
@@ -447,6 +497,12 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       recordingUriRef.current = null;
       isPreBufferingRef.current = false;
       setIsPreBuffering(false);
+
+      // Clear any existing pre-buffer timeout
+      if (preBufferTimeoutRef.current) {
+        clearTimeout(preBufferTimeoutRef.current);
+        preBufferTimeoutRef.current = null;
+      }
 
       setStatusMessage('Preparing to record...');
 
@@ -616,6 +672,13 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
   const stopRecording = useCallback(async (): Promise<void> => {
     setStatusMessage('Stopping recording...');
 
+    // Clear any pre-buffer timeout first
+    if (preBufferTimeoutRef.current) {
+      clearTimeout(preBufferTimeoutRef.current);
+      preBufferTimeoutRef.current = null;
+      console.log('Cleared pre-buffer timeout during stopRecording');
+    }
+
     if (!recordingRef.current) {
       console.log('No recording to stop');
       setIsRecording(false);
@@ -699,6 +762,13 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
     preBufferStartTimeRef.current = null;
     isPreBufferingRef.current = false;
     setIsPreBuffering(false);
+
+    // Clear any existing pre-buffer timeout
+    if (preBufferTimeoutRef.current) {
+      clearTimeout(preBufferTimeoutRef.current);
+      preBufferTimeoutRef.current = null;
+      console.log('Cleared pre-buffer timeout during resetRecording');
+    }
   }, []);
 
   return {

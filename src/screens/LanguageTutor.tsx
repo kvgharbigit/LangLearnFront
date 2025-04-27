@@ -1100,6 +1100,11 @@ const playAudio = async (conversationId, messageIndex = -1) => {
 
   // UI Handlers
   const handleVoiceButtonClick = async () => {
+      // Don't do anything if audio is playing
+      if (isPlaying) {
+        setStatusMessage('Please wait for audio to finish playing');
+        return;
+      }
     // Clean up any active recording/pre-buffering
     cleanup();
 
@@ -1348,58 +1353,64 @@ const playAudio = async (conversationId, messageIndex = -1) => {
           {voiceInputEnabled ? (
             <View style={styles.voiceInputControls}>
               <TouchableOpacity
-                style={[
-                  styles.voiceButton,
-                  (isRecording || isPreBuffering) && styles.recordingButton,
-                  isProcessing && styles.processingButton,
-                  isListening && styles.listeningButton
-                ]}
-                onPress={handleVoiceButtonClick}
-                disabled={isProcessing}
-              >
-                {isRecording ? (
-                  <>
-                    <Animated.View
-                      style={[
-                        styles.pulse,
-                        { transform: [{ scale: pulseAnim }] }
-                      ]}
-                    />
-                    <Text style={styles.micIcon}>🎙️</Text>
-                    <Text style={styles.buttonText}>Stop Recording</Text>
-                  </>
-                ) : isPreBuffering ? (
-                  <>
-                    <Animated.View
-                      style={[
-                        styles.pulse,
-                        { transform: [{ scale: pulseAnim }] }
-                      ]}
-                    />
-                    <Text style={styles.micIcon}>⏱️</Text>
-                    <Text style={styles.buttonText}>Pre-buffering...</Text>
-                  </>
-                ) : isProcessing ? (
-                  <>
-                    <Text style={styles.processingIcon}>⏳</Text>
-                    <Text style={styles.buttonText}>Processing...</Text>
-                  </>
-                ) : isListening ? (
-                  <>
-                    <Text style={styles.listeningIcon}>👂</Text>
-                    <Text style={styles.buttonText}>Listening for speech...</Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.micIcon}>🎙️</Text>
-                    <Text style={styles.buttonText}>
-                      {autoRecordEnabled
-                        ? 'Start Recording (auto after AI)'
-                        : 'Start Recording'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                  style={[
+                    styles.voiceButton,
+                    (isRecording || isPreBuffering) && styles.recordingButton,
+                    isProcessing && styles.processingButton,
+                    isListening && styles.listeningButton,
+                    isPlaying && styles.disabledVoiceButton // Add this new style
+                  ]}
+                  onPress={handleVoiceButtonClick}
+                  disabled={isProcessing || isPlaying} // Add isPlaying to disabled condition
+                >
+                  {isRecording ? (
+                    <>
+                      <Animated.View
+                        style={[
+                          styles.pulse,
+                          { transform: [{ scale: pulseAnim }] }
+                        ]}
+                      />
+                      <Text style={styles.micIcon}>🎙️</Text>
+                      <Text style={styles.buttonText}>Stop Recording</Text>
+                    </>
+                  ) : isPreBuffering ? (
+                    <>
+                      <Animated.View
+                        style={[
+                          styles.pulse,
+                          { transform: [{ scale: pulseAnim }] }
+                        ]}
+                      />
+                      <Text style={styles.micIcon}>⏱️</Text>
+                      <Text style={styles.buttonText}>Pre-buffering...</Text>
+                    </>
+                  ) : isProcessing ? (
+                    <>
+                      <Text style={styles.processingIcon}>⏳</Text>
+                      <Text style={styles.buttonText}>Processing...</Text>
+                    </>
+                  ) : isPlaying ? (
+                    <>
+                      <Text style={styles.playingIcon}>🔊</Text>
+                      <Text style={styles.buttonText}>Audio playing...</Text>
+                    </>
+                  ) : isListening ? (
+                    <>
+                      <Text style={styles.listeningIcon}>👂</Text>
+                      <Text style={styles.buttonText}>Listening for speech...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.micIcon}>🎙️</Text>
+                      <Text style={styles.buttonText}>
+                        {autoRecordEnabled
+                          ? 'Start Recording (auto after AI)'
+                          : 'Start Recording'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
 
               {(isRecording || isPreBuffering) && (
                 <View style={[
@@ -1611,6 +1622,15 @@ const styles = StyleSheet.create({
   listeningButton: {
     backgroundColor: colors.info,
   },
+    disabledVoiceButton: {
+  backgroundColor: colors.gray400,
+  opacity: 0.7,
+  shadowOpacity: 0,
+  elevation: 0,
+},
+playingIcon: {
+  fontSize: 20,
+},
   pulse: {
     position: 'absolute',
     width: '100%',
@@ -1761,5 +1781,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
 
 export default LanguageTutor;
