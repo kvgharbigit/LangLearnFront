@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -77,6 +77,13 @@ const TutorHeader: React.FC<Props> = ({
 
   // Animation
   const [animation] = useState(new Animated.Value(0));
+
+  // Update text input values when props change
+  useEffect(() => {
+    setSpeechThresholdText(speechThreshold.toString());
+    setSilenceThresholdText(silenceThreshold.toString());
+    setSilenceDurationText(silenceDuration.toString());
+  }, [speechThreshold, silenceThreshold, silenceDuration, settingsModalVisible]);
 
   // Toggle functions
   const toggleSettingsModal = () => {
