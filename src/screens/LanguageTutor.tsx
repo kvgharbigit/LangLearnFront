@@ -88,14 +88,28 @@ const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null
 
   // Get language display info
   const getLanguageInfo = (code: string): LanguageInfo => {
-    const languages: Record<string, LanguageInfo> = {
-      'en': { name: 'English', flag: '🇬🇧' },
-      'es': { name: 'Spanish', flag: '🇪🇸' },
-      'fr': { name: 'French', flag: '🇫🇷' },
-      'it': { name: 'Italian', flag: '🇮🇹' }
-    };
-    return languages[code] || { name: 'Unknown', flag: '🏳️' };
+  const languages: Record<string, LanguageInfo> = {
+    'en': { name: 'English', flag: '🇬🇧' },
+    'es': { name: 'Spanish', flag: '🇪🇸' },
+    'fr': { name: 'French', flag: '🇫🇷' },
+    'zh': { name: 'Chinese Mandarin', flag: '🇨🇳' },
+    'de': { name: 'German', flag: '🇩🇪' },
+    'pt': { name: 'Portuguese', flag: '🇵🇹' },
+    'ar': { name: 'Arabic', flag: '🇸🇦' },
+    'ja': { name: 'Japanese', flag: '🇯🇵' },
+    'ko': { name: 'Korean', flag: '🇰🇷' },
+    'it': { name: 'Italian', flag: '🇮🇹' },
+    'ru': { name: 'Russian', flag: '🇷🇺' },
+    'hi': { name: 'Hindi', flag: '🇮🇳' },
+    'pl': { name: 'Polish', flag: '🇵🇱' },
+    'nl': { name: 'Dutch', flag: '🇳🇱' },
+    'hu': { name: 'Hungarian', flag: '🇭🇺' },
+    'fi': { name: 'Finnish', flag: '🇫🇮' },
+    'el': { name: 'Greek', flag: '🇬🇷' },
+    'tr': { name: 'Turkish', flag: '🇹🇷' }
   };
+  return languages[code] || { name: 'Unknown', flag: '🏳️' };
+};
 
   // Get current language info
   const getTargetInfo = () => {
