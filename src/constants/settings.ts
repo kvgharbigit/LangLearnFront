@@ -1,8 +1,9 @@
 // src/constants/settings.ts
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Platform-specific audio settings values
-const PLATFORM_SPECIFIC = {
+export const PLATFORM_SPECIFIC = {
   ios: {
     // iOS tends to need higher thresholds due to different audio processing
     SILENCE_THRESHOLD: 75,
@@ -38,6 +39,53 @@ export const AUDIO_SETTINGS = {
   CHECK_INTERVAL: 50,
 };
 
+// Helper functions to save and load custom audio settings
+export const saveAudioSettings = async (settings: {
+  speechThreshold: number;
+  silenceThreshold: number;
+  silenceDuration: number;
+}) => {
+  try {
+    await AsyncStorage.setItem('AUDIO_SETTINGS', JSON.stringify(settings));
+    return true;
+  } catch (error) {
+    console.error('Error saving audio settings:', error);
+    return false;
+  }
+};
+
+export const loadAudioSettings = async () => {
+  try {
+    const savedSettings = await AsyncStorage.getItem('AUDIO_SETTINGS');
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings);
+      // Update the in-memory settings
+      AUDIO_SETTINGS.SPEECH_THRESHOLD = settings.speechThreshold;
+      AUDIO_SETTINGS.SILENCE_THRESHOLD = settings.silenceThreshold;
+      AUDIO_SETTINGS.SILENCE_DURATION = settings.silenceDuration;
+      return settings;
+    }
+  } catch (error) {
+    console.error('Error loading audio settings:', error);
+  }
+  return null;
+};
+
+// Reset to platform defaults
+export const resetAudioSettings = async () => {
+  try {
+    await AsyncStorage.removeItem('AUDIO_SETTINGS');
+    // Reset the in-memory settings
+    AUDIO_SETTINGS.SPEECH_THRESHOLD = platformValues.SPEECH_THRESHOLD;
+    AUDIO_SETTINGS.SILENCE_THRESHOLD = platformValues.SILENCE_THRESHOLD;
+    AUDIO_SETTINGS.SILENCE_DURATION = platformValues.SILENCE_DURATION;
+    return true;
+  } catch (error) {
+    console.error('Error resetting audio settings:', error);
+    return false;
+  }
+};
+
 // Default audio player settings
 export const PLAYER_SETTINGS = {
   // Default playback speed
@@ -69,5 +117,8 @@ export const API_CONFIG = {
 export default {
   AUDIO_SETTINGS,
   PLAYER_SETTINGS,
-  API_CONFIG
+  API_CONFIG,
+  saveAudioSettings,
+  loadAudioSettings,
+  resetAudioSettings,
 };

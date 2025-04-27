@@ -15,9 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Message as MessageType } from '../types/messages';
-import { AUDIO_SETTINGS, PLAYER_SETTINGS, API_CONFIG } from '../constants/settings';
-
-
+import { AUDIO_SETTINGS, PLAYER_SETTINGS, API_CONFIG, loadAudioSettings, saveAudioSettings } from '../constants/settings';
 
 // Import components
 import Message from '../components/Message';
@@ -31,8 +29,6 @@ import useVoiceRecorder from '../hooks/useVoiceRecorder';
 
 // Import utilities
 import * as api from '../utils/api';
-
-// Import constants
 
 import colors from '../styles/colors';
 
@@ -57,6 +53,11 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const [autoRecordEnabled, setAutoRecordEnabled] = useState<boolean>(false);
   const [isListening, setIsListening] = useState<boolean>(false);
   const [keyboardVisible, setKeyboardVisible] = useState<boolean>(false);
+
+  // New state for customizable audio parameters
+  const [speechThreshold, setSpeechThreshold] = useState<number>(AUDIO_SETTINGS.SPEECH_THRESHOLD);
+  const [silenceThreshold, setSilenceThreshold] = useState<number>(AUDIO_SETTINGS.SILENCE_THRESHOLD);
+  const [silenceDuration, setSilenceDuration] = useState<number>(AUDIO_SETTINGS.SILENCE_DURATION);
 
   // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -91,17 +92,42 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     return getLanguageInfo(getTargetLanguage());
   };
 
-  // Use our custom voice recorder hook with pre-buffer options
-  // Use our custom voice recorder hook with settings from constants
+  // Load saved audio settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      const savedSettings = await loadAudioSettings();
+      if (savedSettings) {
+        setSpeechThreshold(savedSettings.speechThreshold);
+        setSilenceThreshold(savedSettings.silenceThreshold);
+        setSilenceDuration(savedSettings.silenceDuration);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  // Save audio settings when they change
+  useEffect(() => {
+    // Only save if all values are valid
+    if (speechThreshold >= silenceThreshold &&
+        silenceThreshold >= 0 &&
+        silenceDuration >= 500) {
+      saveAudioSettings({
+        speechThreshold,
+        silenceThreshold,
+        silenceDuration
+      });
+    }
+  }, [speechThreshold, silenceThreshold, silenceDuration]);
+
+  // Use our custom voice recorder hook with settings from state values
   const voiceRecorder = useVoiceRecorder({
-    silenceThreshold: AUDIO_SETTINGS.SILENCE_THRESHOLD,
-    speechThreshold: AUDIO_SETTINGS.SPEECH_THRESHOLD,
-    silenceDuration: AUDIO_SETTINGS.SILENCE_DURATION,
+    silenceThreshold: silenceThreshold,
+    speechThreshold: speechThreshold,
+    silenceDuration: silenceDuration,
     minRecordingTime: AUDIO_SETTINGS.MIN_RECORDING_TIME,
     checkInterval: AUDIO_SETTINGS.CHECK_INTERVAL,
     preBufferDuration: 1000, // 1 second pre-buffer
   });
-
 
   // Destructure values from the hook
   const {
@@ -316,89 +342,12 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Welcome message when the component mounts
   useEffect(() => {
-  if (history.length === 0) {
-    // Start a new conversation with the given parameters
-    initializeConversation();
-  }
-}, [route.params]); // Add route.params dependency to re-initialize if params change
-
-
-  // Add this new function to handle initializing conversations
-const initializeConversation = async () => {
-  try {
-    setIsLoading(true);
-
-    // Call the new API endpoint to create a conversation
-    const response = await api.createConversation({
-      difficulty: getDifficulty(),
-      nativeLanguage: getNativeLanguage(),
-      targetLanguage: getTargetLanguage(),
-      learningObjective: getLearningObjective(),
-      tempo: tempo
-    });
-
-    // Update state with the response data
-    if (response) {
-      // Set conversation ID
-      setConversationId(response.conversation_id);
-
-      // Set initial message
-      setHistory(response.history || []);
-
-      // Play audio for the welcome message
-      if (response.has_audio) {
-        setStatusMessage('Streaming welcome audio...');
-        await playAudio(response.conversation_id, 0); // Play the first message (welcome)
-      }
+    if (history.length === 0) {
+      // Start a new conversation with the given parameters
+      initializeConversation();
     }
-  } catch (error) {
-    console.error('Error initializing conversation:', error);
+  }, [route.params]); // Add route.params dependency to re-initialize if params change
 
-    // Fallback if the API call fails
-    const currentTargetLanguage = getTargetLanguage();
-    const currentLearningObjective = getLearningObjective();
-
-    // Create a fallback welcome message
-    let welcomeMessage = {
-      role: 'assistant',
-      content: getWelcomeMessage(currentTargetLanguage, currentLearningObjective),
-      timestamp: new Date().toISOString(),
-      translation: ''
-    };
-
-    setHistory([welcomeMessage]);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-// Helper function to get welcome message based on language
-const getWelcomeMessage = (language: string, learningObjective?: string): string => {
-  const welcomeMessages: Record<string, { basic: string, withObjective: string }> = {
-    'es': {
-      basic: '¡Hola! Soy tu tutor de español. ¿Cómo estás hoy?',
-      withObjective: `¡Hola! Veo que quieres practicar: "${learningObjective}". ¡Empecemos!`
-    },
-    'fr': {
-      basic: 'Bonjour! Je suis votre tuteur de français. Comment allez-vous aujourd\'hui?',
-      withObjective: `Bonjour! Je vois que vous voulez pratiquer: "${learningObjective}". Commençons!`
-    },
-    'it': {
-      basic: 'Ciao! Sono il tuo tutor di italiano. Come stai oggi?',
-      withObjective: `Ciao! Vedo che vuoi praticare: "${learningObjective}". Iniziamo!`
-    },
-    'en': {
-      basic: 'Hello! I\'m your English tutor. How can I help you today?',
-      withObjective: `Hello! I see you want to practice: "${learningObjective}". Let's begin!`
-    }
-  };
-
-  // Get messages for the current language, fallback to English if not found
-  const messages = welcomeMessages[language] || welcomeMessages['en'];
-
-  // Return message with or without learning objective
-  return learningObjective ? messages.withObjective : messages.basic;
-};
   // Cleanup function for all recording-related resources
   const cleanup = () => {
     console.log('Running audio resource cleanup...');
@@ -512,627 +461,703 @@ const getWelcomeMessage = (language: string, learningObjective?: string): string
     };
   }, []);
 
+  // Add this new function to initialize conversations
+  const initializeConversation = async () => {
+    try {
+      setIsLoading(true);
+
+      // Call the new API endpoint to create a conversation
+      const response = await api.createConversation({
+        difficulty: getDifficulty(),
+        nativeLanguage: getNativeLanguage(),
+        targetLanguage: getTargetLanguage(),
+        learningObjective: getLearningObjective(),
+        tempo: tempo
+      });
+
+      // Update state with the response data
+      if (response) {
+        // Set conversation ID
+        setConversationId(response.conversation_id);
+
+        // Set initial message
+        setHistory(response.history || []);
+
+        // Play audio for the welcome message
+        if (response.has_audio) {
+          setStatusMessage('Streaming welcome audio...');
+          await playAudio(response.conversation_id, 0); // Play the first message (welcome)
+        }
+      }
+    } catch (error) {
+      console.error('Error initializing conversation:', error);
+
+      // Fallback if the API call fails
+      const currentTargetLanguage = getTargetLanguage();
+      const currentLearningObjective = getLearningObjective();
+
+      // Create a fallback welcome message
+      let welcomeMessage = {
+        role: 'assistant',
+        content: getWelcomeMessage(currentTargetLanguage, currentLearningObjective),
+        timestamp: new Date().toISOString(),
+        translation: ''
+      };
+
+      setHistory([welcomeMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper function to get welcome message based on language
+  const getWelcomeMessage = (language: string, learningObjective?: string): string => {
+    const welcomeMessages: Record<string, { basic: string, withObjective: string }> = {
+      'es': {
+        basic: '¡Hola! Soy tu tutor de español. ¿Cómo estás hoy?',
+        withObjective: `¡Hola! Veo que quieres practicar: "${learningObjective}". ¡Empecemos!`
+      },
+      'fr': {
+        basic: 'Bonjour! Je suis votre tuteur de français. Comment allez-vous aujourd\'hui?',
+        withObjective: `Bonjour! Je vois que vous voulez pratiquer: "${learningObjective}". Commençons!`
+      },
+      'it': {
+        basic: 'Ciao! Sono il tuo tutor di italiano. Come stai oggi?',
+        withObjective: `Ciao! Vedo che vuoi praticare: "${learningObjective}". Iniziamo!`
+      },
+      'en': {
+        basic: 'Hello! I\'m your English tutor. How can I help you today?',
+        withObjective: `Hello! I see you want to practice: "${learningObjective}". Let's begin!`
+      }
+    };
+
+    // Get messages for the current language, fallback to English if not found
+    const messages = welcomeMessages[language] || welcomeMessages['en'];
+
+    // Return message with or without learning objective
+    return learningObjective ? messages.withObjective : messages.basic;
+  };
+
   // Start smart pre-buffering for auto-record
   // Improved implementation for smart pre-buffering
-const startSmartPreBuffering = async () => {
-  // Don't start if we're already recording or processing
-  if (isRecording || isPreBuffering || isProcessing) {
-    console.log("🎙️ [PRE-BUFFER] Already in recording/processing state, ignoring request");
-    return;
-  }
-
-  try {
-    console.log("🎙️ [PRE-BUFFER] Starting smart pre-buffering");
-
-    // Update UI state immediately
-    setIsListening(true);
-    setStatusMessage('Listening for speech...');
-
-    // Clear any existing timeout
-    if (autoRecordTimeoutRef.current) {
-      clearTimeout(autoRecordTimeoutRef.current);
-      autoRecordTimeoutRef.current = null;
+  const startSmartPreBuffering = async () => {
+    // Don't start if we're already recording or processing
+    if (isRecording || isPreBuffering || isProcessing) {
+      console.log("🎙️ [PRE-BUFFER] Already in recording/processing state, ignoring request");
+      return;
     }
 
-    // Start pre-buffering mode with a short delay to ensure audio mode is properly set
-    setTimeout(async () => {
-      if (isMountedRef.current && !isRecording && !isProcessing && !isPreBuffering) {
-        try {
-          // Configure audio mode for recording just to be safe
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-            interruptionModeIOS: 1, // DoNotMix
-            interruptionModeAndroid: 1, // DoNotMix
-            shouldDuckAndroid: false,
-            playThroughEarpieceAndroid: false,
-            staysActiveInBackground: false,
-          });
+    try {
+      console.log("🎙️ [PRE-BUFFER] Starting smart pre-buffering");
 
-          // Start pre-buffering with explicit await
-          console.log("🎙️ [PRE-BUFFER] Calling startPreBuffering()");
-          await startPreBuffering();
-          console.log("🎙️ [PRE-BUFFER] Pre-buffering started successfully");
-        } catch (innerError) {
-          console.error("🎙️ [PRE-BUFFER] Error in delayed start:", innerError);
+      // Update UI state immediately
+      setIsListening(true);
+      setStatusMessage('Listening for speech...');
+
+      // Clear any existing timeout
+      if (autoRecordTimeoutRef.current) {
+        clearTimeout(autoRecordTimeoutRef.current);
+        autoRecordTimeoutRef.current = null;
+      }
+
+      // Start pre-buffering mode with a short delay to ensure audio mode is properly set
+      setTimeout(async () => {
+        if (isMountedRef.current && !isRecording && !isProcessing && !isPreBuffering) {
+          try {
+            // Configure audio mode for recording just to be safe
+            await Audio.setAudioModeAsync({
+              allowsRecordingIOS: true,
+              playsInSilentModeIOS: true,
+              interruptionModeIOS: 1, // DoNotMix
+              interruptionModeAndroid: 1, // DoNotMix
+              shouldDuckAndroid: false,
+              playThroughEarpieceAndroid: false,
+              staysActiveInBackground: false,
+            });
+
+            // Start pre-buffering with explicit await
+            console.log("🎙️ [PRE-BUFFER] Calling startPreBuffering()");
+            await startPreBuffering();
+            console.log("🎙️ [PRE-BUFFER] Pre-buffering started successfully");
+          } catch (innerError) {
+            console.error("🎙️ [PRE-BUFFER] Error in delayed start:", innerError);
+            setStatusMessage('Ready');
+            setIsListening(false);
+          }
+        } else {
+          console.log("🎙️ [PRE-BUFFER] Conditions changed, not starting pre-buffer");
           setStatusMessage('Ready');
           setIsListening(false);
         }
-      } else {
-        console.log("🎙️ [PRE-BUFFER] Conditions changed, not starting pre-buffer");
-        setStatusMessage('Ready');
-        setIsListening(false);
-      }
-    }, 300);
+      }, 300);
 
-    // Set a 30-second timeout to avoid keeping microphone active indefinitely
-    autoRecordTimeoutRef.current = setTimeout(() => {
-      console.log("🎙️ [PRE-BUFFER] Pre-buffering timeout after 30 seconds of no speech");
+      // Set a 30-second timeout to avoid keeping microphone active indefinitely
+      autoRecordTimeoutRef.current = setTimeout(() => {
+        console.log("🎙️ [PRE-BUFFER] Pre-buffering timeout after 30 seconds of no speech");
+
+        if (isMountedRef.current) {
+          // Stop any active recording
+          if (isPreBuffering || isRecording) {
+            stopRecording().catch(error => {
+              console.warn("Error stopping recording on timeout:", error);
+            });
+          }
+
+          setStatusMessage('Ready');
+          setIsListening(false);
+        }
+
+        autoRecordTimeoutRef.current = null;
+      }, 30000); // 30 seconds timeout
+
+    } catch (error) {
+      console.error("🎙️ [PRE-BUFFER] Error starting pre-buffering:", error);
 
       if (isMountedRef.current) {
-        // Stop any active recording
-        if (isPreBuffering || isRecording) {
-          stopRecording().catch(error => {
-            console.warn("Error stopping recording on timeout:", error);
-          });
-        }
-
         setStatusMessage('Ready');
         setIsListening(false);
       }
 
-      autoRecordTimeoutRef.current = null;
-    }, 30000); // 30 seconds timeout
-
-  } catch (error) {
-    console.error("🎙️ [PRE-BUFFER] Error starting pre-buffering:", error);
-
-    if (isMountedRef.current) {
-      setStatusMessage('Ready');
-      setIsListening(false);
+      // Clean up resources on error
+      if (autoRecordTimeoutRef.current) {
+        clearTimeout(autoRecordTimeoutRef.current);
+        autoRecordTimeoutRef.current = null;
+      }
     }
-
-    // Clean up resources on error
-    if (autoRecordTimeoutRef.current) {
-      clearTimeout(autoRecordTimeoutRef.current);
-      autoRecordTimeoutRef.current = null;
-    }
-  }
-};
-
-  // Text chat handler
-const handleSubmit = async (inputMessage: string) => {
-  hasProcessedCurrentRecordingRef.current = false;
-  if (!inputMessage.trim() || isLoading) return;
-
-  // Add user message to history immediately
-  const userMessage: MessageType = {
-    role: 'user',
-    content: inputMessage,
-    timestamp: new Date().toISOString()
   };
 
-  setHistory(prev => [...prev, userMessage]);
-  setIsLoading(true);
+  // Text chat handler
+  const handleSubmit = async (inputMessage: string) => {
+    hasProcessedCurrentRecordingRef.current = false;
+    if (!inputMessage.trim() || isLoading) return;
 
-  try {
-    const response = await api.sendTextMessage(
-      inputMessage,
-      conversationId,
-      tempo,
-      getDifficulty(),
-      getNativeLanguage(),
-      getTargetLanguage(),
-      getLearningObjective()
-    );
-
-    if (!conversationId && response.conversation_id) {
-      setConversationId(response.conversation_id);
-    }
-
-    // Update history, but preserve our modified structure
-    if (response.history && response.history.length > 0) {
-      // We need to map the server response to our new structure
-      // where corrections are attached to the user's messages
-
-      const newHistory: MessageType[] = [];
-
-      for (let i = 0; i < response.history.length; i++) {
-        const currentMsg = response.history[i];
-
-        if (currentMsg.role === 'user') {
-          // Find the next assistant message (if any)
-          const nextMsg = i + 1 < response.history.length ? response.history[i + 1] : null;
-
-          // Check if the next message has corrections meant for this user message
-          if (nextMsg && nextMsg.role === 'assistant' && (nextMsg.corrected || nextMsg.natural)) {
-            // Add user message with corrections from the assistant message
-            newHistory.push({
-              ...currentMsg,
-              corrected: nextMsg.corrected,
-              natural: nextMsg.natural
-            });
-
-            // Add assistant message without the corrections but WITH translation
-            if (nextMsg) {
-              newHistory.push({
-                role: nextMsg.role,
-                content: nextMsg.content,
-                translation: nextMsg.translation, // Include translation
-                timestamp: nextMsg.timestamp
-              });
-            }
-
-            // Skip the next message since we've already processed it
-            i++;
-          } else {
-            // Regular user message without corrections
-            newHistory.push(currentMsg);
-          }
-        } else if (currentMsg.role === 'assistant' || currentMsg.role === 'system') {
-          // Regular assistant or system message (include translation for assistant)
-          if (currentMsg.role === 'assistant') {
-            newHistory.push({
-              ...currentMsg,
-              translation: currentMsg.translation // Include translation if present
-            });
-          } else {
-            newHistory.push(currentMsg);
-          }
-        }
-      }
-
-      setHistory(newHistory);
-    }
-
-    if (response.has_audio) {
-      setStatusMessage('Streaming audio...');
-      // MODIFIED: Always use -1 to get the latest message's audio
-      await playAudio(response.conversation_id, -1);
-    }
-  } catch (error) {
-    console.error('Error sending message:', error);
-    const errorMessage: MessageType = {
-      role: 'system',
-      content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+    // Add user message to history immediately
+    const userMessage: MessageType = {
+      role: 'user',
+      content: inputMessage,
       timestamp: new Date().toISOString()
     };
 
-    setHistory(prev => [...prev, errorMessage]);
-  } finally {
-    setIsLoading(false);
-  }
-};
+    setHistory(prev => [...prev, userMessage]);
+    setIsLoading(true);
 
+    try {
+      const response = await api.sendTextMessage(
+        inputMessage,
+        conversationId,
+        tempo,
+        getDifficulty(),
+        getNativeLanguage(),
+        getTargetLanguage(),
+        getLearningObjective()
+      );
 
-// Updated implementation for reliable auto-recording after audio playback
-const playAudio = async (conversationId, messageIndex = -1) => {
-  try {
-    // Make sure we're not already pre-buffering or recording
-    if (isPreBuffering || isRecording) {
-      try {
-        await stopRecording();
-      } catch (error) {
-        console.warn("Error stopping recording before playback:", error);
-      }
-    }
-
-    // Update UI state
-    setIsListening(false);
-
-    // Unload previous sound
-    if (soundRef.current) {
-      console.log("🎵 [AUDIO] Unloading previous sound before creating new one");
-      try {
-        // First remove the status update callback
-        soundRef.current.setOnPlaybackStatusUpdate(null);
-        await soundRef.current.unloadAsync();
-      } catch (unloadError) {
-        console.warn("🎵 [AUDIO] Error unloading previous sound:", unloadError);
-      }
-      soundRef.current = null;
-    }
-
-    // Clear any existing auto record timeout
-    if (autoRecordTimeoutRef.current) {
-      clearTimeout(autoRecordTimeoutRef.current);
-      autoRecordTimeoutRef.current = null;
-    }
-
-    // Configure audio session for playback
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-      interruptionModeIOS: 1, // DoNotMix
-      interruptionModeAndroid: 1, // DoNotMix
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: false,
-      staysActiveInBackground: false,
-    });
-    console.log("🎧 Audio session configured for playback");
-
-    // Build streaming URL
-    const audioUrl = api.getAudioStreamUrl(
-      conversationId,
-      messageIndex,
-      tempo,
-      getTargetLanguage() // Use current target language
-    );
-    console.log("🎵 [AUDIO] Audio streaming URL:", audioUrl);
-
-    let statusUpdateCount = 0;
-    let lastPositionMillis = 0;
-    let positionStuckCount = 0;
-    let isCompletionHandled = false;
-    let pollIntervalId = null;
-
-    const onStatusUpdate = (status: Audio.PlaybackStatus) => {
-      // First check if component is still mounted
-      if (!isMountedRef.current) {
-        console.log("🎵 [AUDIO] Component unmounted, ignoring status update");
-        return;
+      if (!conversationId && response.conversation_id) {
+        setConversationId(response.conversation_id);
       }
 
-      statusUpdateCount++;
+      // Update history, but preserve our modified structure
+      if (response.history && response.history.length > 0) {
+        // We need to map the server response to our new structure
+        // where corrections are attached to the user's messages
 
-      if (!status.isLoaded) {
-        if (status.error) {
-          console.error(`🎵 [AUDIO] Playback error: ${status.error}`);
-        }
-        console.log(`🎵 [AUDIO] Status update #${statusUpdateCount}: Not loaded`);
-        return;
-      }
+        const newHistory: MessageType[] = [];
 
-      if (status.positionMillis === lastPositionMillis && status.isPlaying) {
-        positionStuckCount++;
-        if (positionStuckCount > 5) {
-          console.log(`🎵 [AUDIO] WARNING: Position stuck at ${status.positionMillis}ms for ${positionStuckCount} updates`);
-        }
-      } else {
-        positionStuckCount = 0;
-      }
-      lastPositionMillis = status.positionMillis;
+        for (let i = 0; i < response.history.length; i++) {
+          const currentMsg = response.history[i];
 
-      // Check for both explicit finish and our "likely finished" condition
-      const isLikelyFinished =
-        status.isLoaded &&
-        !status.isPlaying &&
-        status.positionMillis > 0 &&
-        (!status.durationMillis || status.positionMillis >= status.durationMillis - 100);
+          if (currentMsg.role === 'user') {
+            // Find the next assistant message (if any)
+            const nextMsg = i + 1 < response.history.length ? response.history[i + 1] : null;
 
-      const nearEnd = status.durationMillis && status.positionMillis > status.durationMillis - 500;
-      if (nearEnd) {
-        console.log(`🎵 [AUDIO] NEAR END: position=${status.positionMillis}ms`);
-      }
+            // Check if the next message has corrections meant for this user message
+            if (nextMsg && nextMsg.role === 'assistant' && (nextMsg.corrected || nextMsg.natural)) {
+              // Add user message with corrections from the assistant message
+              newHistory.push({
+                ...currentMsg,
+                corrected: nextMsg.corrected,
+                natural: nextMsg.natural
+              });
 
-      if (status.isPlaying) {
-        setIsPlaying(true);
-      } else if ((status.didJustFinish || isLikelyFinished) && !isCompletionHandled) {
-        // Set flag to ensure we only handle completion once
-        isCompletionHandled = true;
+              // Add assistant message without the corrections but WITH translation
+              if (nextMsg) {
+                newHistory.push({
+                  role: nextMsg.role,
+                  content: nextMsg.content,
+                  translation: nextMsg.translation, // Include translation
+                  timestamp: nextMsg.timestamp
+                });
+              }
 
-        console.log(`🎵 [AUDIO] DETECTION: Playback completion detected - didJustFinish=${status.didJustFinish}, isPlaying=${status.isPlaying}`);
-        console.log(`🎵 [AUDIO] DETAILS: position=${status.positionMillis}ms, duration=${status.durationMillis || 'unknown'}ms`);
-
-        setIsPlaying(false);
-        setStatusMessage('Ready'); // Update status when playback completes
-
-        // Clean up polling if it exists
-        if (pollIntervalId) {
-          clearInterval(pollIntervalId);
-          pollIntervalId = null;
-        }
-
-        // IMPORTANT: If auto record is enabled, trigger the pre-buffering with a delay
-        if (autoRecordEnabled && voiceInputEnabled) {
-          console.log("🎙️ [AUTO RECORD] Will start pre-buffering in 500ms");
-
-          // Use setTimeout to ensure we don't start recording while still handling audio completion
-          setTimeout(() => {
-            if (isMountedRef.current && !isRecording && !isProcessing && !isPreBuffering) {
-              console.log("🎙️ [AUTO RECORD] Starting pre-buffering NOW");
-              // Start pre-buffering mode
-              startSmartPreBuffering();
+              // Skip the next message since we've already processed it
+              i++;
             } else {
-              console.log("🎙️ [AUTO RECORD] Cannot start pre-buffering - states:", {
-                mounted: isMountedRef.current,
-                recording: isRecording,
-                processing: isProcessing,
-                preBuffering: isPreBuffering
-              });
+              // Regular user message without corrections
+              newHistory.push(currentMsg);
             }
-          }, 500);
-        } else {
-          console.log("🎙️ [AUTO RECORD] Not starting pre-buffering - autoRecord:", autoRecordEnabled, "voiceInput:", voiceInputEnabled);
-        }
-
-        // Cleanup sound
-        if (soundRef.current) {
-          try {
-            // First remove the status update callback
-            soundRef.current.setOnPlaybackStatusUpdate(null);
-
-            // Unload the sound
-            soundRef.current.unloadAsync()
-              .then(() => {
-                soundRef.current = null;
-              })
-              .catch(err => {
-                console.error("🎵 [AUDIO] Unload failed:", err);
-                soundRef.current = null;
+          } else if (currentMsg.role === 'assistant' || currentMsg.role === 'system') {
+            // Regular assistant or system message (include translation for assistant)
+            if (currentMsg.role === 'assistant') {
+              newHistory.push({
+                ...currentMsg,
+                translation: currentMsg.translation // Include translation if present
               });
-          } catch (err) {
-            console.error("🎵 [AUDIO] Unload failure:", err);
-            soundRef.current = null;
+            } else {
+              newHistory.push(currentMsg);
+            }
           }
         }
-      }
-    };
 
-    // Save the callback reference for later cleanup
-    playbackCallbackRef.current = onStatusUpdate;
-
-    // Create sound with shouldPlay: true
-    console.log("🎵 [AUDIO] Creating audio object with streaming");
-    const { sound } = await Audio.Sound.createAsync(
-      { uri: audioUrl, isNetwork: true },
-      {
-        shouldPlay: true,
-        rate: 1.0,
-        progressUpdateIntervalMillis: 100,
-        volume: 1.0,
-        isMuted: false,
-        isLooping: false,
-      },
-      onStatusUpdate
-    );
-
-    soundRef.current = sound;
-
-    // 🔁 Fallback polling mechanism - keep this as an additional safety net
-    const pollingInterval = 200;
-    const maxPollTime = 120000; // 120 seconds (2 minutes) timeout
-    let elapsed = 0;
-
-    pollIntervalId = setInterval(async () => {
-      // First check if component is still mounted
-      if (!isMountedRef.current) {
-        console.log("🎵 [AUDIO] Component unmounted, cleaning up polling interval");
-        clearInterval(pollIntervalId);
-        return;
+        setHistory(newHistory);
       }
 
-      elapsed += pollingInterval;
+      if (response.has_audio) {
+        setStatusMessage('Streaming audio...');
+        // MODIFIED: Always use -1 to get the latest message's audio
+        await playAudio(response.conversation_id, -1);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: MessageType = {
+        role: 'system',
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+        timestamp: new Date().toISOString()
+      };
 
-      if (!soundRef.current || isCompletionHandled) {
-        clearInterval(pollIntervalId);
-        return;
+      setHistory(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Updated implementation for reliable auto-recording after audio playback
+  const playAudio = async (conversationId, messageIndex = -1) => {
+    try {
+      // Make sure we're not already pre-buffering or recording
+      if (isPreBuffering || isRecording) {
+        try {
+          await stopRecording();
+        } catch (error) {
+          console.warn("Error stopping recording before playback:", error);
+        }
       }
 
-      try {
-        const status = await soundRef.current.getStatusAsync();
+      // Update UI state
+      setIsListening(false);
 
-        const likelyFinished =
+      // Unload previous sound
+      if (soundRef.current) {
+        console.log("🎵 [AUDIO] Unloading previous sound before creating new one");
+        try {
+          // First remove the status update callback
+          soundRef.current.setOnPlaybackStatusUpdate(null);
+          await soundRef.current.unloadAsync();
+        } catch (unloadError) {
+          console.warn("🎵 [AUDIO] Error unloading previous sound:", unloadError);
+        }
+        soundRef.current = null;
+      }
+
+      // Clear any existing auto record timeout
+      if (autoRecordTimeoutRef.current) {
+        clearTimeout(autoRecordTimeoutRef.current);
+        autoRecordTimeoutRef.current = null;
+      }
+
+      // Configure audio session for playback
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        interruptionModeIOS: 1, // DoNotMix
+        interruptionModeAndroid: 1, // DoNotMix
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+      });
+      console.log("🎧 Audio session configured for playback");
+
+      // Build streaming URL
+      const audioUrl = api.getAudioStreamUrl(
+        conversationId,
+        messageIndex,
+        tempo,
+        getTargetLanguage() // Use current target language
+      );
+      console.log("🎵 [AUDIO] Audio streaming URL:", audioUrl);
+
+      let statusUpdateCount = 0;
+      let lastPositionMillis = 0;
+      let positionStuckCount = 0;
+      let isCompletionHandled = false;
+      let pollIntervalId = null;
+
+      const onStatusUpdate = (status: Audio.PlaybackStatus) => {
+        // First check if component is still mounted
+        if (!isMountedRef.current) {
+          console.log("🎵 [AUDIO] Component unmounted, ignoring status update");
+          return;
+        }
+
+        statusUpdateCount++;
+
+        if (!status.isLoaded) {
+          if (status.error) {
+            console.error(`🎵 [AUDIO] Playback error: ${status.error}`);
+          }
+          console.log(`🎵 [AUDIO] Status update #${statusUpdateCount}: Not loaded`);
+          return;
+        }
+
+        if (status.positionMillis === lastPositionMillis && status.isPlaying) {
+          positionStuckCount++;
+          if (positionStuckCount > 5) {
+            console.log(`🎵 [AUDIO] WARNING: Position stuck at ${status.positionMillis}ms for ${positionStuckCount} updates`);
+          }
+        } else {
+          positionStuckCount = 0;
+        }
+        lastPositionMillis = status.positionMillis;
+
+        // Check for both explicit finish and our "likely finished" condition
+        const isLikelyFinished =
           status.isLoaded &&
           !status.isPlaying &&
           status.positionMillis > 0 &&
           (!status.durationMillis || status.positionMillis >= status.durationMillis - 100);
 
-        if (likelyFinished && !isCompletionHandled) {
+        const nearEnd = status.durationMillis && status.positionMillis > status.durationMillis - 500;
+        if (nearEnd) {
+          console.log(`🎵 [AUDIO] NEAR END: position=${status.positionMillis}ms`);
+        }
+
+        if (status.isPlaying) {
+          setIsPlaying(true);
+        } else if ((status.didJustFinish || isLikelyFinished) && !isCompletionHandled) {
           // Set flag to ensure we only handle completion once
           isCompletionHandled = true;
 
-          console.log("🎵 [AUDIO] DETECTION: Backup polling mechanism detected playback completion");
-          console.log(`🎵 [AUDIO] DETAILS: isPlaying=${!status.isPlaying}, positionMillis=${status.positionMillis}, durationMillis=${status.durationMillis || 'unknown'}, elapsed=${elapsed}ms`);
+          console.log(`🎵 [AUDIO] DETECTION: Playback completion detected - didJustFinish=${status.didJustFinish}, isPlaying=${status.isPlaying}`);
+          console.log(`🎵 [AUDIO] DETAILS: position=${status.positionMillis}ms, duration=${status.durationMillis || 'unknown'}ms`);
 
           setIsPlaying(false);
-          setStatusMessage('Ready'); // Update status when polling detects completion
+          setStatusMessage('Ready'); // Update status when playback completes
 
-          // Also handle auto record here as a backup
-          if (autoRecordEnabled && voiceInputEnabled && !isRecording && !isProcessing
-              && !isListening && !isPreBuffering && isMountedRef.current) {
-            console.log("🎙️ [AUTO RECORD] Starting smart pre-buffering from polling backup");
+          // Clean up polling if it exists
+          if (pollIntervalId) {
+            clearInterval(pollIntervalId);
+            pollIntervalId = null;
+          }
 
-            // Use setTimeout to ensure we're not in the middle of any other operation
+          // IMPORTANT: If auto record is enabled, trigger the pre-buffering with a delay
+          if (autoRecordEnabled && voiceInputEnabled) {
+            console.log("🎙️ [AUTO RECORD] Will start pre-buffering in 500ms");
+
+            // Use setTimeout to ensure we don't start recording while still handling audio completion
             setTimeout(() => {
               if (isMountedRef.current && !isRecording && !isProcessing && !isPreBuffering) {
+                console.log("🎙️ [AUTO RECORD] Starting pre-buffering NOW");
+                // Start pre-buffering mode
                 startSmartPreBuffering();
+              } else {
+                console.log("🎙️ [AUTO RECORD] Cannot start pre-buffering - states:", {
+                  mounted: isMountedRef.current,
+                  recording: isRecording,
+                  processing: isProcessing,
+                  preBuffering: isPreBuffering
+                });
               }
             }, 500);
+          } else {
+            console.log("🎙️ [AUTO RECORD] Not starting pre-buffering - autoRecord:", autoRecordEnabled, "voiceInput:", voiceInputEnabled);
           }
 
-          // Add null check and use Promise chaining for unloading
+          // Cleanup sound
           if (soundRef.current) {
-            // First remove the status update callback
-            soundRef.current.setOnPlaybackStatusUpdate(null);
-            soundRef.current.unloadAsync()
-              .then(() => {
-                soundRef.current = null;
-              })
-              .catch(unloadError => {
-                console.warn("🎵 [AUDIO] Error unloading in polling interval:", unloadError);
-                soundRef.current = null;
-              });
-          }
+            try {
+              // First remove the status update callback
+              soundRef.current.setOnPlaybackStatusUpdate(null);
 
+              // Unload the sound
+              soundRef.current.unloadAsync()
+                .then(() => {
+                  soundRef.current = null;
+                })
+                .catch(err => {
+                  console.error("🎵 [AUDIO] Unload failed:", err);
+                  soundRef.current = null;
+                });
+            } catch (err) {
+              console.error("🎵 [AUDIO] Unload failure:", err);
+              soundRef.current = null;
+            }
+          }
+        }
+      };
+
+      // Save the callback reference for later cleanup
+      playbackCallbackRef.current = onStatusUpdate;
+
+      // Create sound with shouldPlay: true
+      console.log("🎵 [AUDIO] Creating audio object with streaming");
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUrl, isNetwork: true },
+        {
+          shouldPlay: true,
+          rate: 1.0,
+          progressUpdateIntervalMillis: 100,
+          volume: 1.0,
+          isMuted: false,
+          isLooping: false,
+        },
+        onStatusUpdate
+      );
+
+      soundRef.current = sound;
+
+      // 🔁 Fallback polling mechanism - keep this as an additional safety net
+      const pollingInterval = 200;
+      const maxPollTime = 120000; // 120 seconds (2 minutes) timeout
+      let elapsed = 0;
+
+      pollIntervalId = setInterval(async () => {
+        // First check if component is still mounted
+        if (!isMountedRef.current) {
+          console.log("🎵 [AUDIO] Component unmounted, cleaning up polling interval");
           clearInterval(pollIntervalId);
+          return;
         }
 
-        if (elapsed >= maxPollTime) {
-          console.warn("🎵 [AUDIO] DETECTION: Polling timed out after 120 seconds without detecting finish");
-          setStatusMessage('Ready'); // Update status even if polling times out
+        elapsed += pollingInterval;
 
-          // Make sure to clean up audio even on timeout
+        if (!soundRef.current || isCompletionHandled) {
+          clearInterval(pollIntervalId);
+          return;
+        }
+
+        try {
+          const status = await soundRef.current.getStatusAsync();
+
+          const likelyFinished =
+            status.isLoaded &&
+            !status.isPlaying &&
+            status.positionMillis > 0 &&
+            (!status.durationMillis || status.positionMillis >= status.durationMillis - 100);
+
+          if (likelyFinished && !isCompletionHandled) {
+            // Set flag to ensure we only handle completion once
+            isCompletionHandled = true;
+
+            console.log("🎵 [AUDIO] DETECTION: Backup polling mechanism detected playback completion");
+            console.log(`🎵 [AUDIO] DETAILS: isPlaying=${!status.isPlaying}, positionMillis=${status.positionMillis}, durationMillis=${status.durationMillis || 'unknown'}, elapsed=${elapsed}ms`);
+
+            setIsPlaying(false);
+            setStatusMessage('Ready'); // Update status when polling detects completion
+
+            // Also handle auto record here as a backup
+            if (autoRecordEnabled && voiceInputEnabled && !isRecording && !isProcessing
+                && !isListening && !isPreBuffering && isMountedRef.current) {
+              console.log("🎙️ [AUTO RECORD] Starting smart pre-buffering from polling backup");
+
+              // Use setTimeout to ensure we're not in the middle of any other operation
+              setTimeout(() => {
+                if (isMountedRef.current && !isRecording && !isProcessing && !isPreBuffering) {
+                  startSmartPreBuffering();
+                }
+              }, 500);
+            }
+
+            // Add null check and use Promise chaining for unloading
+            if (soundRef.current) {
+              // First remove the status update callback
+              soundRef.current.setOnPlaybackStatusUpdate(null);
+              soundRef.current.unloadAsync()
+                .then(() => {
+                  soundRef.current = null;
+                })
+                .catch(unloadError => {
+                  console.warn("🎵 [AUDIO] Error unloading in polling interval:", unloadError);
+                  soundRef.current = null;
+                });
+            }
+
+            clearInterval(pollIntervalId);
+          }
+
+          if (elapsed >= maxPollTime) {
+            console.warn("🎵 [AUDIO] DETECTION: Polling timed out after 120 seconds without detecting finish");
+            setStatusMessage('Ready'); // Update status even if polling times out
+
+            // Make sure to clean up audio even on timeout
+            if (soundRef.current) {
+              try {
+                // First remove the status update callback
+                soundRef.current.setOnPlaybackStatusUpdate(null);
+                await soundRef.current.unloadAsync();
+              } catch (timeoutError) {
+                console.warn("🎵 [AUDIO] Error unloading on timeout:", timeoutError);
+              }
+              soundRef.current = null;
+            }
+
+            clearInterval(pollIntervalId);
+          }
+        } catch (pollError) {
+          console.error("🎵 [AUDIO] Error during polling:", pollError);
+          // If we get an error during polling, it's safer to clean up
           if (soundRef.current) {
             try {
               // First remove the status update callback
               soundRef.current.setOnPlaybackStatusUpdate(null);
               await soundRef.current.unloadAsync();
-            } catch (timeoutError) {
-              console.warn("🎵 [AUDIO] Error unloading on timeout:", timeoutError);
+            } catch (secondaryError) {
+              console.warn("🎵 [AUDIO] Secondary error during cleanup:", secondaryError);
             }
             soundRef.current = null;
           }
-
           clearInterval(pollIntervalId);
         }
-      } catch (pollError) {
-        console.error("🎵 [AUDIO] Error during polling:", pollError);
-        // If we get an error during polling, it's safer to clean up
-        if (soundRef.current) {
-          try {
-            // First remove the status update callback
-            soundRef.current.setOnPlaybackStatusUpdate(null);
-            await soundRef.current.unloadAsync();
-          } catch (secondaryError) {
-            console.warn("🎵 [AUDIO] Secondary error during cleanup:", secondaryError);
-          }
-          soundRef.current = null;
+      }, pollingInterval);
+
+      // Initial status check
+      const initialStatus = await sound.getStatusAsync();
+      console.log("🎵 [AUDIO] Initial sound status:", {
+        isLoaded: initialStatus.isLoaded,
+        positionMillis: initialStatus.positionMillis,
+        durationMillis: initialStatus.durationMillis,
+        isPlaying: initialStatus.isPlaying,
+        isBuffering: initialStatus.isBuffering
+      });
+
+      setIsPlaying(true);
+    } catch (error) {
+      console.error("🎵 [AUDIO] DETECTION: Error during audio playback:", error);
+      setHistory(prev => [
+        ...prev,
+        {
+          role: 'system',
+          content: "Sorry, I couldn't play the audio response. You can continue with text chat.",
+          timestamp: new Date().toISOString()
         }
-        clearInterval(pollIntervalId);
-      }
-    }, pollingInterval);
+      ]);
+      setIsPlaying(false);
+      setStatusMessage('Ready'); // Update status on error
 
-    // Initial status check
-    const initialStatus = await sound.getStatusAsync();
-    console.log("🎵 [AUDIO] Initial sound status:", {
-      isLoaded: initialStatus.isLoaded,
-      positionMillis: initialStatus.positionMillis,
-      durationMillis: initialStatus.durationMillis,
-      isPlaying: initialStatus.isPlaying,
-      isBuffering: initialStatus.isBuffering
-    });
-
-    setIsPlaying(true);
-  } catch (error) {
-    console.error("🎵 [AUDIO] DETECTION: Error during audio playback:", error);
-    setHistory(prev => [
-      ...prev,
-      {
-        role: 'system',
-        content: "Sorry, I couldn't play the audio response. You can continue with text chat.",
-        timestamp: new Date().toISOString()
+      // Clean up if there's an error during playback setup
+      if (soundRef.current) {
+        try {
+          // First remove the status update callback
+          soundRef.current.setOnPlaybackStatusUpdate(null);
+          await soundRef.current.unloadAsync();
+        } catch (cleanupError) {
+          console.warn("🎵 [AUDIO] Error during error cleanup:", cleanupError);
+        }
+        soundRef.current = null;
       }
-    ]);
-    setIsPlaying(false);
-    setStatusMessage('Ready'); // Update status on error
-
-    // Clean up if there's an error during playback setup
-    if (soundRef.current) {
-      try {
-        // First remove the status update callback
-        soundRef.current.setOnPlaybackStatusUpdate(null);
-        await soundRef.current.unloadAsync();
-      } catch (cleanupError) {
-        console.warn("🎵 [AUDIO] Error during error cleanup:", cleanupError);
-      }
-      soundRef.current = null;
     }
-  }
-};
+  };
 
   const handleAudioData = async () => {
-  const audioUri = getAudioURI();
-  console.log("🎧 Audio URI to submit:", audioUri);
-  if (!audioUri) {
-    setStatusMessage('No audio data recorded');
-    return;
-  }
+    const audioUri = getAudioURI();
+    console.log("🎧 Audio URI to submit:", audioUri);
+    if (!audioUri) {
+      setStatusMessage('No audio data recorded');
+      return;
+    }
 
-  setIsLoading(true);
-  setIsProcessing(true);
-  setStatusMessage('Processing audio data...');
+    setIsLoading(true);
+    setIsProcessing(true);
+    setStatusMessage('Processing audio data...');
 
-  try {
-    // Show temporary message
-    const tempMessage: MessageType = {
-      role: 'user',
-      content: "🎤 Processing voice...",
-      timestamp: new Date().toISOString(),
-      isTemporary: true
-    };
-    setHistory(prev => [...prev, tempMessage]);
+    try {
+      // Show temporary message
+      const tempMessage: MessageType = {
+        role: 'user',
+        content: "🎤 Processing voice...",
+        timestamp: new Date().toISOString(),
+        isTemporary: true
+      };
+      setHistory(prev => [...prev, tempMessage]);
 
-    const response = await api.sendVoiceRecording({
-      audioUri,
-      conversationId,
-      tempo,
-      difficulty: getDifficulty(),
-      nativeLanguage: getNativeLanguage(),
-      targetLanguage: getTargetLanguage(),
-      learningObjective: getLearningObjective()
-    });
+      const response = await api.sendVoiceRecording({
+        audioUri,
+        conversationId,
+        tempo,
+        difficulty: getDifficulty(),
+        nativeLanguage: getNativeLanguage(),
+        targetLanguage: getTargetLanguage(),
+        learningObjective: getLearningObjective()
+      });
 
-    setStatusMessage('Received response from server');
-    console.log("📨 Received response from server:", response);
+      setStatusMessage('Received response from server');
+      console.log("📨 Received response from server:", response);
 
-    // Update conversation, attaching corrections to the user message
-    setHistory(prev => {
-      const filtered = prev.filter(msg => !msg.isTemporary);
+      // Update conversation, attaching corrections to the user message
+      setHistory(prev => {
+        const filtered = prev.filter(msg => !msg.isTemporary);
 
-      if (response.transcribed_text) {
+        if (response.transcribed_text) {
+          return [
+            ...filtered,
+            // User message with corrections attached
+            {
+              role: 'user',
+              content: response.transcribed_text,
+              corrected: response.corrected,
+              natural: response.natural,
+              timestamp: new Date().toISOString()
+            },
+            // AI response (without corrections but WITH translation)
+            {
+              role: 'assistant',
+              content: response.reply,
+              translation: response.translation, // Include translation
+              timestamp: new Date().toISOString()
+            }
+          ];
+        }
+        return filtered;
+      });
+
+      if (!conversationId && response.conversation_id) {
+        setConversationId(response.conversation_id);
+      }
+
+      // Play audio using the same approach as text input
+      if (response.has_audio) {
+        setStatusMessage('Streaming audio...');
+        // MODIFIED: Always use -1 to get the latest message's audio
+        await playAudio(response.conversation_id, -1);
+      }
+
+    } catch (error) {
+      console.error('Error processing voice input:', error);
+      setStatusMessage(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+      setHistory(prev => {
+        const filtered = prev.filter(msg => !msg.isTemporary);
         return [
           ...filtered,
-          // User message with corrections attached
           {
-            role: 'user',
-            content: response.transcribed_text,
-            corrected: response.corrected,
-            natural: response.natural,
-            timestamp: new Date().toISOString()
-          },
-          // AI response (without corrections but WITH translation)
-          {
-            role: 'assistant',
-            content: response.reply,
-            translation: response.translation, // Include translation
+            role: 'system',
+            content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
             timestamp: new Date().toISOString()
           }
         ];
-      }
-      return filtered;
-    });
-
-    if (!conversationId && response.conversation_id) {
-      setConversationId(response.conversation_id);
+      });
+    } finally {
+      setIsLoading(false);
+      setIsProcessing(false);
+      resetRecording();
     }
-
-    // Play audio using the same approach as text input
-    if (response.has_audio) {
-      setStatusMessage('Streaming audio...');
-      // MODIFIED: Always use -1 to get the latest message's audio
-      await playAudio(response.conversation_id, -1);
-    }
-
-  } catch (error) {
-    console.error('Error processing voice input:', error);
-    setStatusMessage(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-
-    setHistory(prev => {
-      const filtered = prev.filter(msg => !msg.isTemporary);
-      return [
-        ...filtered,
-        {
-          role: 'system',
-          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-          timestamp: new Date().toISOString()
-        }
-      ];
-    });
-  } finally {
-    setIsLoading(false);
-    setIsProcessing(false);
-    resetRecording();
-  }
-};
+  };
 
   // UI Handlers
   const handleVoiceButtonClick = async () => {
-      // Don't do anything if audio is playing
-      if (isPlaying) {
-        setStatusMessage('Please wait for audio to finish playing');
-        return;
-      }
+    // Don't do anything if audio is playing
+    if (isPlaying) {
+      setStatusMessage('Please wait for audio to finish playing');
+      return;
+    }
     // Clean up any active recording/pre-buffering
     cleanup();
 
@@ -1227,6 +1252,13 @@ const playAudio = async (conversationId, messageIndex = -1) => {
         setAutoRecordEnabled={setAutoRecordEnabled}
         debugMode={debugMode}
         setDebugMode={setDebugMode}
+        // New props for audio parameters
+        speechThreshold={speechThreshold}
+        setSpeechThreshold={setSpeechThreshold}
+        silenceThreshold={silenceThreshold}
+        setSilenceThreshold={setSilenceThreshold}
+        silenceDuration={silenceDuration}
+        setSilenceDuration={setSilenceDuration}
         navigation={navigation}
       />
 
@@ -1341,8 +1373,8 @@ const playAudio = async (conversationId, messageIndex = -1) => {
 
             <AudioVisualizer
               audioSamples={audioSamples}
-              speechThreshold={AUDIO_SETTINGS.SPEECH_THRESHOLD}
-              silenceThreshold={AUDIO_SETTINGS.SILENCE_THRESHOLD}
+              speechThreshold={speechThreshold}
+              silenceThreshold={silenceThreshold}
             />
           </View>
         </View>
@@ -1650,15 +1682,15 @@ const styles = StyleSheet.create({
   listeningButton: {
     backgroundColor: colors.info,
   },
-    disabledVoiceButton: {
-  backgroundColor: colors.gray400,
-  opacity: 0.7,
-  shadowOpacity: 0,
-  elevation: 0,
-},
-playingIcon: {
-  fontSize: 20,
-},
+  disabledVoiceButton: {
+    backgroundColor: colors.gray400,
+    opacity: 0.7,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  playingIcon: {
+    fontSize: 20,
+  },
   pulse: {
     position: 'absolute',
     width: '100%',
@@ -1809,6 +1841,5 @@ playingIcon: {
     fontSize: 14,
   },
 });
-
 
 export default LanguageTutor;

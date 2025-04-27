@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   Animated,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
@@ -31,6 +32,13 @@ interface Props {
   setAutoRecordEnabled: (enabled: boolean) => void;
   debugMode: boolean;
   setDebugMode: (enabled: boolean) => void;
+  // New props for audio thresholds and duration
+  speechThreshold: number;
+  setSpeechThreshold: (value: number) => void;
+  silenceThreshold: number;
+  setSilenceThreshold: (value: number) => void;
+  silenceDuration: number;
+  setSilenceDuration: (value: number) => void;
   navigation: any;
 }
 
@@ -47,6 +55,13 @@ const TutorHeader: React.FC<Props> = ({
   setAutoRecordEnabled,
   debugMode,
   setDebugMode,
+  // New props
+  speechThreshold,
+  setSpeechThreshold,
+  silenceThreshold,
+  setSilenceThreshold,
+  silenceDuration,
+  setSilenceDuration,
   navigation,
 }) => {
   // State
@@ -54,6 +69,11 @@ const TutorHeader: React.FC<Props> = ({
   const [helpModalVisible, setHelpModalVisible] = useState<boolean>(false);
   const [audioInfoVisible, setAudioInfoVisible] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'audio' | 'advanced'>('audio');
+
+  // State for text input values
+  const [speechThresholdText, setSpeechThresholdText] = useState<string>(speechThreshold.toString());
+  const [silenceThresholdText, setSilenceThresholdText] = useState<string>(silenceThreshold.toString());
+  const [silenceDurationText, setSilenceDurationText] = useState<string>(silenceDuration.toString());
 
   // Animation
   const [animation] = useState(new Animated.Value(0));
@@ -90,6 +110,114 @@ const TutorHeader: React.FC<Props> = ({
 
   const goBack = () => {
     navigation.goBack();
+  };
+
+  // Helper function to ensure numbers are within valid ranges
+  const updateSpeechThreshold = (value: string) => {
+    setSpeechThresholdText(value);
+    const numValue = parseInt(value);
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+      // Ensure speech threshold is always >= silence threshold
+      setSpeechThreshold(Math.max(numValue, silenceThreshold));
+    }
+  };
+
+  const updateSilenceThreshold = (value: string) => {
+    setSilenceThresholdText(value);
+    const numValue = parseInt(value);
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+      // Ensure silence threshold is always <= speech threshold
+      setSilenceThreshold(Math.min(numValue, speechThreshold));
+    }
+  };
+
+  const updateSilenceDuration = (value: string) => {
+    setSilenceDurationText(value);
+    const numValue = parseInt(value);
+    if (!isNaN(numValue) && numValue >= 500 && numValue <= 5000) {
+      setSilenceDuration(numValue);
+    }
+  };
+
+  // Increment/Decrement functions
+  const incrementSpeechThreshold = () => {
+    if (speechThreshold < 100) {
+      const newValue = speechThreshold + 1;
+      setSpeechThreshold(newValue);
+      setSpeechThresholdText(newValue.toString());
+    }
+  };
+
+  const decrementSpeechThreshold = () => {
+    if (speechThreshold > silenceThreshold) {
+      const newValue = speechThreshold - 1;
+      setSpeechThreshold(newValue);
+      setSpeechThresholdText(newValue.toString());
+    }
+  };
+
+  const incrementSilenceThreshold = () => {
+    if (silenceThreshold < speechThreshold) {
+      const newValue = silenceThreshold + 1;
+      setSilenceThreshold(newValue);
+      setSilenceThresholdText(newValue.toString());
+    }
+  };
+
+  const decrementSilenceThreshold = () => {
+    if (silenceThreshold > 0) {
+      const newValue = silenceThreshold - 1;
+      setSilenceThreshold(newValue);
+      setSilenceThresholdText(newValue.toString());
+    }
+  };
+
+  const incrementSilenceDuration = () => {
+    if (silenceDuration < 5000) {
+      const newValue = silenceDuration + 100;
+      setSilenceDuration(newValue);
+      setSilenceDurationText(newValue.toString());
+    }
+  };
+
+  const decrementSilenceDuration = () => {
+    if (silenceDuration > 500) {
+      const newValue = silenceDuration - 100;
+      setSilenceDuration(newValue);
+      setSilenceDurationText(newValue.toString());
+    }
+  };
+
+  // Handle onBlur to validate and update with correct values
+  const handleSpeechThresholdBlur = () => {
+    const numValue = parseInt(speechThresholdText);
+    if (isNaN(numValue) || numValue < 0 || numValue > 100) {
+      setSpeechThresholdText(speechThreshold.toString());
+    } else {
+      const validValue = Math.max(numValue, silenceThreshold);
+      setSpeechThreshold(validValue);
+      setSpeechThresholdText(validValue.toString());
+    }
+  };
+
+  const handleSilenceThresholdBlur = () => {
+    const numValue = parseInt(silenceThresholdText);
+    if (isNaN(numValue) || numValue < 0 || numValue > 100) {
+      setSilenceThresholdText(silenceThreshold.toString());
+    } else {
+      const validValue = Math.min(numValue, speechThreshold);
+      setSilenceThreshold(validValue);
+      setSilenceThresholdText(validValue.toString());
+    }
+  };
+
+  const handleSilenceDurationBlur = () => {
+    const numValue = parseInt(silenceDurationText);
+    if (isNaN(numValue) || numValue < 500 || numValue > 5000) {
+      setSilenceDurationText(silenceDuration.toString());
+    } else {
+      setSilenceDuration(numValue);
+    }
   };
 
   // Speed options with their labels and values - including Extra Slow
@@ -223,6 +351,171 @@ const TutorHeader: React.FC<Props> = ({
                     </ScrollView>
                   </View>
 
+                  {/* New Audio Parameters Section */}
+                  <View style={styles.settingBlock}>
+                    <View style={styles.settingHeader}>
+                      <View style={styles.settingIconContainer}>
+                        <Ionicons name="mic-outline" size={16} color={colors.primary} />
+                      </View>
+                      <Text style={styles.settingTitle}>Voice Recognition Parameters</Text>
+                    </View>
+
+                    <View style={styles.audioParamContainer}>
+                      <Text style={styles.audioParamLabel}>Speech Threshold</Text>
+                      <Text style={styles.audioParamHint}>
+                        Audio level that indicates speech (0-100)
+                      </Text>
+                      <View style={styles.numericInputContainer}>
+                        <TouchableOpacity
+                          style={styles.numericButton}
+                          onPress={decrementSpeechThreshold}
+                          disabled={speechThreshold <= silenceThreshold}
+                        >
+                          <Ionicons
+                            name="remove"
+                            size={20}
+                            color={speechThreshold <= silenceThreshold ? colors.gray400 : colors.gray700}
+                          />
+                        </TouchableOpacity>
+                        <TextInput
+                          style={styles.numericInput}
+                          value={speechThresholdText}
+                          onChangeText={updateSpeechThreshold}
+                          onBlur={handleSpeechThresholdBlur}
+                          keyboardType="number-pad"
+                          maxLength={3}
+                          selectTextOnFocus
+                        />
+                        <TouchableOpacity
+                          style={styles.numericButton}
+                          onPress={incrementSpeechThreshold}
+                          disabled={speechThreshold >= 100}
+                        >
+                          <Ionicons
+                            name="add"
+                            size={20}
+                            color={speechThreshold >= 100 ? colors.gray400 : colors.gray700}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <View style={styles.audioParamContainer}>
+                      <Text style={styles.audioParamLabel}>Silence Threshold</Text>
+                      <Text style={styles.audioParamHint}>
+                        Audio level that indicates silence (0-100)
+                      </Text>
+                      <View style={styles.numericInputContainer}>
+                        <TouchableOpacity
+                          style={styles.numericButton}
+                          onPress={decrementSilenceThreshold}
+                          disabled={silenceThreshold <= 0}
+                        >
+                          <Ionicons
+                            name="remove"
+                            size={20}
+                            color={silenceThreshold <= 0 ? colors.gray400 : colors.gray700}
+                          />
+                        </TouchableOpacity>
+                        <TextInput
+                          style={styles.numericInput}
+                          value={silenceThresholdText}
+                          onChangeText={updateSilenceThreshold}
+                          onBlur={handleSilenceThresholdBlur}
+                          keyboardType="number-pad"
+                          maxLength={3}
+                          selectTextOnFocus
+                        />
+                        <TouchableOpacity
+                          style={styles.numericButton}
+                          onPress={incrementSilenceThreshold}
+                          disabled={silenceThreshold >= speechThreshold}
+                        >
+                          <Ionicons
+                            name="add"
+                            size={20}
+                            color={silenceThreshold >= speechThreshold ? colors.gray400 : colors.gray700}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <View style={styles.audioParamContainer}>
+                      <Text style={styles.audioParamLabel}>Auto-Send Duration</Text>
+                      <Text style={styles.audioParamHint}>
+                        Silence time before auto-send (500-5000ms)
+                      </Text>
+                      <View style={styles.numericInputContainer}>
+                        <TouchableOpacity
+                          style={styles.numericButton}
+                          onPress={decrementSilenceDuration}
+                          disabled={silenceDuration <= 500}
+                        >
+                          <Ionicons
+                            name="remove"
+                            size={20}
+                            color={silenceDuration <= 500 ? colors.gray400 : colors.gray700}
+                          />
+                        </TouchableOpacity>
+                        <TextInput
+                          style={styles.numericInput}
+                          value={silenceDurationText}
+                          onChangeText={updateSilenceDuration}
+                          onBlur={handleSilenceDurationBlur}
+                          keyboardType="number-pad"
+                          maxLength={4}
+                          selectTextOnFocus
+                        />
+                        <TouchableOpacity
+                          style={styles.numericButton}
+                          onPress={incrementSilenceDuration}
+                          disabled={silenceDuration >= 5000}
+                        >
+                          <Ionicons
+                            name="add"
+                            size={20}
+                            color={silenceDuration >= 5000 ? colors.gray400 : colors.gray700}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <View style={styles.thresholdVisualizer}>
+                      <Text style={styles.visualizerLabel}>Visual Reference:</Text>
+                      <View style={styles.visualizerBar}>
+                        <View style={[styles.silenceZone, { width: `${silenceThreshold}%` }]} />
+                        <View style={[styles.middleZone, { width: `${speechThreshold - silenceThreshold}%` }]} />
+                        <View style={[styles.speechZone, { width: `${100 - speechThreshold}%` }]} />
+                      </View>
+                      <View style={styles.visualizerLabels}>
+                        <Text style={styles.visualizerLabelText}>Silence</Text>
+                        <Text style={styles.visualizerLabelText}>Medium</Text>
+                        <Text style={styles.visualizerLabelText}>Speech</Text>
+                      </View>
+                    </View>
+
+                    {/* Reset Button */}
+                    <TouchableOpacity
+                      style={styles.resetButton}
+                      onPress={() => {
+                        // Reset to platform defaults
+                        const platformDefaults = Platform.OS === 'ios'
+                          ? { speech: 78, silence: 75, duration: 1500 }
+                          : { speech: 45, silence: 43, duration: 1500 };
+
+                        setSpeechThreshold(platformDefaults.speech);
+                        setSpeechThresholdText(platformDefaults.speech.toString());
+                        setSilenceThreshold(platformDefaults.silence);
+                        setSilenceThresholdText(platformDefaults.silence.toString());
+                        setSilenceDuration(platformDefaults.duration);
+                        setSilenceDurationText(platformDefaults.duration.toString());
+                      }}
+                    >
+                      <Ionicons name="refresh" size={16} color="white" />
+                      <Text style={styles.resetButtonText}>Reset to Defaults</Text>
+                    </TouchableOpacity>
+                  </View>
+
                   {/* Audio Thresholds Toggle */}
                   <TouchableOpacity
                     style={styles.infoToggle}
@@ -234,7 +527,7 @@ const TutorHeader: React.FC<Props> = ({
                       color={colors.primary}
                     />
                     <Text style={styles.infoToggleText}>
-                      {audioInfoVisible ? "Hide Audio Thresholds" : "Show Audio Thresholds"}
+                      {audioInfoVisible ? "Hide Platform Details" : "Show Platform Details"}
                     </Text>
                   </TouchableOpacity>
 
@@ -248,7 +541,7 @@ const TutorHeader: React.FC<Props> = ({
                     >
                       <View style={styles.platformBadge}>
                         <Text style={styles.platformBadgeText}>
-                          {Platform.OS === 'ios' ? 'iOS' : 'Android'} Settings
+                          {Platform.OS === 'ios' ? 'iOS' : 'Android'} Default Settings
                         </Text>
                       </View>
 
@@ -268,8 +561,8 @@ const TutorHeader: React.FC<Props> = ({
                       </View>
 
                       <Text style={styles.thresholdDescription}>
-                        These thresholds are optimized for your device to provide the best
-                        speech detection experience.
+                        These are the default threshold values for your device. You can customize them
+                        above to optimize voice recognition for your speaking environment.
                       </Text>
                     </Animated.View>
                   )}
@@ -486,13 +779,31 @@ const TutorHeader: React.FC<Props> = ({
               <View style={styles.helpSection}>
                 <View style={styles.helpSectionHeader}>
                   <Ionicons name="hardware-chip" size={20} color="#FF9800" />
-                  <Text style={styles.helpSectionTitle}>Device Settings</Text>
+                  <Text style={styles.helpSectionTitle}>Audio Parameters</Text>
                 </View>
                 <Text style={styles.helpParagraph}>
-                  The app uses different audio sensitivity settings on iOS and Android
-                  devices to compensate for hardware and software differences. These
-                  settings are automatically applied based on your device.
+                  You can customize three key audio parameters:
                 </Text>
+                <View style={styles.helpItemList}>
+                  <View style={styles.helpItem}>
+                    <Ionicons name="volume-high" size={16} color="#4CAF50" />
+                    <Text style={styles.helpItemText}>
+                      <Text style={{fontWeight: 'bold'}}>Speech Threshold:</Text> Audio level that indicates speech (higher value = louder speech needed)
+                    </Text>
+                  </View>
+                  <View style={styles.helpItem}>
+                    <Ionicons name="volume-low" size={16} color="#FF9800" />
+                    <Text style={styles.helpItemText}>
+                      <Text style={{fontWeight: 'bold'}}>Silence Threshold:</Text> Audio level that indicates silence (higher value = more background noise allowed)
+                    </Text>
+                  </View>
+                  <View style={styles.helpItem}>
+                    <Ionicons name="timer-outline" size={16} color="#2196F3" />
+                    <Text style={styles.helpItemText}>
+                      <Text style={{fontWeight: 'bold'}}>Auto-Send Duration:</Text> How long to wait in silence before auto-sending (higher value = longer pauses allowed)
+                    </Text>
+                  </View>
+                </View>
               </View>
 
               <View style={styles.helpSection}>
@@ -510,13 +821,13 @@ const TutorHeader: React.FC<Props> = ({
                   <View style={styles.helpItem}>
                     <Ionicons name="alert-circle" size={16} color="#F44336" />
                     <Text style={styles.helpItemText}>
-                      If voice isn't detected, try increasing speaking volume
+                      If voice isn't detected, try decreasing the speech threshold
                     </Text>
                   </View>
                   <View style={styles.helpItem}>
                     <Ionicons name="alert-circle" size={16} color="#F44336" />
                     <Text style={styles.helpItemText}>
-                      If recordings cut off too early, disable auto-submit
+                      If recordings cut off too early, increase the silence duration
                     </Text>
                   </View>
                   <View style={styles.helpItem}>
@@ -585,7 +896,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '80%',
+    maxHeight: '90%', // Increased for more space
     minHeight: '40%',
     paddingBottom: Platform.OS === 'ios' ? 34 : 24, // Extra padding for iOS home indicator
     marginTop: 'auto', // This pushes the modal to the bottom
@@ -851,6 +1162,103 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.gray700,
     flex: 1,
+  },
+  // New styles for audio parameter inputs
+  audioParamContainer: {
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+    paddingBottom: 16,
+  },
+  audioParamLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.gray800,
+    marginBottom: 4,
+  },
+  audioParamHint: {
+    fontSize: 13,
+    color: colors.gray600,
+    marginBottom: 8,
+  },
+  numericInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    overflow: 'hidden',
+  },
+  numericButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.gray100,
+  },
+  numericInput: {
+    flex: 1,
+    height: 44,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.gray800,
+    paddingHorizontal: 10,
+  },
+  thresholdVisualizer: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  visualizerLabel: {
+    fontSize: 14,
+    color: colors.gray700,
+    marginBottom: 8,
+  },
+  visualizerBar: {
+    height: 24,
+    borderRadius: 12,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  silenceZone: {
+    height: '100%',
+    backgroundColor: '#ced4da', // Gray for silence
+  },
+  middleZone: {
+    height: '100%',
+    backgroundColor: '#ff9800', // Orange for medium
+  },
+  speechZone: {
+    height: '100%',
+    backgroundColor: '#4caf50', // Green for speech
+  },
+  visualizerLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  visualizerLabelText: {
+    fontSize: 12,
+    color: colors.gray600,
+  },
+  resetButton: {
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignSelf: 'center',
+    marginTop: 8,
+    gap: 6,
+  },
+  resetButtonText: {
+    color: 'white',
+    fontWeight: '500',
+    fontSize: 14,
   },
 });
 
