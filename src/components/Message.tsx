@@ -1,8 +1,9 @@
-// Updated Message.tsx with improved dynamic sizing for user message bubbles
+// Updated Message.tsx with replay button for assistant messages and proper export structure
 
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import HTML from 'react-native-render-html';
+import { Ionicons } from '@expo/vector-icons';
 import { normalizeText, areMessagesEquivalent, highlightDifferences } from '../utils/text';
 
 // Get screen width for dynamic sizing
@@ -14,18 +15,30 @@ export interface MessageData {
   content: string;
   corrected?: string;
   natural?: string;
-  translation?: string;  // Added translation field
+  translation?: string;
   timestamp: string;
   isTemporary?: boolean;
+  hasAudio?: boolean; // Property to indicate if message has audio
 }
 
-// Props interface
+// Props interface with replay-related props
 interface MessageProps {
   message: MessageData;
   originalUserMessage?: string | null;
+  isLatestAssistantMessage?: boolean; // Prop to identify the latest assistant message
+  onRequestReplay?: () => void; // Callback for replay request
+  isPlaying?: boolean; // Indicate if audio is currently playing
+  isMuted?: boolean; // Indicate if audio is muted
 }
 
-const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
+const Message: React.FC<MessageProps> = ({
+  message,
+  originalUserMessage,
+  isLatestAssistantMessage = false,
+  onRequestReplay,
+  isPlaying = false,
+  isMuted = false
+}) => {
   // Add state for tracking if we're showing the translation
   const [isShowingTranslation, setIsShowingTranslation] = useState<boolean>(false);
 
@@ -115,22 +128,28 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
     }
   }), []);
 
-  // Updated base styles for rendering HTML content with better wrapping behavior
-  const correctedBaseStyle = useMemo(() => ({
-    ...styles.annotationText,
-    ...(isUser ? styles.userAnnotationText : {}),
-    ...(isEquivalentToCorrected ? styles.identicalText : {color: '#4CAF50'}), // Green for unchanged words
-    flexShrink: 1,
-    flexWrap: 'wrap',
-  }), [isUser, isEquivalentToCorrected]);
+  // Updated base styles for rendering HTML content - fixed to avoid using flexWrap which is causing issues
+  const correctedBaseStyle = useMemo(() => {
+    const baseStyle = {
+      ...styles.annotationText,
+      color: isEquivalentToCorrected ? '#4CAF50' : '#212529'
+    };
+    if (isUser) {
+      return { ...baseStyle, ...styles.userAnnotationText };
+    }
+    return baseStyle;
+  }, [isUser, isEquivalentToCorrected]);
 
-  const nativeBaseStyle = useMemo(() => ({
-    ...styles.annotationText,
-    ...(isUser ? styles.userAnnotationText : {}),
-    ...(isEquivalentToNative ? styles.identicalText : {color: '#4CAF50'}), // Green for unchanged words
-    flexShrink: 1,
-    flexWrap: 'wrap',
-  }), [isUser, isEquivalentToNative]);
+  const nativeBaseStyle = useMemo(() => {
+    const baseStyle = {
+      ...styles.annotationText,
+      color: isEquivalentToNative ? '#4CAF50' : '#212529'
+    };
+    if (isUser) {
+      return { ...baseStyle, ...styles.userAnnotationText };
+    }
+    return baseStyle;
+  }, [isUser, isEquivalentToNative]);
 
   // Toggle translation function
   const toggleTranslation = () => {
@@ -138,6 +157,14 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
       setIsShowingTranslation(!isShowingTranslation);
     }
   };
+
+  // Check if this message should show a replay button
+  const showReplayButton = isAssistant &&
+                           isLatestAssistantMessage &&
+                           onRequestReplay &&
+                           !isUser &&
+                           message.hasAudio === true &&
+                           !isMuted;
 
   return (
     <View style={[
@@ -185,7 +212,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
                       source={{ html: highlightedNative }}
                       contentWidth={screenWidth * 0.75} // Increased available width
                       tagsStyles={nativeTagsStyles}
-                      baseStyle={nativeBaseStyle}
+                      baseFontStyle={nativeBaseStyle}
                     />
                   </View>
                 </View>
@@ -199,10 +226,7 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
               source={{ html: highlightIncorrectWords }}
               contentWidth={screenWidth * 0.75} // Increased available width
               tagsStyles={correctedTagsStyles}
-              baseStyle={[
-                styles.mainText,
-                isUser && styles.userMainText
-              ]}
+              baseFontStyle={isUser ? { ...styles.mainText, ...styles.userMainText } : styles.mainText}
             />
           </View>
         ) : isAssistant && message.translation ? (
@@ -254,9 +278,9 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
                   <View style={styles.annotationTextContainer}>
                     <HTML
                       source={{ html: highlightedCorrected }}
-                      contentWidth={screenWidth * 0.75} // Increased available width for annotations
+                      contentWidth={screenWidth * 0.75} // Increased available width
                       tagsStyles={correctedTagsStyles}
-                      baseStyle={correctedBaseStyle}
+                      baseFontStyle={correctedBaseStyle}
                     />
 
                     {isEquivalentToCorrected && (
@@ -297,6 +321,29 @@ const Message: React.FC<MessageProps> = ({ message, originalUserMessage }) => {
                 </View>
               </View>
             )}
+          </View>
+        )}
+
+        {/* Add replay button for assistant messages if this is the latest one */}
+        {showReplayButton && (
+          <View style={styles.replayButtonContainer}>
+            <TouchableOpacity
+              style={[
+                styles.replayButton,
+                isPlaying && styles.replayButtonPlaying
+              ]}
+              onPress={onRequestReplay}
+              disabled={isPlaying}
+            >
+              {isPlaying ? (
+                <Ionicons name="volume-high" size={16} color="#ffffff" />
+              ) : (
+                <Ionicons name="play" size={16} color="#ffffff" />
+              )}
+              <Text style={styles.replayButtonText}>
+                {isPlaying ? 'Playing...' : 'Replay'}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -407,8 +454,7 @@ const styles = StyleSheet.create({
   annotationText: {
     fontSize: 14,
     lineHeight: 20,
-    flexShrink: 1, // Allow text to shrink if needed
-    flexWrap: 'wrap',
+    // Remove flexShrink and flexWrap which may be causing issues in HTML rendering
   },
   userAnnotationLabel: {
     color: '#2196F3', // Blue for grammar in user message (now on white background)
@@ -469,14 +515,42 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: 'italic',
   },
+  // New styles for replay button
+  replayButtonContainer: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  replayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#5d6af8',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  replayButtonPlaying: {
+    backgroundColor: '#4CAF50', // Green when playing
+  },
+  replayButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
 });
 
+// Export the component with memo for optimization
+// This needs to be outside any functions/blocks at the top level
 export default React.memo(Message, (prev, next) => {
   return (
     prev.message.content === next.message.content &&
     prev.message.corrected === next.message.corrected &&
     prev.message.natural === next.message.natural &&
     prev.message.translation === next.message.translation &&
-    prev.originalUserMessage === next.originalUserMessage
+    prev.originalUserMessage === next.originalUserMessage &&
+    prev.isLatestAssistantMessage === next.isLatestAssistantMessage &&
+    prev.isPlaying === next.isPlaying &&
+    prev.isMuted === next.isMuted
   );
 });

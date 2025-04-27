@@ -81,13 +81,15 @@ export const sendTextMessage = async (
 };
 
 // Add a new helper function to get the streaming audio URL
+// Add a new helper function to get the streaming audio URL
 export const getAudioStreamUrl = (
   conversationId: string,
   messageIndex: number = -1,
   tempo: number = 0.75,
-  targetLanguage: string = 'es'
+  targetLanguage: string = 'es',
+  isMuted: boolean = false  // Add muted parameter
 ) => {
-  return `${API_URL}/stream-audio/${conversationId}?message_index=${messageIndex}&tempo=${tempo}&target_language=${targetLanguage}`;
+  return `${API_URL}/stream-audio/${conversationId}?message_index=${messageIndex}&tempo=${tempo}&target_language=${targetLanguage}&is_muted=${isMuted}`;
 };
 
 /**

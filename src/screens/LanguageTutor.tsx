@@ -691,109 +691,210 @@ const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null
   };
 
   // Text chat handler
-  const handleSubmit = async (inputMessage: string) => {
-    hasProcessedCurrentRecordingRef.current = false;
-    if (!inputMessage.trim() || isLoading) return;
+  // Update to handleSubmit function in LanguageTutor.tsx
+const handleSubmit = async (inputMessage: string) => {
+  hasProcessedCurrentRecordingRef.current = false;
+  if (!inputMessage.trim() || isLoading) return;
 
-    // Add user message to history immediately
-    const userMessage: MessageType = {
-      role: 'user',
-      content: inputMessage,
+  // Add user message to history immediately
+  const userMessage: MessageType = {
+    role: 'user',
+    content: inputMessage,
+    timestamp: new Date().toISOString()
+  };
+
+  setHistory(prev => [...prev, userMessage]);
+  setIsLoading(true);
+
+  try {
+    const response = await api.sendTextMessage(
+      inputMessage,
+      conversationId,
+      tempo,
+      getDifficulty(),
+      getNativeLanguage(),
+      getTargetLanguage(),
+      getLearningObjective(),
+      isMuted
+    );
+
+    if (!conversationId && response.conversation_id) {
+      setConversationId(response.conversation_id);
+    }
+
+    // Update history, but preserve our modified structure
+    if (response.history && response.history.length > 0) {
+      // We need to map the server response to our new structure
+      // where corrections are attached to the user's messages
+
+      const newHistory: MessageType[] = [];
+
+      for (let i = 0; i < response.history.length; i++) {
+        const currentMsg = response.history[i];
+
+        if (currentMsg.role === 'user') {
+          // Find the next assistant message (if any)
+          const nextMsg = i + 1 < response.history.length ? response.history[i + 1] : null;
+
+          // Check if the next message has corrections meant for this user message
+          if (nextMsg && nextMsg.role === 'assistant' && (nextMsg.corrected || nextMsg.natural)) {
+            // Add user message with corrections from the assistant message
+            newHistory.push({
+              ...currentMsg,
+              corrected: nextMsg.corrected,
+              natural: nextMsg.natural
+            });
+
+            // Add assistant message without the corrections but WITH translation
+            if (nextMsg) {
+              newHistory.push({
+                role: nextMsg.role,
+                content: nextMsg.content,
+                translation: nextMsg.translation, // Include translation
+                timestamp: nextMsg.timestamp,
+                hasAudio: response.has_audio // Set hasAudio based on API response
+              });
+            }
+
+            // Skip the next message since we've already processed it
+            i++;
+          } else {
+            // Regular user message without corrections
+            newHistory.push(currentMsg);
+          }
+        } else if (currentMsg.role === 'assistant' || currentMsg.role === 'system') {
+          // Regular assistant or system message (include translation for assistant)
+          if (currentMsg.role === 'assistant') {
+            newHistory.push({
+              ...currentMsg,
+              translation: currentMsg.translation, // Include translation if present
+              hasAudio: response.has_audio // Set hasAudio based on API response
+            });
+          } else {
+            newHistory.push(currentMsg);
+          }
+        }
+      }
+
+      setHistory(newHistory);
+    }
+
+    if (response.has_audio) {
+      setStatusMessage('Streaming audio...');
+      // MODIFIED: Always use -1 to get the latest message's audio
+      await playAudio(response.conversation_id, -1);
+    }
+  } catch (error) {
+    console.error('Error sending message:', error);
+    const errorMessage: MessageType = {
+      role: 'system',
+      content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
       timestamp: new Date().toISOString()
     };
 
-    setHistory(prev => [...prev, userMessage]);
-    setIsLoading(true);
+    setHistory(prev => [...prev, errorMessage]);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-    try {
-      const response = await api.sendTextMessage(
-        inputMessage,
-        conversationId,
-        tempo,
-        getDifficulty(),
-        getNativeLanguage(),
-        getTargetLanguage(),
-        getLearningObjective(),
-          isMuted
-      );
+// Update to handleAudioData function in LanguageTutor.tsx
+const handleAudioData = async () => {
+  const audioUri = getAudioURI();
+  console.log("🎧 Audio URI to submit:", audioUri);
+  if (!audioUri) {
+    setStatusMessage('No audio data recorded');
+    return;
+  }
 
-      if (!conversationId && response.conversation_id) {
-        setConversationId(response.conversation_id);
-      }
+  setIsLoading(true);
+  setIsProcessing(true);
+  setStatusMessage('Processing audio data...');
 
-      // Update history, but preserve our modified structure
-      if (response.history && response.history.length > 0) {
-        // We need to map the server response to our new structure
-        // where corrections are attached to the user's messages
+  try {
+    // Show temporary message
+    const tempMessage: MessageType = {
+      role: 'user',
+      content: "🎤 Processing voice...",
+      timestamp: new Date().toISOString(),
+      isTemporary: true
+    };
+    setHistory(prev => [...prev, tempMessage]);
 
-        const newHistory: MessageType[] = [];
+    const response = await api.sendVoiceRecording({
+      audioUri,
+      conversationId,
+      tempo,
+      difficulty: getDifficulty(),
+      nativeLanguage: getNativeLanguage(),
+      targetLanguage: getTargetLanguage(),
+      learningObjective: getLearningObjective(),
+      isMuted: isMuted
+    });
 
-        for (let i = 0; i < response.history.length; i++) {
-          const currentMsg = response.history[i];
+    setStatusMessage('Received response from server');
+    console.log("📨 Received response from server:", response);
 
-          if (currentMsg.role === 'user') {
-            // Find the next assistant message (if any)
-            const nextMsg = i + 1 < response.history.length ? response.history[i + 1] : null;
+    // Update conversation, attaching corrections to the user message
+    setHistory(prev => {
+      const filtered = prev.filter(msg => !msg.isTemporary);
 
-            // Check if the next message has corrections meant for this user message
-            if (nextMsg && nextMsg.role === 'assistant' && (nextMsg.corrected || nextMsg.natural)) {
-              // Add user message with corrections from the assistant message
-              newHistory.push({
-                ...currentMsg,
-                corrected: nextMsg.corrected,
-                natural: nextMsg.natural
-              });
-
-              // Add assistant message without the corrections but WITH translation
-              if (nextMsg) {
-                newHistory.push({
-                  role: nextMsg.role,
-                  content: nextMsg.content,
-                  translation: nextMsg.translation, // Include translation
-                  timestamp: nextMsg.timestamp
-                });
-              }
-
-              // Skip the next message since we've already processed it
-              i++;
-            } else {
-              // Regular user message without corrections
-              newHistory.push(currentMsg);
-            }
-          } else if (currentMsg.role === 'assistant' || currentMsg.role === 'system') {
-            // Regular assistant or system message (include translation for assistant)
-            if (currentMsg.role === 'assistant') {
-              newHistory.push({
-                ...currentMsg,
-                translation: currentMsg.translation // Include translation if present
-              });
-            } else {
-              newHistory.push(currentMsg);
-            }
+      if (response.transcribed_text) {
+        return [
+          ...filtered,
+          // User message with corrections attached
+          {
+            role: 'user',
+            content: response.transcribed_text,
+            corrected: response.corrected,
+            natural: response.natural,
+            timestamp: new Date().toISOString()
+          },
+          // AI response (without corrections but WITH translation)
+          {
+            role: 'assistant',
+            content: response.reply,
+            translation: response.translation, // Include translation
+            timestamp: new Date().toISOString(),
+            hasAudio: response.has_audio // Set hasAudio based on API response
           }
-        }
-
-        setHistory(newHistory);
+        ];
       }
+      return filtered;
+    });
 
-      if (response.has_audio) {
-        setStatusMessage('Streaming audio...');
-        // MODIFIED: Always use -1 to get the latest message's audio
-        await playAudio(response.conversation_id, -1);
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const errorMessage: MessageType = {
-        role: 'system',
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-        timestamp: new Date().toISOString()
-      };
-
-      setHistory(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
+    if (!conversationId && response.conversation_id) {
+      setConversationId(response.conversation_id);
     }
-  };
+
+    // Play audio using the same approach as text input
+    if (response.has_audio) {
+      setStatusMessage('Streaming audio...');
+      // MODIFIED: Always use -1 to get the latest message's audio
+      await playAudio(response.conversation_id, -1);
+    }
+
+  } catch (error) {
+    console.error('Error processing voice input:', error);
+    setStatusMessage(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+    setHistory(prev => {
+      const filtered = prev.filter(msg => !msg.isTemporary);
+      return [
+        ...filtered,
+        {
+          role: 'system',
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+          timestamp: new Date().toISOString()
+        }
+      ];
+    });
+  } finally {
+    setIsLoading(false);
+    setIsProcessing(false);
+    resetRecording();
+  }
+};
 
   // Updated implementation for reliable auto-recording after audio playback
   const playAudio = async (conversationId, messageIndex = -1) => {
@@ -856,7 +957,8 @@ const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null
         conversationId,
         messageIndex,
         tempo,
-        getTargetLanguage() // Use current target language
+        getTargetLanguage(), // Use current target language
+        isMuted // Pass the muted state to the API
       );
       console.log("🎵 [AUDIO] Audio streaming URL:", audioUrl);
 
@@ -1131,101 +1233,7 @@ const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null
     }
   };
 
-  const handleAudioData = async () => {
-    const audioUri = getAudioURI();
-    console.log("🎧 Audio URI to submit:", audioUri);
-    if (!audioUri) {
-      setStatusMessage('No audio data recorded');
-      return;
-    }
 
-    setIsLoading(true);
-    setIsProcessing(true);
-    setStatusMessage('Processing audio data...');
-
-    try {
-      // Show temporary message
-      const tempMessage: MessageType = {
-        role: 'user',
-        content: "🎤 Processing voice...",
-        timestamp: new Date().toISOString(),
-        isTemporary: true
-      };
-      setHistory(prev => [...prev, tempMessage]);
-
-      const response = await api.sendVoiceRecording({
-        audioUri,
-        conversationId,
-        tempo,
-        difficulty: getDifficulty(),
-        nativeLanguage: getNativeLanguage(),
-        targetLanguage: getTargetLanguage(),
-        learningObjective: getLearningObjective(),
-        isMuted: isMuted
-      });
-
-      setStatusMessage('Received response from server');
-      console.log("📨 Received response from server:", response);
-
-      // Update conversation, attaching corrections to the user message
-      setHistory(prev => {
-        const filtered = prev.filter(msg => !msg.isTemporary);
-
-        if (response.transcribed_text) {
-          return [
-            ...filtered,
-            // User message with corrections attached
-            {
-              role: 'user',
-              content: response.transcribed_text,
-              corrected: response.corrected,
-              natural: response.natural,
-              timestamp: new Date().toISOString()
-            },
-            // AI response (without corrections but WITH translation)
-            {
-              role: 'assistant',
-              content: response.reply,
-              translation: response.translation, // Include translation
-              timestamp: new Date().toISOString()
-            }
-          ];
-        }
-        return filtered;
-      });
-
-      if (!conversationId && response.conversation_id) {
-        setConversationId(response.conversation_id);
-      }
-
-      // Play audio using the same approach as text input
-      if (response.has_audio) {
-        setStatusMessage('Streaming audio...');
-        // MODIFIED: Always use -1 to get the latest message's audio
-        await playAudio(response.conversation_id, -1);
-      }
-
-    } catch (error) {
-      console.error('Error processing voice input:', error);
-      setStatusMessage(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-
-      setHistory(prev => {
-        const filtered = prev.filter(msg => !msg.isTemporary);
-        return [
-          ...filtered,
-          {
-            role: 'system',
-            content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-            timestamp: new Date().toISOString()
-          }
-        ];
-      });
-    } finally {
-      setIsLoading(false);
-      setIsProcessing(false);
-      resetRecording();
-    }
-  };
 
   // UI Handlers
   const handleVoiceButtonClick = async () => {
@@ -1269,30 +1277,54 @@ const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null
   };
 
   // Render conversation messages
-  const renderMessages = () => {
-    if (history.length === 0) {
-      return (
-        <View style={styles.emptyState}>
-          <Text style={styles.welcomeIcon}>👋</Text>
-          <Text style={styles.welcomeTitle}>
-            {getWelcomeTitle(getTargetLanguage())}
-          </Text>
-          <Text style={styles.welcomeText}>
-            {getWelcomeSubtitle(getTargetLanguage())}
-          </Text>
-        </View>
-      );
-    }
+  // Render conversation messages
+const renderMessages = () => {
+  if (history.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.welcomeIcon}>👋</Text>
+        <Text style={styles.welcomeTitle}>
+          {getWelcomeTitle(getTargetLanguage())}
+        </Text>
+        <Text style={styles.welcomeText}>
+          {getWelcomeSubtitle(getTargetLanguage())}
+        </Text>
+      </View>
+    );
+  }
 
-    return history.map((msg, index) => (
+  return history.map((msg, index) => {
+    // Determine if this is the latest assistant message that can be replayed
+    const isLatestAssistantMessage =
+      msg.role === 'assistant' &&
+      index === history.findLastIndex(m => m.role === 'assistant');
+
+    // Only show replay button if:
+    // 1. This is the latest assistant message
+    // 2. The message has audio available (was generated when not muted)
+    // 3. Audio is not currently muted
+    // 4. We have a valid conversation ID and message index for replay
+    const canReplayThisMessage =
+      isLatestAssistantMessage &&
+      msg.hasAudio === true &&  // Must explicitly check for true
+      !isMuted &&
+      canReplayLastMessage;
+
+    return (
       <Message
         key={index}
-        message={msg}
-        // No need to pass originalUserMessage anymore since corrections
-        // are attached directly to user messages
+        message={{
+          ...msg,
+          // hasAudio is already part of the message object now
+        }}
+        isLatestAssistantMessage={isLatestAssistantMessage}
+        onRequestReplay={canReplayThisMessage ? handleReplayLastMessage : undefined}
+        isPlaying={isPlaying}
+        isMuted={isMuted}
       />
-    ));
-  };
+    );
+  });
+};
 
   // Helper functions for welcome messages in different languages
   const getWelcomeTitle = (lang: string): string => {
@@ -1491,15 +1523,7 @@ const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null
             </View>
           )}
         </ScrollView>
-        {canReplayLastMessage && (
-        <View style={styles.replayButtonContainer}>
-          <ReplayButton
-            onPress={handleReplayLastMessage}
-            isPlaying={isPlaying}
-            isMuted={isMuted}
-            disabled={isLoading || isProcessing}
-          />
-        </View>
+
       )}
         <View style={styles.inputContainer}>
           {voiceInputEnabled ? (
@@ -1932,12 +1956,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
   },
-  replayButtonContainer: {
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingVertical: 8,
-  backgroundColor: 'white',
-},
+
 });
 
 export default LanguageTutor;
