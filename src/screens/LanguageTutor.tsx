@@ -549,9 +549,9 @@ const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null
         nativeLanguage: getNativeLanguage(),
         targetLanguage: getTargetLanguage(),
         learningObjective: getLearningObjective(),
+        conversationMode: route.params.conversationMode, // Add this line
         tempo: tempo,
-        isMuted: isMuted // Add the muted parameter
-
+        isMuted: isMuted
       });
 
       // Update state with the response data

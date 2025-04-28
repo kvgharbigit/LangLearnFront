@@ -1,11 +1,12 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import { ConversationMode } from '../components/ConversationModeSelector';
 
 // Update this to your actual API URL
 //const API_URL = 'https://language-tutor-984417336702.asia-east1.run.app';
 const API_URL = 'http://192.168.86.26:8004';
 
-// Update the ChatParams interface to include isMuted
+// Update the ChatParams interface to include isMuted and conversationMode
 interface ChatParams {
   message: string;
   conversation_id?: string | null;
@@ -14,10 +15,11 @@ interface ChatParams {
   native_language: string;
   target_language: string;
   learning_objective?: string;
-  is_muted?: boolean; // Add this parameter
+  is_muted?: boolean;
+  conversation_mode?: ConversationMode;
 }
 
-// Update the VoiceParams interface to include isMuted
+// Update the VoiceParams interface to include isMuted and conversationMode
 interface VoiceParams {
   audioUri: string;
   conversationId?: string | null;
@@ -26,7 +28,8 @@ interface VoiceParams {
   nativeLanguage: string;
   targetLanguage: string;
   learningObjective?: string;
-  isMuted?: boolean; // Add this parameter
+  isMuted?: boolean;
+  conversationMode?: ConversationMode;
 }
 
 /**
@@ -40,7 +43,8 @@ export const sendTextMessage = async (
   nativeLanguage: string = 'en',
   targetLanguage: string = 'es',
   learningObjective: string = '',
-  isMuted: boolean = false // Add this parameter with default value
+  isMuted: boolean = false,
+  conversationMode: ConversationMode = 'language_lesson'
 ) => {
   try {
     const params: ChatParams = {
@@ -51,8 +55,13 @@ export const sendTextMessage = async (
       native_language: nativeLanguage,
       target_language: targetLanguage,
       learning_objective: learningObjective,
-      is_muted: isMuted // Add this field
+      is_muted: isMuted,
+      conversation_mode: conversationMode
     };
+
+    // Add debug logging
+    console.log("🔍 Debug - API sendTextMessage params:", JSON.stringify(params, null, 2));
+    console.log("🔍 Debug - conversation_mode value:", conversationMode);
 
     const response = await fetch(`${API_URL}/chat`, {
       method: 'POST',
@@ -81,13 +90,12 @@ export const sendTextMessage = async (
 };
 
 // Add a new helper function to get the streaming audio URL
-// Add a new helper function to get the streaming audio URL
 export const getAudioStreamUrl = (
   conversationId: string,
   messageIndex: number = -1,
   tempo: number = 0.75,
   targetLanguage: string = 'es',
-  isMuted: boolean = false  // Add muted parameter
+  isMuted: boolean = false
 ) => {
   return `${API_URL}/stream-audio/${conversationId}?message_index=${messageIndex}&tempo=${tempo}&target_language=${targetLanguage}&is_muted=${isMuted}`;
 };
@@ -103,7 +111,8 @@ export const sendVoiceRecording = async ({
   nativeLanguage = 'en',
   targetLanguage = 'es',
   learningObjective = '',
-  isMuted = false // Add this parameter with default value
+  isMuted = false,
+  conversationMode = 'language_lesson'
 }: VoiceParams) => {
   try {
     // Get file info
@@ -131,7 +140,8 @@ export const sendVoiceRecording = async ({
     formData.append('native_language', nativeLanguage);
     formData.append('target_language', targetLanguage);
     formData.append('learning_objective', learningObjective);
-    formData.append('is_muted', isMuted.toString()); // Add this field
+    formData.append('is_muted', isMuted.toString());
+    formData.append('conversation_mode', conversationMode);
 
     const response = await fetch(`${API_URL}/voice-input`, {
       method: 'POST',
@@ -240,32 +250,40 @@ export const createConversation = async ({
   nativeLanguage,
   targetLanguage,
   learningObjective,
+  conversationMode = 'language_lesson',
   tempo,
-  isMuted = false // Add this parameter with default value
+  isMuted = false
 }: {
   difficulty: string;
   nativeLanguage: string;
   targetLanguage: string;
   learningObjective?: string;
+  conversationMode?: ConversationMode;
   tempo?: number;
-  isMuted?: boolean; // Add this parameter
+  isMuted?: boolean;
 }) => {
   try {
-    // Import API_CONFIG from your constants if you haven't already
-    // Replace with your actual API URL if needed
+    // Create request body
+    const requestBody = {
+      difficulty,
+      native_language: nativeLanguage,
+      target_language: targetLanguage,
+      learning_objective: learningObjective || '',
+      conversation_mode: conversationMode,
+      tempo: tempo || 0.75,
+      is_muted: isMuted
+    };
+
+    // Add debug logging
+    console.log("🔍 Debug - createConversation request body:", JSON.stringify(requestBody, null, 2));
+    console.log("🔍 Debug - conversation_mode value:", conversationMode);
+
     const response = await fetch(`${API_URL}/create-conversation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        difficulty,
-        native_language: nativeLanguage,
-        target_language: targetLanguage,
-        learning_objective: learningObjective || '',
-        tempo: tempo || 0.75,
-        is_muted: isMuted // Add this field
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {

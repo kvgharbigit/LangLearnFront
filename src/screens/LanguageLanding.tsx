@@ -4,7 +4,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  TextInput,
   StyleSheet,
   ActivityIndicator,
   ScrollView,
@@ -21,10 +20,10 @@ import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import LanguageSelector from '../components/LanguageSelector';
+import ConversationModeSelector, { ConversationMode } from '../components/ConversationModeSelector';
 import { DIFFICULTY_LEVELS } from '../constants/languages';
 import { getLanguagePreferences, saveLanguagePreferences } from '../utils/languageStorage';
 import { getLanguageInfo } from '../constants/languages';
-// No additional imports needed
 
 // Get screen dimensions for responsive design
 const { width, height } = Dimensions.get('window');
@@ -39,6 +38,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   const [nativeLanguage, setNativeLanguage] = useState<string>('en');
   const [targetLanguage, setTargetLanguage] = useState<string>('');
   const [difficulty, setDifficulty] = useState<string>('beginner');
+  const [conversationMode, setConversationMode] = useState<ConversationMode>('language_lesson');
   const [learningObjective, setLearningObjective] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -140,6 +140,13 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
     setTargetLanguage(code);
   };
 
+  // Handle conversation mode selection
+  const handleConversationModeSelect = (mode: ConversationMode) => {
+  console.log(`🔍 Debug - Mode selected in selector: ${mode}`);
+  setConversationMode(mode);
+  console.log(`🔍 Debug - State updated, conversationMode is now: ${mode}`);
+};
+
   // Handle start learning button press
   const handleStartLearning = (): void => {
     // Basic validation
@@ -148,6 +155,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
     }
 
     setIsSaving(true);
+    console.log(`🔍 Debug - About to navigate with conversationMode: ${conversationMode}`);
 
     // Simulate loading for a better UX
     setTimeout(() => {
@@ -155,7 +163,8 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
         nativeLanguage,
         targetLanguage,
         difficulty,
-        learningObjective: learningObjective.trim()
+        learningObjective: learningObjective.trim(),
+        conversationMode: conversationMode
       });
       setIsSaving(false);
     }, 800);
@@ -184,19 +193,19 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
 
       {/* Profile Button - Only shown when user is authenticated */}
       {user && (
-  <TouchableOpacity
-    style={styles.profileButton}
-    onPress={() => navigation.navigate('Profile')}
-    accessibilityLabel="Profile"
-    accessibilityHint="Navigate to your profile page"
-  >
-    <View style={styles.avatarContainer}>
-      <Text style={styles.avatarText}>
-        {user.displayName ? user.displayName.charAt(0).toUpperCase() : '👤'}
-      </Text>
-    </View>
-  </TouchableOpacity>
-)}
+        <TouchableOpacity
+          style={styles.profileButton}
+          onPress={() => navigation.navigate('Profile')}
+          accessibilityLabel="Profile"
+          accessibilityHint="Navigate to your profile page"
+        >
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatarText}>
+              {user.displayName ? user.displayName.charAt(0).toUpperCase() : '👤'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -247,67 +256,47 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
               />
 
               <View style={styles.section}>
-  <Text style={styles.sectionTitle}>My level:</Text>
-  <View style={styles.difficultyContainer}>
-    {DIFFICULTY_LEVELS.map(level => (
-      <TouchableOpacity
-        key={level.level}
-        style={[
-          styles.difficultyOption,
-          difficulty === level.level && styles.selectedDifficulty
-        ]}
-        onPress={() => setDifficulty(level.level)}
-        accessibilityLabel={level.label}
-        accessibilityHint={`Set your proficiency level to ${level.label}`}
-      >
-        <View style={[
-          styles.difficultyIconContainer,
-          difficulty === level.level && styles.selectedDifficultyIcon
-        ]}>
-          <Text style={styles.difficultyIcon}>{level.icon}</Text>
-        </View>
-        <Text
-          style={[
-            styles.difficultyText,
-            difficulty === level.level && styles.selectedDifficultyText
-          ]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {level.label}
-        </Text>
-      </TouchableOpacity>
-    ))}
-  </View>
-</View>
+                <Text style={styles.sectionTitle}>My level:</Text>
+                <View style={styles.difficultyContainer}>
+                  {DIFFICULTY_LEVELS.map(level => (
+                    <TouchableOpacity
+                      key={level.level}
+                      style={[
+                        styles.difficultyOption,
+                        difficulty === level.level && styles.selectedDifficulty
+                      ]}
+                      onPress={() => setDifficulty(level.level)}
+                      accessibilityLabel={level.label}
+                      accessibilityHint={`Set your proficiency level to ${level.label}`}
+                    >
+                      <View style={[
+                        styles.difficultyIconContainer,
+                        difficulty === level.level && styles.selectedDifficultyIcon
+                      ]}>
+                        <Text style={styles.difficultyIcon}>{level.icon}</Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.difficultyText,
+                          difficulty === level.level && styles.selectedDifficultyText
+                        ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {level.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
-              <View style={styles.section}>
-  <Text style={styles.sectionTitle}> Topic (Optional)</Text>
-  <View style={styles.textAreaContainer}>
-    <TextInput
-      style={styles.textArea}
-      value={learningObjective}
-      onChangeText={setLearningObjective}
-      placeholder="• Travel tips for Mexico
-• Grammar of the Past Tense
-• The Roman Empire
-"
-      multiline
-      scrollEnabled={false}
-      numberOfLines={4}
-      textAlignVertical="top"
-      placeholderTextColor={colors.gray500}
-    />
-  </View>
-
-  {/* New topic info note */}
-  <View style={styles.topicInfoContainer}>
-    <Ionicons name="information-circle" size={16} color={colors.info} style={styles.infoIcon} />
-    <Text style={styles.topicInfoText}>
-      Our AI tutor has extensive knowledge on almost any topic far beyond grammar. Feel free to discuss travel, culture, science, history, relationships, or any subject you're interested in learning about - even if its just gossiping about your favourite TV show!
-    </Text>
-  </View>
-</View>
+              {/* Conversation Mode Selector */}
+              <ConversationModeSelector
+                selectedMode={conversationMode}
+                onSelectMode={handleConversationModeSelect}
+                promptText={learningObjective}
+                onChangePromptText={setLearningObjective}
+              />
 
               <TouchableOpacity
                 style={[
@@ -328,8 +317,6 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
                 )}
               </TouchableOpacity>
             </View>
-
-
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -364,8 +351,7 @@ const colors = {
   cardBackground: '#ffffff',
 };
 
-// Updated styles in LanguageLanding.tsx
-
+// Styles from original LanguageLanding.tsx
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -540,23 +526,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '700',
   },
-  textAreaContainer: {
-    width: '100%',
-  },
-  textArea: {
-    width: '100%',
-    minHeight: 120,
-    maxHeight: 120,
-    borderWidth: 1.5,
-    borderColor: colors.gray300,
-    borderRadius: 16,
-    padding: 16,
-    fontSize: 15,
-    lineHeight: 22,
-    textAlignVertical: 'top',
-    color: colors.gray800,
-    backgroundColor: colors.white,
-  },
   startButton: {
     backgroundColor: colors.primary,
     paddingVertical: 16,
@@ -591,94 +560,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.3,
   },
-  featuresSection: {
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  featuresTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.gray800,
-    textAlign: 'center',
-  },
-  featuresGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  featureCard: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: 'rgba(0, 0, 0, 0.06)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    shadowOpacity: 1,
-    elevation: 3,
-    width: '48%',
-    alignItems: 'center',
-  },
-  featureIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  featureTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.gray800,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  featureText: {
-    color: colors.gray600,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  testButton: {
-    flexDirection: 'row',
-    backgroundColor: colors.white,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    shadowColor: colors.gray400,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  testButtonText: {
-    color: colors.gray700,
-    fontWeight: '600',
-    fontSize: 14,
-    marginLeft: 8,
-  },
-  footer: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  footerDivider: {
-    height: 1,
-    width: 60,
-    backgroundColor: colors.gray300,
-    marginBottom: 16,
-  },
-  footerText: {
-    color: colors.gray500,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  // Updated profile button styles
   profileButton: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 55 : 16, // Adjusted for iOS to be below status bar
@@ -707,24 +588,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.white,
-  },
-   topicInfoContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(3, 169, 244, 0.08)',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 12,
-    alignItems: 'flex-start',
-  },
-  infoIcon: {
-    marginRight: 8,
-    marginTop: 2,
-  },
-  topicInfoText: {
-    fontSize: 13,
-    color: colors.gray700,
-    flex: 1,
-    lineHeight: 18,
   },
 });
 

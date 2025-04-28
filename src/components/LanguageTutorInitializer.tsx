@@ -6,11 +6,13 @@ import { createConversation } from '../utils/api';
 import { getWelcomeTitle, getWelcomeSubtitle } from '../utils/languageUtils';
 import { saveLanguagePreferences } from '../utils/languageStorage';
 import colors from '../styles/colors';
+import { ConversationMode } from './ConversationModeSelector';
 
 interface LanguageTutorInitializerProps {
   targetLanguage: string;
   nativeLanguage: string;
   difficulty: string;
+  conversationMode: ConversationMode;
   learningObjective?: string;
   tempo?: number;
   isMuted?: boolean;
@@ -21,6 +23,7 @@ const LanguageTutorInitializer: React.FC<LanguageTutorInitializerProps> = ({
   targetLanguage,
   nativeLanguage,
   difficulty,
+  conversationMode,
   learningObjective = '',
   tempo = 0.8,
   isMuted = false,
@@ -32,10 +35,36 @@ const LanguageTutorInitializer: React.FC<LanguageTutorInitializerProps> = ({
   const targetInfo = getLanguageInfo(targetLanguage);
   const nativeInfo = getLanguageInfo(nativeLanguage);
 
+  // Helper function to get conversation mode display name
+  const getConversationModeDisplayName = (mode: ConversationMode): string => {
+    switch (mode) {
+      case 'language_lesson':
+        return 'Language Lesson';
+      case 'topic_lesson':
+        return 'Content Learning';
+      case 'free_conversation':
+        return 'Free Conversation';
+      default:
+        return 'Conversation';
+    }
+  };
+
   useEffect(() => {
     const initConversation = async () => {
       try {
         setStatus('Creating your conversation...');
+
+        // Add debug logging
+        console.log("🔍 Debug - LanguageTutorInitializer params:", {
+          difficulty,
+          nativeLanguage,
+          targetLanguage,
+          learningObjective,
+          conversationMode,
+          tempo,
+          isMuted
+        });
+        console.log("🔍 Debug - conversationMode value:", conversationMode);
 
         // Save these preferences again just to make sure they're persistent
         await saveLanguagePreferences(
@@ -59,6 +88,7 @@ const LanguageTutorInitializer: React.FC<LanguageTutorInitializerProps> = ({
           nativeLanguage,
           targetLanguage,
           learningObjective,
+          conversationMode,
           tempo,
           isMuted
         });
@@ -76,7 +106,7 @@ const LanguageTutorInitializer: React.FC<LanguageTutorInitializerProps> = ({
     };
 
     initConversation();
-  }, [targetLanguage, nativeLanguage, difficulty, learningObjective, tempo, isMuted]);
+  }, [targetLanguage, nativeLanguage, difficulty, conversationMode, learningObjective, tempo, isMuted]);
 
   // If there's an error, show error message
   if (error) {
@@ -120,6 +150,13 @@ const LanguageTutorInitializer: React.FC<LanguageTutorInitializerProps> = ({
             <Text style={styles.languageInfoLabel}>Level:</Text>
             <Text style={styles.languageInfoName}>
               {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+            </Text>
+          </View>
+
+          <View style={styles.languageInfoItem}>
+            <Text style={styles.languageInfoLabel}>Mode:</Text>
+            <Text style={styles.languageInfoName}>
+              {getConversationModeDisplayName(conversationMode)}
             </Text>
           </View>
         </View>

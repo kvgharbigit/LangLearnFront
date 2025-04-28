@@ -1,25 +1,6 @@
-// export type RootStackParamList = {
-//   LanguageLanding: undefined;
-//   SpanishTutor: {
-//     nativeLanguage: string;
-//     targetLanguage: string;
-//     difficulty: string;
-//     learningObjective: string;
-//   };
-// };
-
-// export type RootStackParamList = {
-//   LanguageLanding: undefined;
-//   SpanishTutor: {
-//     nativeLanguage: string;
-//     targetLanguage: string;
-//     difficulty: string;
-//     learningObjective: string;
-//   };
-//   AudioTest: undefined; // Add this new route/
-// };/
-
 // types/navigation.ts
+import { ConversationMode } from '../components/ConversationModeSelector';
+
 export type RootStackParamList = {
   Home: undefined;
   LanguageLanding: undefined;
@@ -28,6 +9,7 @@ export type RootStackParamList = {
     targetLanguage: string;
     difficulty: string;
     learningObjective?: string;
+    conversationMode: ConversationMode; // Added new parameter
   };
   AudioTest: undefined;
   // Keep other screen types if you have any
