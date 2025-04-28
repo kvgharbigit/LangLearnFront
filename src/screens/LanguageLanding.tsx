@@ -10,6 +10,7 @@ import {
   ScrollView,
   Dimensions,
   Platform,
+  Image, // Add this line
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -76,20 +77,20 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
       )}
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logoIconBackground}>
-              <Text style={styles.logoIcon}>🌎</Text>
-            </View>
-            <Text style={styles.title}>LangLearn</Text>
-          </View>
-          <Text style={styles.tagline}>Your AI-powered language learning companion</Text>
-        </View>
-
+    <ScrollView
+  contentContainerStyle={styles.scrollContent}
+  showsVerticalScrollIndicator={false}
+>
+  <View style={styles.header}>
+    <View style={styles.logoContainer}>
+      <Image
+        source={require('../../assets/transparent_background_mascot_icon.png')}
+        style={styles.logoImage}
+      />
+      <Text style={styles.title}>LangLearn</Text>
+    </View>
+    <Text style={styles.tagline}>Your AI-powered language learning companion</Text>
+  </View>
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderLine}>
@@ -445,6 +446,12 @@ const styles = StyleSheet.create({
     color: colors.gray800,
     backgroundColor: colors.white,
   },
+  logoImage: {
+  width: 100,  // Make it bigger
+  height: 100, // Make it bigger
+  marginRight: 12, // Space between image and text
+  resizeMode: 'contain',
+},
   startButton: {
     backgroundColor: colors.primary,
     paddingVertical: 16,
