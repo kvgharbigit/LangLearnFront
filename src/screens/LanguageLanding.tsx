@@ -1,5 +1,5 @@
 // src/screens/LanguageLanding.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,9 @@ import {
   ScrollView,
   Dimensions,
   Platform,
-  Image, // Add this line
+  Image,
+  KeyboardAvoidingView,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -19,11 +21,13 @@ import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import LanguageSelector from '../components/LanguageSelector';
-import LanguageDropdown from '../components/LanguageDropdown';
 import { DIFFICULTY_LEVELS } from '../constants/languages';
+import { getLanguagePreferences, saveLanguagePreferences } from '../utils/languageStorage';
+import { getLanguageInfo } from '../constants/languages';
+// No additional imports needed
 
 // Get screen dimensions for responsive design
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LanguageLanding'>;
 
@@ -36,16 +40,114 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   const [targetLanguage, setTargetLanguage] = useState<string>('');
   const [difficulty, setDifficulty] = useState<string>('beginner');
   const [learningObjective, setLearningObjective] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // Animation values
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const translateY = React.useRef(new Animated.Value(20)).current;
+
+  // Load saved language preferences when component mounts
+  useEffect(() => {
+    loadSavedPreferences();
+
+    // Run entrance animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, []);
+
+  // Function to load saved preferences from storage
+  const loadSavedPreferences = async () => {
+    try {
+      setIsLoading(true);
+      const { targetLanguage: savedTarget, nativeLanguage: savedNative } = await getLanguagePreferences();
+
+      if (savedNative) {
+        setNativeLanguage(savedNative.code);
+      }
+
+      if (savedTarget) {
+        setTargetLanguage(savedTarget.code);
+      }
+    } catch (error) {
+      console.error('Error loading saved language preferences:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Save preferences when they change
+  useEffect(() => {
+    // Only save if both languages are selected and different from each other
+    if (nativeLanguage && targetLanguage && nativeLanguage !== targetLanguage && !isLoading) {
+      savePreferences();
+    }
+  }, [nativeLanguage, targetLanguage]);
+
+  // Function to save preferences to storage
+  const savePreferences = async () => {
+    try {
+      if (!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage) {
+        return;
+      }
+
+      // Get full language info objects
+      const nativeInfo = getLanguageInfo(nativeLanguage);
+      const targetInfo = getLanguageInfo(targetLanguage);
+
+      await saveLanguagePreferences(
+        {
+          code: targetLanguage,
+          name: targetInfo.name,
+          flag: targetInfo.flag
+        },
+        {
+          code: nativeLanguage,
+          name: nativeInfo.name,
+          flag: nativeInfo.flag
+        }
+      );
+    } catch (error) {
+      console.error('Error saving language preferences:', error);
+    }
+  };
+
+  // Handle native language selection
+  const handleNativeLanguageSelect = (code: string) => {
+    // If selecting the same language that's currently the target, swap them
+    if (code === targetLanguage) {
+      setTargetLanguage(nativeLanguage);
+    }
+    setNativeLanguage(code);
+  };
+
+  // Handle target language selection
+  const handleTargetLanguageSelect = (code: string) => {
+    // If selecting the same language that's currently the native, swap them
+    if (code === nativeLanguage) {
+      setNativeLanguage(targetLanguage);
+    }
+    setTargetLanguage(code);
+  };
 
   // Handle start learning button press
   const handleStartLearning = (): void => {
     // Basic validation
-    if (!nativeLanguage || !targetLanguage) {
+    if (!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage) {
       return;
     }
 
-    setIsLoading(true);
+    setIsSaving(true);
 
     // Simulate loading for a better UX
     setTimeout(() => {
@@ -55,205 +157,191 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
         difficulty,
         learningObjective: learningObjective.trim()
       });
-      setIsLoading(false);
+      setIsSaving(false);
     }, 800);
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <Image
+          source={require('../../assets/transparent_background_mascot_icon.png')}
+          style={styles.loadingLogo}
+        />
+        <ActivityIndicator size="large" color={colors.primary} style={styles.loadingIndicator} />
+        <Text style={styles.loadingText}>Loading your language settings...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
+      {/* Decorative background elements */}
+      <View style={styles.backgroundDecoration1} />
+      <View style={styles.backgroundDecoration2} />
+
       {/* Profile Button - Only shown when user is authenticated */}
       {user && (
-        <TouchableOpacity
-          style={styles.profileButton}
-          onPress={() => navigation.navigate('Profile')}
-        >
-          <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
-              {user.displayName ? user.displayName.charAt(0).toUpperCase() : '👤'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      )}
-
-    <ScrollView
-  contentContainerStyle={styles.scrollContent}
-  showsVerticalScrollIndicator={false}
->
-  <View style={styles.header}>
-    <View style={styles.logoContainer}>
-      <Image
-        source={require('../../assets/transparent_background_mascot_icon.png')}
-        style={styles.logoImage}
-      />
-      <Text style={styles.title}>LangLearn</Text>
+  <TouchableOpacity
+    style={styles.profileButton}
+    onPress={() => navigation.navigate('Profile')}
+    accessibilityLabel="Profile"
+    accessibilityHint="Navigate to your profile page"
+  >
+    <View style={styles.avatarContainer}>
+      <Text style={styles.avatarText}>
+        {user.displayName ? user.displayName.charAt(0).toUpperCase() : '👤'}
+      </Text>
     </View>
-    <Text style={styles.tagline}>Your AI-powered language learning companion</Text>
-  </View>
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardHeaderLine}>
-              <View style={styles.lineDecoration}></View>
-              <Text style={styles.cardTitle}>Choose Your Languages</Text>
-              <View style={styles.lineDecoration}></View>
-            </View>
-          </View>
+  </TouchableOpacity>
+)}
 
-          {/* Native Language Selection - Using LanguageSelector */}
-          <LanguageSelector
-            title="I speak:"
-            selectedLanguage={nativeLanguage}
-            onSelectLanguage={setNativeLanguage}
-          />
-
-          {/* Target Language Selection - Using LanguageSelector */}
-          <LanguageSelector
-            title="I want to learn:"
-            selectedLanguage={targetLanguage}
-            onSelectLanguage={setTargetLanguage}
-            excludeLanguage={nativeLanguage} // Don't show the native language
-          />
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>My level:</Text>
-            <View style={styles.difficultyContainer}>
-              {DIFFICULTY_LEVELS.map(level => (
-                <TouchableOpacity
-                  key={level.level}
-                  style={[
-                    styles.difficultyOption,
-                    difficulty === level.level && styles.selectedDifficulty
-                  ]}
-                  onPress={() => setDifficulty(level.level)}
-                >
-                  <View style={[
-                    styles.difficultyIconContainer,
-                    difficulty === level.level && styles.selectedDifficultyIcon
-                  ]}>
-                    <Text style={styles.difficultyIcon}>{level.icon}</Text>
-                  </View>
-                  <Text style={[
-                    styles.difficultyText,
-                    difficulty === level.level && styles.selectedDifficultyText
-                  ]}>
-                    {level.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Conversation Themes (Optional)</Text>
-            <View style={styles.textAreaContainer}>
-              <TextInput
-                style={styles.textArea}
-                value={learningObjective}
-                onChangeText={setLearningObjective}
-                placeholder="• Ordering food at restaurants
-- Past tense conjugation
-- Travel and vacation vocabulary
-- Business expressions"
-                multiline
-                scrollEnabled={false}
-                numberOfLines={4}
-                textAlignVertical="top"
-                placeholderTextColor="#adb5bd"
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.startButton,
-              (!nativeLanguage || !targetLanguage) && styles.disabledButton,
-              isLoading && styles.loadingButton
-            ]}
-            onPress={handleStartLearning}
-            disabled={!nativeLanguage || !targetLanguage || isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Text style={styles.startButtonText}>Start Learning</Text>
-                <View style={styles.rocketContainer}>
-                  <Text style={styles.startButtonIcon}>🚀</Text>
-                </View>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.features}>
-          <View style={styles.featureHeaderLine}>
-            <View style={styles.lineDecoration}></View>
-            <Text style={styles.featuresTitle}>Key Features</Text>
-            <View style={styles.lineDecoration}></View>
-          </View>
-
-          <View style={styles.feature}>
-            <View style={styles.featureIconContainer}>
-              <Text style={styles.featureIcon}>🎙️</Text>
-            </View>
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>Voice Conversation</Text>
-              <Text style={styles.featureText}>Practice speaking with our AI tutor and get instant feedback</Text>
-            </View>
-          </View>
-
-          <View style={styles.feature}>
-            <View style={[styles.featureIconContainer, styles.featureIconGrammar]}>
-              <Text style={styles.featureIcon}>✍️</Text>
-            </View>
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>Grammar Correction</Text>
-              <Text style={styles.featureText}>Learn from your mistakes with real-time corrections</Text>
-            </View>
-          </View>
-
-          <View style={styles.feature}>
-            <View style={[styles.featureIconContainer, styles.featureIconNatural]}>
-              <Text style={styles.featureIcon}>🔄</Text>
-            </View>
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>Natural Alternatives</Text>
-              <Text style={styles.featureText}>Discover how native speakers would express the same ideas</Text>
-            </View>
-          </View>
-
-          <View style={styles.feature}>
-            <View style={[styles.featureIconContainer, styles.featureIconMultilingual]}>
-              <Text style={styles.featureIcon}>🌐</Text>
-            </View>
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>18 Languages Supported</Text>
-              <Text style={styles.featureText}>Learn multiple languages with the same intuitive interface</Text>
-            </View>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.testButton}
-          onPress={() => navigation.navigate('AudioTest')}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.testButtonIcon}>🎤</Text>
-          <Text style={styles.testButtonText}>Test Your Microphone</Text>
-        </TouchableOpacity>
+          <Animated.View
+            style={[
+              styles.animatedContent,
+              { opacity: fadeAnim, transform: [{ translateY }] }
+            ]}
+          >
+            <View style={styles.header}>
+              <View style={styles.logoContainer}>
+                <Image
+                  source={require('../../assets/transparent_background_mascot_icon.png')}
+                  style={styles.logoImage}
+                />
+                <View>
+                  <Text style={styles.title}>LangLearn</Text>
+                  <Text style={styles.tagline}>AI-powered language learning</Text>
+                </View>
+              </View>
+            </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>© 2025 LangLearn • Privacy Policy • Terms of Service</Text>
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Conversation Settings</Text>
+                <View style={styles.cardDivider} />
+              </View>
+
+              {/* Native Language Selection - Using LanguageSelector */}
+              <LanguageSelector
+                title="I speak:"
+                selectedLanguage={nativeLanguage}
+                onSelectLanguage={handleNativeLanguageSelect}
+              />
+
+              {/* Target Language Selection - Using LanguageSelector */}
+              <LanguageSelector
+                title="I want to learn:"
+                selectedLanguage={targetLanguage}
+                onSelectLanguage={handleTargetLanguageSelect}
+                excludeLanguage={nativeLanguage} // Don't show the native language
+              />
+
+              <View style={styles.section}>
+  <Text style={styles.sectionTitle}>My level:</Text>
+  <View style={styles.difficultyContainer}>
+    {DIFFICULTY_LEVELS.map(level => (
+      <TouchableOpacity
+        key={level.level}
+        style={[
+          styles.difficultyOption,
+          difficulty === level.level && styles.selectedDifficulty
+        ]}
+        onPress={() => setDifficulty(level.level)}
+        accessibilityLabel={level.label}
+        accessibilityHint={`Set your proficiency level to ${level.label}`}
+      >
+        <View style={[
+          styles.difficultyIconContainer,
+          difficulty === level.level && styles.selectedDifficultyIcon
+        ]}>
+          <Text style={styles.difficultyIcon}>{level.icon}</Text>
         </View>
-      </ScrollView>
+        <Text
+          style={[
+            styles.difficultyText,
+            difficulty === level.level && styles.selectedDifficultyText
+          ]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {level.label}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+</View>
+
+              <View style={styles.section}>
+  <Text style={styles.sectionTitle}> Topic (Optional)</Text>
+  <View style={styles.textAreaContainer}>
+    <TextInput
+      style={styles.textArea}
+      value={learningObjective}
+      onChangeText={setLearningObjective}
+      placeholder="• Travel tips for Mexico
+• Grammar of the Past Tense
+• Relationship Advice
+"
+      multiline
+      scrollEnabled={false}
+      numberOfLines={4}
+      textAlignVertical="top"
+      placeholderTextColor={colors.gray500}
+    />
+  </View>
+
+  {/* New topic info note */}
+  <View style={styles.topicInfoContainer}>
+    <Ionicons name="information-circle" size={16} color={colors.info} style={styles.infoIcon} />
+    <Text style={styles.topicInfoText}>
+      Our AI tutor has extensive knowledge on almost any topic. Feel free to discuss travel, culture, science, history, relationships, or any subject you're interested in learning about - even if its just gossiping about your favourite TV show!
+    </Text>
+  </View>
+</View>
+
+              <TouchableOpacity
+                style={[
+                  styles.startButton,
+                  (!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage) && styles.disabledButton,
+                  isSaving && styles.loadingButton
+                ]}
+                onPress={handleStartLearning}
+                disabled={!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage || isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Text style={styles.startButtonText}>Start Chatting!</Text>
+                    <Ionicons name="arrow-forward" size={18} color="white" style={styles.startButtonIcon} />
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 // Enhanced color palette
 const colors = {
-  primary: '#5D6AF8',
-  primaryLight: '#E8EAFF',
+  primary: '#5468FF',
+  primaryGradientStart: '#7B86FF',
+  primaryLight: '#EEF0FF',
   primaryDark: '#3A46CF',
   secondary: '#FF6B6B',
   accent: '#FFD166',
@@ -272,90 +360,117 @@ const colors = {
   gray800: '#343a40',
   gray900: '#212529',
   white: '#ffffff',
-  background: '#f8f9fa',
+  background: '#F9FAFF',
   cardBackground: '#ffffff',
 };
+
+// Updated styles in LanguageLanding.tsx
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
+  animatedContent: {
+    flex: 1,
+  },
+  backgroundDecoration1: {
+    position: 'absolute',
+    width: 350,
+    height: 350,
+    borderRadius: 175,
+    backgroundColor: colors.primaryLight,
+    opacity: 0.4,
+    top: -100,
+    right: -100,
+  },
+  backgroundDecoration2: {
+    position: 'absolute',
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: colors.primaryLight,
+    opacity: 0.3,
+    bottom: -50,
+    left: -100,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  loadingLogo: {
+    width: 120,
+    height: 120,
+    marginBottom: 24,
+  },
+  loadingIndicator: {
+    marginBottom: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.gray700,
+    textAlign: 'center',
+  },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 24, // Reduced from original to give more space at top
     paddingBottom: 32,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
-    marginTop: 8,
+    marginTop: 40, // Increased to make room for the profile button
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  logoIconBackground: {
-    width: 54,
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoImage: {
+    width: 80,
+    height: 80,
     marginRight: 12,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  logoIcon: {
-    fontSize: 30,
+    resizeMode: 'contain',
   },
   title: {
-    fontSize: 38,
+    fontSize: 34,
     fontWeight: '800',
     color: colors.primary,
     letterSpacing: -0.5,
-    textShadowColor: 'rgba(93, 106, 248, 0.15)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    marginBottom: 4,
   },
   tagline: {
     fontSize: 16,
     color: colors.gray600,
-    textAlign: 'center',
     letterSpacing: 0.2,
   },
   card: {
     backgroundColor: colors.cardBackground,
     borderRadius: 24,
     padding: 24,
-    shadowColor: colors.gray800,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 24,
+    shadowOpacity: 1,
+    elevation: 8,
     marginBottom: 30,
   },
   cardHeader: {
-    marginBottom: 20,
-  },
-  cardHeaderLine: {
-    flexDirection: 'row',
+    marginBottom: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
   },
-  lineDecoration: {
-    height: 1,
-    flex: 1,
-    backgroundColor: colors.gray200,
-    marginHorizontal: 12,
+  cardDivider: {
+    height: 3,
+    width: 40,
+    backgroundColor: colors.primary,
+    marginTop: 8,
+    borderRadius: 2,
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: colors.gray800,
     textAlign: 'center',
@@ -375,39 +490,35 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   difficultyOption: {
-    backgroundColor: colors.gray50,
+    backgroundColor: colors.white,
     borderWidth: 2,
     borderColor: colors.gray200,
     borderRadius: 16,
     padding: 12,
     alignItems: 'center',
-    width: '31%',
+    width: '32%', // Slightly increased from 31%
     shadowColor: colors.gray400,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   selectedDifficulty: {
     borderColor: colors.primary,
     backgroundColor: colors.primaryLight,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
   },
   difficultyIconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
-    shadowColor: colors.gray800,
+    shadowColor: colors.gray300,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 2,
   },
   selectedDifficultyIcon: {
@@ -416,13 +527,14 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   difficultyIcon: {
-    fontSize: 20,
+    fontSize: 22,
   },
   difficultyText: {
     fontWeight: '600',
-    color: colors.gray800,
+    color: colors.gray700,
     textAlign: 'center',
-    fontSize: 13,
+    fontSize: 13, // Reduced from 14 to better fit
+    flexWrap: 'nowrap', // Prevent text from wrapping
   },
   selectedDifficultyText: {
     color: colors.primary,
@@ -430,52 +542,40 @@ const styles = StyleSheet.create({
   },
   textAreaContainer: {
     width: '100%',
-    marginTop: 12,
   },
   textArea: {
     width: '100%',
     minHeight: 120,
     maxHeight: 120,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: colors.gray300,
     borderRadius: 16,
     padding: 16,
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 22,
     textAlignVertical: 'top',
     color: colors.gray800,
     backgroundColor: colors.white,
   },
-  logoImage: {
-  width: 100,  // Make it bigger
-  height: 100, // Make it bigger
-  marginRight: 12, // Space between image and text
-  resizeMode: 'contain',
-},
   startButton: {
     backgroundColor: colors.primary,
     paddingVertical: 16,
     paddingHorizontal: 32,
-    borderRadius: 50,
+    borderRadius: 16,
     marginTop: 16,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 5,
     alignSelf: 'center',
     minWidth: 220,
     flexDirection: 'row',
   },
-  rocketContainer: {
-    marginLeft: 8,
-    marginBottom: -2,
-  },
   startButtonIcon: {
-    fontSize: 18,
-    color: 'white',
+    marginLeft: 8,
   },
   disabledButton: {
     backgroundColor: colors.gray400,
@@ -483,7 +583,7 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   loadingButton: {
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primaryGradientStart,
   },
   startButtonText: {
     color: 'white',
@@ -491,128 +591,140 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.3,
   },
-  features: {
+  featuresSection: {
     marginBottom: 32,
-  },
-  featureHeaderLine: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
   },
   featuresTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: colors.gray800,
     textAlign: 'center',
   },
-  feature: {
+  featuresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  featureCard: {
     backgroundColor: colors.white,
     borderRadius: 20,
     padding: 20,
-    marginBottom: 14,
-    shadowColor: colors.gray800,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    marginBottom: 16,
+    shadowColor: 'rgba(0, 0, 0, 0.06)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    shadowOpacity: 1,
     elevation: 3,
-    flexDirection: 'row',
+    width: '48%',
     alignItems: 'center',
   },
   featureIconContainer: {
-    width: 56,
-    height: 56,
+    width: 52,
+    height: 52,
     borderRadius: 16,
-    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
-  },
-  featureIconGrammar: {
-    backgroundColor: `rgba(255, 107, 107, 0.1)`,
-  },
-  featureIconNatural: {
-    backgroundColor: `rgba(6, 214, 160, 0.1)`,
-  },
-  featureIconMultilingual: {
-    backgroundColor: `rgba(3, 169, 244, 0.1)`,
-  },
-  featureIcon: {
-    fontSize: 24,
-  },
-  featureContent: {
-    flex: 1,
+    marginBottom: 12,
   },
   featureTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.primary,
-    marginBottom: 4,
+    color: colors.gray800,
+    marginBottom: 8,
+    textAlign: 'center',
   },
   featureText: {
     color: colors.gray600,
     fontSize: 14,
     lineHeight: 20,
+    textAlign: 'center',
   },
   testButton: {
+    flexDirection: 'row',
     backgroundColor: colors.white,
     paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 50,
+    borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 40,
-    alignSelf: 'center',
+    marginTop: 20,
     borderWidth: 1,
     borderColor: colors.gray300,
-    flexDirection: 'row',
-    shadowColor: colors.gray800,
+    shadowColor: colors.gray400,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  testButtonIcon: {
-    fontSize: 16,
-    marginRight: 8,
-    color: colors.primary,
-  },
   testButtonText: {
     color: colors.gray700,
-    fontWeight: '500',
+    fontWeight: '600',
     fontSize: 14,
+    marginLeft: 8,
   },
   footer: {
     paddingVertical: 20,
     alignItems: 'center',
+  },
+  footerDivider: {
+    height: 1,
+    width: 60,
+    backgroundColor: colors.gray300,
+    marginBottom: 16,
   },
   footerText: {
     color: colors.gray500,
     fontSize: 12,
     textAlign: 'center',
   },
+  // Updated profile button styles
   profileButton: {
     position: 'absolute',
-    top: 16,
+    top: Platform.OS === 'ios' ? 55 : 16, // Adjusted for iOS to be below status bar
     right: 16,
     zIndex: 10,
-  },
-  avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primary, // Added background color for visibility
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  avatarContainer: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatarText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.white,
+  },
+   topicInfoContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(3, 169, 244, 0.08)',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    alignItems: 'flex-start',
+  },
+  infoIcon: {
+    marginRight: 8,
+    marginTop: 2,
+  },
+  topicInfoText: {
+    fontSize: 13,
+    color: colors.gray700,
+    flex: 1,
+    lineHeight: 18,
   },
 });
 

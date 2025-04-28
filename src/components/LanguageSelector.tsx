@@ -1,6 +1,6 @@
 // src/components/LanguageSelector.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,10 +30,26 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLangInfo, setSelectedLangInfo] = useState<Language>({
+    code: 'unknown',
+    name: 'Select Language',
+    flag: '🌎'
+  });
 
-  // Get the currently selected language info
-  const selectedLangInfo = LANGUAGES.find(lang => lang.code === selectedLanguage) ||
-    { code: 'unknown', name: 'Select Language', flag: '🌎' };
+  // Update selected language info when selectedLanguage prop changes
+  useEffect(() => {
+    const langInfo = LANGUAGES.find(lang => lang.code === selectedLanguage);
+    if (langInfo) {
+      setSelectedLangInfo(langInfo);
+    } else if (selectedLanguage) {
+      // If we have a language code but no matching info, use a placeholder
+      setSelectedLangInfo({
+        code: selectedLanguage,
+        name: selectedLanguage.toUpperCase(),
+        flag: '🌎'
+      });
+    }
+  }, [selectedLanguage]);
 
   // Filter languages based on search query and excluded language
   const getFilteredLanguages = () => {
@@ -55,12 +71,20 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       <Text style={styles.title}>{title}</Text>
 
       <TouchableOpacity
-        style={styles.selector}
+        style={[
+          styles.selector,
+          selectedLanguage ? styles.selectorSelected : styles.selectorEmpty
+        ]}
         onPress={() => setModalVisible(true)}
       >
         <View style={styles.selectedLanguage}>
           <Text style={styles.languageFlag}>{selectedLangInfo.flag}</Text>
-          <Text style={styles.languageName}>{selectedLangInfo.name}</Text>
+          <Text style={[
+            styles.languageName,
+            selectedLanguage ? styles.languageNameSelected : styles.languageNameEmpty
+          ]}>
+            {selectedLangInfo.name}
+          </Text>
         </View>
         <Ionicons name="chevron-down" size={20} color={colors.gray600} />
       </TouchableOpacity>
@@ -157,6 +181,24 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                 </View>
               }
             />
+
+            {/* Recently used languages section */}
+            {selectedLanguage && (
+              <View style={styles.recentSection}>
+                <Text style={styles.recentTitle}>Previously Selected</Text>
+                <TouchableOpacity
+                  style={styles.recentLanguage}
+                  onPress={() => {
+                    onSelectLanguage(selectedLanguage);
+                    setModalVisible(false);
+                    setSearchQuery('');
+                  }}
+                >
+                  <Text style={styles.recentFlag}>{selectedLangInfo.flag}</Text>
+                  <Text style={styles.recentName}>{selectedLangInfo.name}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -180,12 +222,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.gray50,
     borderWidth: 1,
-    borderColor: colors.gray300,
     borderRadius: 12,
     padding: 14,
     height: 60,
+  },
+  selectorEmpty: {
+    backgroundColor: colors.gray50,
+    borderColor: colors.gray300,
+  },
+  selectorSelected: {
+    backgroundColor: colors.gray100,
+    borderColor: colors.gray400,
   },
   selectedLanguage: {
     flexDirection: 'row',
@@ -198,6 +246,11 @@ const styles = StyleSheet.create({
   languageName: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  languageNameEmpty: {
+    color: colors.gray600,
+  },
+  languageNameSelected: {
     color: colors.gray800,
   },
   modalOverlay: {
@@ -212,7 +265,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     width: '100%',
     maxWidth: 500,
-    maxHeight: '90%', // Increased from 80% to give more room
+    maxHeight: '90%',
     overflow: 'hidden',
   },
   modalHeader: {
@@ -270,13 +323,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     alignItems: 'center',
-    width: 130, // Fixed width for consistency
-    minHeight: 110, // Fixed minimum height
+    width: 130,
+    minHeight: 110,
     justifyContent: 'center',
   },
   selectedOption: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
+    borderColor: colors.gray600,
+    backgroundColor: colors.gray100,
   },
   excludedOption: {
     opacity: 0.6,
@@ -293,7 +346,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   selectedText: {
-    color: colors.primary,
+    color: colors.gray900,
     fontWeight: '700',
   },
   excludedText: {
@@ -306,7 +359,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.gray600,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -333,7 +386,35 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: colors.gray600,
-  }
+  },
+  recentSection: {
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+    padding: 16,
+  },
+  recentTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray700,
+    marginBottom: 12,
+  },
+  recentLanguage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.gray100,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  recentFlag: {
+    fontSize: 22,
+    marginRight: 12,
+  },
+  recentName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.gray800,
+  },
 });
 
 export default LanguageSelector;
