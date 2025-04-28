@@ -45,8 +45,10 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     });
   };
 
-  // Determine grid columns based on screen width
-  const numColumns = Math.floor(Dimensions.get('window').width / 140);
+  // Calculate the optimal number of columns based on screen width
+  const screenWidth = Dimensions.get('window').width;
+  // Adjust this calculation for better responsiveness
+  const numColumns = Math.max(2, Math.floor((screenWidth - 40) / 160));
 
   return (
     <View style={styles.container}>
@@ -102,7 +104,9 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               data={getFilteredLanguages()}
               keyExtractor={(item) => item.code}
               numColumns={numColumns}
+              key={numColumns} // This forces re-render when numColumns changes
               contentContainerStyle={styles.languageList}
+              columnWrapperStyle={styles.columnWrapper}
               renderItem={({ item }) => {
                 const isSelected = selectedLanguage === item.code;
                 const isExcluded = excludeLanguage === item.code;
@@ -208,7 +212,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     width: '100%',
     maxWidth: 500,
-    maxHeight: '80%',
+    maxHeight: '90%', // Increased from 80% to give more room
     overflow: 'hidden',
   },
   modalHeader: {
@@ -251,20 +255,24 @@ const styles = StyleSheet.create({
     color: colors.gray800,
   },
   languageList: {
-    paddingHorizontal: 12,
+    padding: 8,
     paddingBottom: 20,
   },
+  columnWrapper: {
+    justifyContent: 'space-around',
+    marginVertical: 4,
+  },
   languageOption: {
-    flex: 1,
     margin: 8,
     backgroundColor: colors.gray50,
     borderWidth: 1,
     borderColor: colors.gray300,
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     alignItems: 'center',
-    minWidth: 120,
-    maxWidth: 160,
+    width: 130, // Fixed width for consistency
+    minHeight: 110, // Fixed minimum height
+    justifyContent: 'center',
   },
   selectedOption: {
     borderColor: colors.primary,
