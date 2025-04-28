@@ -1,4 +1,4 @@
-// Enhanced LanguageLanding.tsx
+// src/screens/LanguageLanding.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -10,7 +10,6 @@ import {
   ScrollView,
   Dimensions,
   Platform,
-  Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -18,16 +17,12 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import LanguageSelector from '../components/LanguageSelector';
+import LanguageDropdown from '../components/LanguageDropdown';
+import { DIFFICULTY_LEVELS } from '../constants/languages';
 
 // Get screen dimensions for responsive design
 const { width } = Dimensions.get('window');
-
-// Language interface
-interface Language {
-  code: string;
-  name: string;
-  flag: string;
-}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LanguageLanding'>;
 
@@ -36,33 +31,11 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
 
   // State
-  const [nativeLanguage, setNativeLanguage] = useState<string>('');
+  const [nativeLanguage, setNativeLanguage] = useState<string>('en');
   const [targetLanguage, setTargetLanguage] = useState<string>('');
   const [difficulty, setDifficulty] = useState<string>('beginner');
   const [learningObjective, setLearningObjective] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  // Language options
-  const languages: Language[] = [
-  { code: 'en', name: 'English', flag: '🇬🇧' },
-  { code: 'es', name: 'Spanish', flag: '🇪🇸' },
-  { code: 'fr', name: 'French', flag: '🇫🇷' },
-  { code: 'zh', name: 'Chinese Mandarin', flag: '🇨🇳' },
-  { code: 'de', name: 'German', flag: '🇩🇪' },
-  { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
-  { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
-  { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
-  { code: 'ko', name: 'Korean', flag: '🇰🇷' },
-  { code: 'it', name: 'Italian', flag: '🇮🇹' },
-  { code: 'ru', name: 'Russian', flag: '🇷🇺' },
-  { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
-  { code: 'pl', name: 'Polish', flag: '🇵🇱' },
-  { code: 'nl', name: 'Dutch', flag: '🇳🇱' },
-  { code: 'hu', name: 'Hungarian', flag: '🇭🇺' },
-  { code: 'fi', name: 'Finnish', flag: '🇫🇮' },
-  { code: 'el', name: 'Greek', flag: '🇬🇷' },
-  { code: 'tr', name: 'Turkish', flag: '🇹🇷' }
-];
 
   // Handle start learning button press
   const handleStartLearning = (): void => {
@@ -83,14 +56,6 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
       });
       setIsLoading(false);
     }, 800);
-  };
-
-  // For responsive layouts, calculate item width
-  const getItemWidth = (): number => {
-    const itemsPerRow = width > 500 ? 4 : 2;
-    const padding = 40; // Total horizontal padding
-    const gap = 10 * (itemsPerRow - 1); // Total gap between items
-    return (width - padding - gap) / itemsPerRow;
   };
 
   return (
@@ -134,103 +99,44 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
             </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>I speak:</Text>
-            <View style={styles.languageOptions}>
-              {languages.map(lang => (
-                <TouchableOpacity
-                  key={`native-${lang.code}`}
-                  style={[
-                    styles.languageOption,
-                    nativeLanguage === lang.code && styles.selectedOption
-                  ]}
-                  onPress={() => setNativeLanguage(lang.code)}
-                >
-                  <View style={styles.flagContainer}>
-                    <Text style={styles.languageFlag}>{lang.flag}</Text>
-                  </View>
-                  <Text style={[
-                    styles.languageName,
-                    nativeLanguage === lang.code && styles.selectedText
-                  ]}>
-                    {lang.name}
-                  </Text>
+          {/* Native Language Selection - Using LanguageSelector */}
+          <LanguageSelector
+            title="I speak:"
+            selectedLanguage={nativeLanguage}
+            onSelectLanguage={setNativeLanguage}
+          />
 
-                  {nativeLanguage === lang.code && (
-                    <View style={styles.checkmark}>
-                      <Text style={styles.checkmarkText}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>I want to learn:</Text>
-            <View style={styles.languageOptions}>
-              {languages.map(lang => (
-                <TouchableOpacity
-                  key={`target-${lang.code}`}
-                  style={[
-                    styles.languageOption,
-                    targetLanguage === lang.code && styles.selectedOption,
-                    nativeLanguage === lang.code && styles.disabledOption
-                  ]}
-                  disabled={nativeLanguage === lang.code}
-                  onPress={() => nativeLanguage !== lang.code && setTargetLanguage(lang.code)}
-                >
-                  <View style={styles.flagContainer}>
-                    <Text style={styles.languageFlag}>{lang.flag}</Text>
-                  </View>
-                  <Text style={[
-                    styles.languageName,
-                    targetLanguage === lang.code && styles.selectedText
-                  ]}>
-                    {lang.name}
-                  </Text>
-
-                  {targetLanguage === lang.code && (
-                    <View style={styles.checkmark}>
-                      <Text style={styles.checkmarkText}>✓</Text>
-                    </View>
-                  )}
-
-                  {nativeLanguage === lang.code && (
-                    <View style={styles.disabledOverlay}>
-                      <Text style={styles.disabledText}>Already speak</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+          {/* Target Language Selection - Using LanguageSelector */}
+          <LanguageSelector
+            title="I want to learn:"
+            selectedLanguage={targetLanguage}
+            onSelectLanguage={setTargetLanguage}
+            excludeLanguage={nativeLanguage} // Don't show the native language
+          />
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>My level:</Text>
             <View style={styles.difficultyContainer}>
-              {['beginner', 'intermediate', 'advanced'].map(level => (
+              {DIFFICULTY_LEVELS.map(level => (
                 <TouchableOpacity
-                  key={level}
+                  key={level.level}
                   style={[
                     styles.difficultyOption,
-                    difficulty === level && styles.selectedDifficulty
+                    difficulty === level.level && styles.selectedDifficulty
                   ]}
-                  onPress={() => setDifficulty(level)}
+                  onPress={() => setDifficulty(level.level)}
                 >
                   <View style={[
                     styles.difficultyIconContainer,
-                    difficulty === level && styles.selectedDifficultyIcon
+                    difficulty === level.level && styles.selectedDifficultyIcon
                   ]}>
-                    <Text style={styles.difficultyIcon}>
-                      {level === 'beginner' ? '🌱' : level === 'intermediate' ? '🌿' : '🌳'}
-                    </Text>
+                    <Text style={styles.difficultyIcon}>{level.icon}</Text>
                   </View>
                   <Text style={[
                     styles.difficultyText,
-                    difficulty === level && styles.selectedDifficultyText
+                    difficulty === level.level && styles.selectedDifficultyText
                   ]}>
-                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                    {level.label}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -245,9 +151,9 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
                 value={learningObjective}
                 onChangeText={setLearningObjective}
                 placeholder="• Ordering food at restaurants
-• Past tense conjugation
-• Travel and vacation vocabulary
-• Business expressions"
+- Past tense conjugation
+- Travel and vacation vocabulary
+- Business expressions"
                 multiline
                 scrollEnabled={false}
                 numberOfLines={4}
@@ -315,6 +221,16 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.featureText}>Discover how native speakers would express the same ideas</Text>
             </View>
           </View>
+
+          <View style={styles.feature}>
+            <View style={[styles.featureIconContainer, styles.featureIconMultilingual]}>
+              <Text style={styles.featureIcon}>🌐</Text>
+            </View>
+            <View style={styles.featureContent}>
+              <Text style={styles.featureTitle}>18 Languages Supported</Text>
+              <Text style={styles.featureText}>Learn multiple languages with the same intuitive interface</Text>
+            </View>
+          </View>
         </View>
 
         <TouchableOpacity
@@ -341,6 +257,9 @@ const colors = {
   secondary: '#FF6B6B',
   accent: '#FFD166',
   success: '#06D6A0',
+  danger: '#FF5252',
+  warning: '#FFC107',
+  info: '#03A9F4',
   gray50: '#f8f9fa',
   gray100: '#f1f3f5',
   gray200: '#e9ecef',
@@ -449,103 +368,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontWeight: '600',
     letterSpacing: 0.2,
-  },
-  languageOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  languageOption: {
-    backgroundColor: colors.gray50,
-    borderWidth: 2,
-    borderColor: colors.gray200,
-    borderRadius: 16,
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '48%',
-    aspectRatio: 1.2,
-    position: 'relative',
-    shadowColor: colors.gray400,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  selectedOption: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  flagContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-    shadowColor: colors.gray800,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  languageFlag: {
-    fontSize: 28,
-  },
-  languageName: {
-    fontWeight: '600',
-    color: colors.gray800,
-    textAlign: 'center',
-    fontSize: 14,
-  },
-  selectedText: {
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  checkmark: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkmarkText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  disabledOption: {
-    opacity: 0.6,
-  },
-  disabledOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 16,
-  },
-  disabledText: {
-    color: colors.gray700,
-    fontSize: 12,
-    fontWeight: '500',
-    backgroundColor: 'rgba(248, 249, 250, 0.9)',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
   },
   difficultyContainer: {
     flexDirection: 'row',
@@ -705,6 +527,9 @@ const styles = StyleSheet.create({
   featureIconNatural: {
     backgroundColor: `rgba(6, 214, 160, 0.1)`,
   },
+  featureIconMultilingual: {
+    backgroundColor: `rgba(3, 169, 244, 0.1)`,
+  },
   featureIcon: {
     fontSize: 24,
   },
@@ -781,28 +606,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.white,
-  },
-   // Add these new styles for the learning objective section:
-  objectiveDescription: {
-    fontSize: 14,
-    color: colors.gray600,
-    marginBottom: 12,
-    fontStyle: 'italic',
-  },
-  objectiveConfirmation: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(6, 214, 160, 0.1)',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  objectiveConfirmationText: {
-    marginLeft: 8,
-    fontSize: 13,
-    color: colors.success,
-    flex: 1,
   },
 });
 

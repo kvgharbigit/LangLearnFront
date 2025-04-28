@@ -15,10 +15,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
 import { AUDIO_SETTINGS } from '../constants/settings';
-import MicrophoneTest from './MicrophoneTest'; // Import the new component
+import MicrophoneTest from './MicrophoneTest';
+import { getLanguageInfo } from '../constants/languages';
 
 interface Props {
   targetLanguage: string;
+  nativeLanguage: string;
   targetInfo: {
     name: string;
     flag: string;
@@ -33,14 +35,14 @@ interface Props {
   setAutoRecordEnabled: (enabled: boolean) => void;
   debugMode: boolean;
   setDebugMode: (enabled: boolean) => void;
-  // New props for audio thresholds and duration
+  // Props for audio thresholds and duration
   speechThreshold: number;
   setSpeechThreshold: (value: number) => void;
   silenceThreshold: number;
   setSilenceThreshold: (value: number) => void;
   silenceDuration: number;
   setSilenceDuration: (value: number) => void;
-  // New prop for mute functionality
+  // Prop for mute functionality
   isMuted: boolean;
   setIsMuted: (muted: boolean) => void;
   navigation: any;
@@ -48,6 +50,7 @@ interface Props {
 
 const TutorHeader: React.FC<Props> = ({
   targetLanguage,
+  nativeLanguage,
   targetInfo,
   tempo,
   setTempo,
@@ -75,7 +78,7 @@ const TutorHeader: React.FC<Props> = ({
   const [settingsModalVisible, setSettingsModalVisible] = useState<boolean>(false);
   const [helpModalVisible, setHelpModalVisible] = useState<boolean>(false);
   const [audioInfoVisible, setAudioInfoVisible] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'audio' | 'advanced'>('audio');
+  const [activeTab, setActiveTab] = useState<'audio' | 'advanced' | 'language'>('audio');
   const [showMicTest, setShowMicTest] = useState<boolean>(false);
 
   // State for text input values
@@ -272,7 +275,7 @@ const TutorHeader: React.FC<Props> = ({
           <Text style={styles.titleText}>{targetInfo.name} Tutor</Text>
         </View>
 
-        {/* New mute button */}
+        {/* Mute button */}
         <TouchableOpacity style={styles.muteButton} onPress={toggleMute}>
           <Ionicons
             name={isMuted ? "volume-mute" : "volume-medium"}
@@ -341,13 +344,31 @@ const TutorHeader: React.FC<Props> = ({
                   Advanced
                 </Text>
               </TouchableOpacity>
+
+              {/* Language Tab */}
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'language' && styles.activeTab]}
+                onPress={() => setActiveTab('language')}
+              >
+                <Ionicons
+                  name="language"
+                  size={18}
+                  color={activeTab === 'language' ? colors.primary : colors.gray600}
+                />
+                <Text style={[
+                  styles.tabText,
+                  activeTab === 'language' && styles.activeTabText
+                ]}>
+                  Language
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Tab Content */}
             <ScrollView style={styles.tabContent}>
               {activeTab === 'audio' ? (
                 <>
-                  {/* Mute Toggle - NEW */}
+                  {/* Mute Toggle */}
                   <View style={styles.switchSetting}>
                     <View style={styles.switchTextContainer}>
                       <View style={[
@@ -426,7 +447,7 @@ const TutorHeader: React.FC<Props> = ({
                     </ScrollView>
                   </View>
 
-                  {/* New Audio Parameters Section */}
+                  {/* Audio Parameters Section */}
                   <View style={styles.settingBlock}>
                     <View style={styles.settingHeader}>
                       <View style={styles.settingIconContainer}>
@@ -569,7 +590,7 @@ const TutorHeader: React.FC<Props> = ({
                       </View>
                     </View>
 
-                    {/* NEW: Microphone test toggle button */}
+                    {/* Microphone test toggle button */}
                     <TouchableOpacity
                       style={styles.testToggleButton}
                       onPress={toggleMicTest}
@@ -580,7 +601,7 @@ const TutorHeader: React.FC<Props> = ({
                       </Text>
                     </TouchableOpacity>
 
-                    {/* NEW: Microphone test section */}
+                    {/* Microphone test section */}
                     {showMicTest && (
                       <MicrophoneTest
                         speechThreshold={speechThreshold}
@@ -661,7 +682,7 @@ const TutorHeader: React.FC<Props> = ({
                     </Animated.View>
                   )}
                 </>
-              ) : (
+              ) : activeTab === 'advanced' ? (
                 <>
                   {/* Debug Mode */}
                   <View style={styles.switchSetting}>
@@ -685,7 +706,7 @@ const TutorHeader: React.FC<Props> = ({
                     />
                   </View>
 
-                  {/* Voice Input Toggle - MOVED UP IN THE LIST */}
+                  {/* Voice Input Toggle */}
                   <View style={styles.switchSetting}>
                     <View style={styles.switchTextContainer}>
                       <View style={styles.settingIconContainer}>
@@ -794,6 +815,46 @@ const TutorHeader: React.FC<Props> = ({
                     <Text style={styles.helpButtonText}>
                       Voice Recording Help
                     </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                // Language Tab Content
+                <>
+                  {/* Current Language Info */}
+                  <View style={styles.languageInfoSection}>
+                    <View style={styles.currentLanguageHeader}>
+                      <Text style={styles.sectionHeading}>Current Language</Text>
+                    </View>
+
+                    <View style={styles.currentLanguageCard}>
+                      <Text style={styles.currentLanguageFlag}>{targetInfo.flag}</Text>
+                      <View style={styles.currentLanguageDetails}>
+                        <Text style={styles.currentLanguageName}>{targetInfo.name}</Text>
+                        <Text style={styles.currentLanguageCode}>{targetLanguage.toUpperCase()}</Text>
+                      </View>
+                    </View>
+
+
+                  </View>
+
+                  {/* Replace language switching with info message */}
+                  <View style={styles.languageInfoMessage}>
+                    <Ionicons name="information-circle" size={22} color={colors.primary} />
+                    <Text style={styles.languageInfoText}>
+                      To change languages, please finish this conversation and return to the language selection screen.
+                    </Text>
+                  </View>
+
+                  {/* Return button */}
+                  <TouchableOpacity
+                    style={styles.returnButton}
+                    onPress={() => {
+                      toggleSettingsModal();
+                      navigation.navigate('LanguageLanding');
+                    }}
+                  >
+                    <Ionicons name="arrow-back" size={16} color="white" />
+                    <Text style={styles.returnButtonText}>Return to Language Selection</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -967,6 +1028,7 @@ const styles = StyleSheet.create({
     gap: 8,
     flex: 1, // Allow title to take up available space
     justifyContent: 'center', // Center the title
+    flexWrap: 'wrap', // Allow items to wrap on smaller screens
   },
   flagIcon: {
     fontSize: 20,
@@ -996,7 +1058,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    // Removed background darkening
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   modalContent: {
     backgroundColor: 'white',
@@ -1403,6 +1465,113 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   danger: "#F44336", // Define this color for the mute button
+
+  // New styles for language tab
+  languageInfoSection: {
+    marginBottom: 20,
+    backgroundColor: colors.gray50,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  currentLanguageHeader: {
+    marginBottom: 12,
+  },
+  sectionHeading: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.gray800,
+    marginBottom: 8,
+  },
+  currentLanguageCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'white', // Changed from colors.primaryLight to white
+  padding: 16,
+  borderRadius: 12,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: colors.gray200, // Added a light border instead
+},
+
+  currentLanguageFlag: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  currentLanguageDetails: {
+    flex: 1,
+  },
+  currentLanguageName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  currentLanguageCode: {
+    fontSize: 14,
+    color: colors.gray600,
+  },
+  nativeLanguageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  nativeLanguageLabel: {
+    fontSize: 14,
+    color: colors.gray700,
+  },
+  nativeLanguageBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+  },
+  nativeLanguageFlag: {
+    fontSize: 16,
+    marginRight: 4,
+  },
+  nativeLanguageName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.gray700,
+  },
+  // New styles for language info message
+languageInfoMessage: {
+  flexDirection: 'row',
+  backgroundColor: 'white', // Changed from colors.primaryLight to white
+  padding: 16,
+  borderRadius: 12,
+  marginBottom: 16,
+  alignItems: 'flex-start',
+  borderWidth: 1,
+  borderColor: colors.gray200, // Added a light border
+},
+  languageInfoText: {
+    flex: 1,
+    marginLeft: 12,
+    color: colors.gray700,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  returnButton: {
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  returnButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
 });
 
 export default TutorHeader;

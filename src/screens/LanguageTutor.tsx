@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getWelcomeTitle, getWelcomeSubtitle, getWelcomeMessage, checkRepetitionRequest } from '../utils/languageUtils';
 import {
   View,
   Text,
@@ -588,33 +589,7 @@ const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null
     }
   };
 
-  // Helper function to get welcome message based on language
-  const getWelcomeMessage = (language: string, learningObjective?: string): string => {
-    const welcomeMessages: Record<string, { basic: string, withObjective: string }> = {
-      'es': {
-        basic: '¡Hola! Soy tu tutor de español. ¿Cómo estás hoy?',
-        withObjective: `¡Hola! Veo que quieres practicar: "${learningObjective}". ¡Empecemos!`
-      },
-      'fr': {
-        basic: 'Bonjour! Je suis votre tuteur de français. Comment allez-vous aujourd\'hui?',
-        withObjective: `Bonjour! Je vois que vous voulez pratiquer: "${learningObjective}". Commençons!`
-      },
-      'it': {
-        basic: 'Ciao! Sono il tuo tutor di italiano. Come stai oggi?',
-        withObjective: `Ciao! Vedo che vuoi praticare: "${learningObjective}". Iniziamo!`
-      },
-      'en': {
-        basic: 'Hello! I\'m your English tutor. How can I help you today?',
-        withObjective: `Hello! I see you want to practice: "${learningObjective}". Let's begin!`
-      }
-    };
 
-    // Get messages for the current language, fallback to English if not found
-    const messages = welcomeMessages[language] || welcomeMessages['en'];
-
-    // Return message with or without learning objective
-    return learningObjective ? messages.withObjective : messages.basic;
-  };
 
   // Start smart pre-buffering for auto-record
   // Improved implementation for smart pre-buffering
@@ -710,8 +685,46 @@ const handleSubmit = async (inputMessage: string) => {
   hasProcessedCurrentRecordingRef.current = false;
   if (!inputMessage.trim() || isLoading) return;
 
+  // Check if this is a repetition request - if so, handle specially
+  if (checkRepetitionRequest(inputMessage, getTargetLanguage(), getNativeLanguage())) {
+    // Find the last assistant message
+    const lastAssistantMessageIndex = history.findLastIndex(msg => msg.role === 'assistant');
+
+    if (lastAssistantMessageIndex >= 0) {
+      const lastAssistantMessage = history[lastAssistantMessageIndex];
+
+      // Add user's repetition request to history
+      const userMessage = {
+        role: 'user',
+        content: inputMessage,
+        timestamp: new Date().toISOString()
+      };
+
+      setHistory(prev => [...prev, userMessage]);
+
+      // If muted, just add the assistant message to history; if not muted, also play audio
+      const assistantMessage = {
+        role: 'assistant',
+        content: lastAssistantMessage.content,
+        translation: lastAssistantMessage.translation || '',
+        timestamp: new Date().toISOString(),
+        hasAudio: !isMuted,
+        isRepetition: true
+      };
+
+      setHistory(prev => [...prev, assistantMessage]);
+
+      // Play audio for the repetition message if not muted
+      if (!isMuted) {
+        await playAudio(conversationId, history.length); // This will play the newly added message
+      }
+
+      return;
+    }
+  }
+
   // Add user message to history immediately
-  const userMessage: MessageType = {
+  const userMessage = {
     role: 'user',
     content: inputMessage,
     timestamp: new Date().toISOString()
@@ -741,7 +754,7 @@ const handleSubmit = async (inputMessage: string) => {
       // We need to map the server response to our new structure
       // where corrections are attached to the user's messages
 
-      const newHistory: MessageType[] = [];
+      const newHistory = [];
 
       for (let i = 0; i < response.history.length; i++) {
         const currentMsg = response.history[i];
@@ -800,7 +813,7 @@ const handleSubmit = async (inputMessage: string) => {
     }
   } catch (error) {
     console.error('Error sending message:', error);
-    const errorMessage: MessageType = {
+    const errorMessage = {
       role: 'system',
       content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
       timestamp: new Date().toISOString()
@@ -1340,24 +1353,7 @@ const renderMessages = () => {
   });
 };
 
-  // Helper functions for welcome messages in different languages
-  const getWelcomeTitle = (lang: string): string => {
-    switch(lang) {
-      case 'es': return '¡Hola! Soy tu tutor de español.';
-      case 'fr': return 'Bonjour! Je suis votre tuteur de français.';
-      case 'it': return 'Ciao! Sono il tuo tutor di italiano.';
-      default: return 'Hello! I am your English tutor.';  // en
-    }
-  }
 
-  const getWelcomeSubtitle = (lang: string): string => {
-    switch(lang) {
-      case 'es': return 'Start practicing your Spanish conversation skills!';
-      case 'fr': return 'Start practicing your French conversation skills!';
-      case 'it': return 'Start practicing your Italian conversation skills!';
-      default: return 'Start practicing your English conversation skills!';  // en
-    }
-  }
 
   return (
     <SafeAreaView style={styles.container}>

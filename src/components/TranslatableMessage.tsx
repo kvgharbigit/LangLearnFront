@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
+import { getLanguageInfo } from '../constants/languages';
 
 interface TranslatableMessageProps {
   originalText: string;
@@ -23,24 +24,14 @@ const TranslatableMessage: React.FC<TranslatableMessageProps> = ({
 
   // Get language emoji based on language code
   const getLanguageEmoji = (code: string): string => {
-    const emojiMap: {[key: string]: string} = {
-      'en': '🇬🇧',
-      'es': '🇪🇸',
-      'fr': '🇫🇷',
-      'it': '🇮🇹',
-      'pt': '🇵🇹',
-      'pl': '🇵🇱',
-      'nl': '🇳🇱',
-      'ru': '🇷🇺',
-      'hu': '🇭🇺',
-      'fi': '🇫🇮',
-      'el': '🇬🇷',
-      'ja': '🇯🇵',
-      'zh': '🇨🇳',
-      'ko': '🇰🇷',
-      'tr': '🇹🇷'
-    };
-    return emojiMap[code] || '🌎';
+    const languageInfo = getLanguageInfo(code);
+    return languageInfo.flag;
+  };
+
+  // Get language name
+  const getLanguageName = (code: string): string => {
+    const languageInfo = getLanguageInfo(code);
+    return languageInfo.name;
   };
 
   const toggleTranslation = async () => {
@@ -101,12 +92,16 @@ const TranslatableMessage: React.FC<TranslatableMessageProps> = ({
         {showTranslation ? (
           <View style={styles.indicatorContainer}>
             <Text style={styles.languageEmoji}>{getLanguageEmoji(nativeLanguage)}</Text>
-            <Text style={styles.translateText}>Tap to see original</Text>
+            <Text style={styles.translateText}>
+              Tap to see original in {getLanguageName(targetLanguage)}
+            </Text>
           </View>
         ) : (
           <View style={styles.indicatorContainer}>
             <Ionicons name="language-outline" size={14} color={colors.primary} />
-            <Text style={styles.translateText}>Tap to translate</Text>
+            <Text style={styles.translateText}>
+              Tap to translate to {getLanguageName(nativeLanguage)}
+            </Text>
           </View>
         )}
       </View>
