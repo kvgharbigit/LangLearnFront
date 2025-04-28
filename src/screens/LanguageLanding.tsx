@@ -290,7 +290,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
       onChangeText={setLearningObjective}
       placeholder="• Travel tips for Mexico
 • Grammar of the Past Tense
-• Relationship Advice
+• The Roman Empire
 "
       multiline
       scrollEnabled={false}
@@ -304,7 +304,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   <View style={styles.topicInfoContainer}>
     <Ionicons name="information-circle" size={16} color={colors.info} style={styles.infoIcon} />
     <Text style={styles.topicInfoText}>
-      Our AI tutor has extensive knowledge on almost any topic. Feel free to discuss travel, culture, science, history, relationships, or any subject you're interested in learning about - even if its just gossiping about your favourite TV show!
+      Our AI tutor has extensive knowledge on almost any topic far beyond grammar. Feel free to discuss travel, culture, science, history, relationships, or any subject you're interested in learning about - even if its just gossiping about your favourite TV show!
     </Text>
   </View>
 </View>
