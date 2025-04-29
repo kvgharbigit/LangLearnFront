@@ -33,6 +33,11 @@
     "newArchEnabled": true,
     "plugins": [
       "@react-native-firebase/app"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "08897675-6d90-4552-ab1f-b81ecea27c1a"
+      }
+    }
   }
 }
