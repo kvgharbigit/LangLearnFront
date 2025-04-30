@@ -42,4 +42,5 @@ yarn-error.*
 .vscode/
 *.swp
 *.swo
+node_modules/
 EOL
