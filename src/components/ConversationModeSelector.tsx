@@ -27,7 +27,7 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
       label: 'Language Lesson',
       icon: 'book-outline',
       description: 'Focus on language learning concepts (grammar, vocabulary, etc.)',
-      placeholder: '• Past tense verbs\n• Common travel phrases\n• Food vocabulary'
+      placeholder: '• The Subjunctive Mood\n• Common travel phrases\n• Food vocabulary'
     },
     {
       id: 'topic_lesson' as ConversationMode,
