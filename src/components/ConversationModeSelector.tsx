@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
 
 // Define conversation mode types
-export type ConversationMode = 'language_lesson' | 'topic_lesson' | 'free_conversation';
+export type ConversationMode = 'language_lesson' | 'topic_lesson' | 'free_conversation' | 'interview' | 'verb_challenge' | 'noun_challenge' | 'situation_simulation';
 
 interface ConversationModeSelectorProps {
   selectedMode: ConversationMode;
@@ -25,30 +25,71 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
   // State for the dropdown modal
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
 
-  // Options for conversation modes
-  const modeOptions = [
+  // Categorized options for conversation modes
+  const conversationCategories = [
     {
-      id: 'language_lesson' as ConversationMode,
-      label: 'Grammar Lesson',
-      icon: 'book-outline',
-      description: 'Focus on language learning concepts (grammar, vocabulary, etc.)',
-      placeholder: '• The Subjunctive Mood\n• Conjugating the Preterite \n• Common Verbs'
+      title: 'Language Lessons',
+      modes: [
+        {
+          id: 'language_lesson' as ConversationMode,
+          label: 'Grammar Lesson',
+          icon: 'book-outline',
+          description: 'Focus on language learning concepts (grammar, vocabulary, etc.)',
+          placeholder: '• The Subjunctive Mood\n• Conjugating the Preterite \n• Common Verbs'
+        },
+        {
+          id: 'verb_challenge' as ConversationMode,
+          label: 'Verb Challenge',
+          icon: 'flash-outline',
+          description: 'AI gives you important/common verbs for you to use in a sentence in varying tenses.',
+          placeholder: '• Specific verb tenses to practice\n• Difficulty level preferences\n• Types of verbs'
+        },
+        {
+          id: 'noun_challenge' as ConversationMode,
+          label: 'Noun Challenge',
+          icon: 'cube-outline',
+          description: 'AI gives you important/common nouns for you to use in a sentence.',
+          placeholder: '• Categories of nouns\n• Specific topics\n• Difficulty preferences'
+        }
+      ]
     },
     {
-      id: 'topic_lesson' as ConversationMode,
-      label: 'Non-Language Lesson',
-      icon: 'school-outline',
-      description: 'Learn about non-language topics in the language of your choice!',
-      placeholder: '• History of Rome\n• Dog Training Tips\n• Modern Art Movements'
-    },
-    {
-      id: 'free_conversation' as ConversationMode,
-      label: 'Free Conversation',
-      icon: 'chatbubbles-outline',
-      description: 'Have a chat about anything with an AI who knows everything!',
-      placeholder: '• Game of Thrones\n• Golfing Tips\n• Holiday Destinations'
+      title: 'Conversations',
+      modes: [
+        {
+          id: 'topic_lesson' as ConversationMode,
+          label: 'Non-Language Lesson',
+          icon: 'school-outline',
+          description: 'Learn about non-language topics in the language of your choice!',
+          placeholder: '• History of Rome\n• Dog Training Tips\n• Modern Art Movements'
+        },
+        {
+          id: 'free_conversation' as ConversationMode,
+          label: 'Free Conversation',
+          icon: 'chatbubbles-outline',
+          description: 'Have a chat about anything with an AI who knows everything!',
+          placeholder: '• Game of Thrones\n• Golfing Tips\n• Holiday Destinations'
+        },
+        {
+          id: 'interview' as ConversationMode,
+          label: 'Interview',
+          icon: 'person-outline',
+          description: 'Answer questions from the AI about yourself!',
+          placeholder: '• Your Hobbies\n• Travel Experiences\n• Life Goals'
+        },
+        {
+          id: 'situation_simulation' as ConversationMode,
+          label: 'Situation Simulation',
+          icon: 'theatre-outline',
+          description: 'Pick an imaginary scenario in which you are having a conversation.',
+          placeholder: '• At a restaurant\n• Job interview\n• Airport check-in\n• Shopping for clothes'
+        }
+      ]
     }
   ];
+  
+  // Flatten the categories for use when we need to find a specific mode
+  const modeOptions = conversationCategories.flatMap(category => category.modes);
 
   // Get the currently selected mode's details
   const currentMode = modeOptions.find(mode => mode.id === selectedMode) || modeOptions[0];
@@ -195,11 +236,22 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
               </TouchableOpacity>
             </View>
             <FlatList
-              data={modeOptions}
-              renderItem={renderDropdownItem}
-              keyExtractor={item => item.id}
+              data={conversationCategories}
+              renderItem={({ item: category }) => (
+                <View>
+                  <Text style={styles.categoryTitle}>{category.title}</Text>
+                  {category.modes.map((mode, index) => (
+                    <React.Fragment key={mode.id}>
+                      {renderDropdownItem({ item: mode })}
+                      {index < category.modes.length - 1 && <View style={styles.separator} />}
+                    </React.Fragment>
+                  ))}
+                  {/* Add spacing after category except the last one */}
+                  <View style={styles.categorySpacing} />
+                </View>
+              )}
+              keyExtractor={item => item.title}
               showsVerticalScrollIndicator={false}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
           </View>
         </TouchableOpacity>
@@ -377,6 +429,21 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.gray200,
     marginHorizontal: 16,
+  },
+  // Category styles
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    letterSpacing: 0.5,
+  },
+  categorySpacing: {
+    height: 16,
+    backgroundColor: colors.gray50,
+    marginTop: 8,
   },
 });
 

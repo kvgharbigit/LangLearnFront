@@ -159,8 +159,9 @@ const Message: React.FC<MessageProps> = ({
   };
 
   // Check if this message should show a replay button
+  // Only show replay button on the latest assistant message
   const showReplayButton = isAssistant &&
-                           isLatestAssistantMessage &&
+                           isLatestAssistantMessage && // Only show on latest assistant message
                            onRequestReplay &&
                            !isUser &&
                            message.hasAudio === true &&

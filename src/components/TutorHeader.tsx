@@ -15,6 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
 import colors from '../styles/colors';
 import { AUDIO_SETTINGS } from '../constants/settings';
 import MicrophoneTest from './MicrophoneTest';
@@ -368,23 +369,17 @@ const TutorHeader: React.FC<Props> = ({
       speechThreshold: platformDefaults.speech,
       silenceThreshold: platformDefaults.silence,
       silenceDuration: platformDefaults.duration,
-      tempo: 0.8, // Default tempo
+      tempo: 0.9, // Default tempo (90%)
       isMuted: false
     });
   };
 
-  // Speed options with their labels and values
-  const speedOptions = [
-    { label: 'Extra Slow', value: 0.4 },
-    { label: 'Slow', value: 0.6 },
-    { label: 'Normal', value: 0.8 },
-    { label: 'Fast', value: 1.0 },
-    { label: 'Very Fast', value: 1.2 },
-  ];
-
-  // Helper function to determine if speed option is active
-  const isSpeedActive = (value: number): boolean => {
-    return Math.abs(tempo - value) < 0.05;
+  // Helper function to get descriptive text based on tempo value
+  const getTempoDescription = (value: number): string => {
+    if (value <= 0.65) return 'Slow';
+    if (value <= 0.9) return 'Normal';
+    if (value <= 1.0) return 'Fast';
+    return 'Very Fast';
   };
 
   return (
@@ -520,38 +515,31 @@ const TutorHeader: React.FC<Props> = ({
                     <Text style={[
                       styles.speedValue,
                       isMuted && styles.disabledSpeedValue
-                    ]}>{Math.round(tempo * 100)}%</Text>
+                    ]}>{getTempoDescription(tempo)} ({Math.round(tempo * 100)}%)</Text>
                   </View>
 
-                  {/* Speed buttons in a scrollable row */}
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.speedButtonsScrollContainer}
-                  >
-                    {speedOptions.map((option) => (
-                      <TouchableOpacity
-                        key={option.label}
-                        style={[
-                          styles.speedButton,
-                          isSpeedActive(option.value) && styles.activeSpeedButton,
-                          isMuted && styles.disabledSpeedButton
-                        ]}
-                        onPress={() => !isMuted && handleTempoChange(option.value)}
-                        disabled={isMuted}
-                      >
-                        <Text
-                          style={[
-                            styles.speedButtonText,
-                            isSpeedActive(option.value) && styles.activeSpeedButtonText,
-                            isMuted && styles.disabledText
-                          ]}
-                        >
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
+                  {/* Speed slider */}
+                  <View style={styles.sliderContainer}>
+                    <Slider
+                      style={styles.slider}
+                      minimumValue={0.6}  // 60%
+                      maximumValue={1.2}  // 120%
+                      step={0.05}
+                      value={tempo}
+                      onValueChange={handleTempoChange}
+                      minimumTrackTintColor={isMuted ? colors.gray400 : colors.primary}
+                      maximumTrackTintColor={colors.gray300}
+                      thumbTintColor={isMuted ? colors.gray400 : colors.primary}
+                      disabled={isMuted}
+                    />
+                    
+                    {/* Speed labels */}
+                    <View style={styles.speedLabels}>
+                      <Text style={[styles.speedLabel, isMuted && styles.disabledText]}>60%</Text>
+                      <Text style={[styles.speedLabel, isMuted && styles.disabledText]}>90%</Text>
+                      <Text style={[styles.speedLabel, isMuted && styles.disabledText]}>120%</Text>
+                    </View>
+                  </View>
                 </View>
 
                 {/* Audio Parameters Section */}
@@ -1264,41 +1252,26 @@ disabledSpeedValue: {
   color: colors.gray500,
 },
 
-// Speed Button related styles
-speedButtonsScrollContainer: {
-  paddingBottom: 8,
-  gap: 8,
+// Slider related styles
+sliderContainer: {
+  width: '100%',
+  paddingVertical: 8,
 },
-speedButton: {
-  backgroundColor: colors.white,
-  paddingVertical: 10,
-  paddingHorizontal: 16,
-  borderRadius: 20,
-  marginRight: 10,
-  borderWidth: 1,
-  borderColor: colors.gray300,
-  shadowColor: colors.gray400,
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.1,
-  shadowRadius: 2,
-  elevation: 1,
+slider: {
+  width: '100%',
+  height: 40,
 },
-activeSpeedButton: {
-  backgroundColor: colors.primaryLight,
-  borderColor: colors.primary,
+speedLabels: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginTop: -4,
+  paddingHorizontal: 8,
 },
-disabledSpeedButton: {
-  borderColor: colors.gray300,
-  backgroundColor: colors.gray100,
-},
-speedButtonText: {
-  fontSize: 14,
+speedLabel: {
+  fontSize: 12,
+  color: colors.gray600,
   fontWeight: '500',
-  color: colors.gray700,
-},
-activeSpeedButtonText: {
-  color: colors.primary,
-  fontWeight: '600',
 },
 
 // Audio Parameter related styles

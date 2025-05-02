@@ -21,9 +21,10 @@ interface Props {
   disabled: boolean;
   isPlaying: boolean;
   targetLanguage: string;
+  isMuted?: boolean; // Add isMuted property
 }
 
-const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLanguage }) => {
+const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLanguage, isMuted = false }) => {
   const [message, setMessage] = useState<string>('');
   const [showSpecialChars, setShowSpecialChars] = useState<boolean>(false);
   const inputRef = useRef<TextInput>(null);
@@ -62,8 +63,8 @@ const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLangu
   }, [message]);
 
   const handleSubmit = () => {
-    // Check if audio is playing - show alert if it is
-    if (isPlaying) {
+    // Check if audio is playing and not muted - show alert if it is
+    if (isPlaying && !isMuted) {
       Keyboard.dismiss();
       // Show a toast or alert to inform the user
       Alert.alert(
@@ -73,6 +74,8 @@ const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLangu
       );
       return;
     }
+    
+    // Allow sending messages when muted even if audio is playing
 
     // Check if message is empty or only whitespace
     if (!message.trim()) {
@@ -114,8 +117,8 @@ const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLangu
       // Remove the newline character
       const textWithoutNewline = text.slice(0, -1);
       
-      // If valid message, submit it and clear immediately
-      if (textWithoutNewline.trim() && !disabled && !isPlaying) {
+      // If valid message, submit it and clear immediately (allow when muted, even if audio is playing)
+      if (textWithoutNewline.trim() && !disabled && (!isPlaying || isMuted)) {
         console.log('Enter key detected, clearing input and submitting message');
         
         // Store message to submit
@@ -196,7 +199,7 @@ const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLangu
           returnKeyType="send"
           onSubmitEditing={() => {
             console.log('onSubmitEditing triggered');
-            if (message.trim() && !disabled && !isPlaying) {
+            if (message.trim() && !disabled && (!isPlaying || isMuted)) {
               const messageToSend = message.trim();
               // Clear the input immediately and thoroughly
               clearInputField();
@@ -230,8 +233,8 @@ const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLangu
               // Check if shift key is pressed (for new line)
               const isShiftPressed = e.nativeEvent.shiftKey || shiftKeyPressed.current;
               
-              // If not pressing shift and not disabled/playing, submit
-              if (!isShiftPressed && !disabled && !isPlaying && message.trim()) {
+              // If not pressing shift and not disabled, and either not playing or muted, submit
+              if (!isShiftPressed && !disabled && (!isPlaying || isMuted) && message.trim()) {
                 console.log('Processing Enter key submission');
                 
                 // Prevent default behavior
@@ -256,10 +259,10 @@ const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLangu
         <TouchableOpacity
           style={[
             styles.sendButton,
-            (!message.trim() || disabled || isPlaying) && styles.disabledButton
+            (!message.trim() || disabled || (isPlaying && !isMuted)) && styles.disabledButton
           ]}
           onPress={handleSubmit}
-          disabled={!message.trim() || disabled || isPlaying} // Disable button when audio is playing
+          disabled={!message.trim() || disabled || (isPlaying && !isMuted)} // Allow sending if muted, even when audio is playing
         >
           {isPlaying ? (
             <Text style={styles.sendButtonIcon}>🔊</Text> // Show audio icon when playing

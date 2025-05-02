@@ -2,7 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Storage keys for preferences
-const PREFERENCE_KEYS = {
+export const PREFERENCE_KEYS = {
   // Audio settings
   SPEECH_THRESHOLD: 'pref_speech_threshold',
   SILENCE_THRESHOLD: 'pref_silence_threshold',
@@ -127,7 +127,7 @@ export const getAudioSettings = async (): Promise<AudioSettings> => {
       speechThreshold: isIOS ? 78 : 45,
       silenceThreshold: isIOS ? 75 : 43,
       silenceDuration: 1500,
-      tempo: 0.8,
+      tempo: 0.9,
       isMuted: false,
     };
 
@@ -169,7 +169,7 @@ export const getAudioSettings = async (): Promise<AudioSettings> => {
       speechThreshold: Platform.OS === 'ios' ? 78 : 45,
       silenceThreshold: Platform.OS === 'ios' ? 75 : 43,
       silenceDuration: 1500,
-      tempo: 0.8,
+      tempo: 0.9,  // Updated to match the default tempo of 0.9 (90%)
       isMuted: false,
     };
   }

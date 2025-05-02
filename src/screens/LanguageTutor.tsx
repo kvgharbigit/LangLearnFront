@@ -20,7 +20,9 @@ import SafeView from '../components/SafeView';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Message as MessageType } from '../types/messages';
-import { AUDIO_SETTINGS, PLAYER_SETTINGS, API_CONFIG, loadAudioSettings, saveAudioSettings } from '../constants/settings';
+import { AUDIO_SETTINGS, PLAYER_SETTINGS, API_CONFIG } from '../constants/settings';
+import { getAudioSettings, saveAudioSettings, saveSingleAudioSetting, PREFERENCE_KEYS } from '../utils/userPreferences';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MuteInfoModal from '../components/MuteInfoModal';
 import ReplayButton from '../components/ReplayButton';
 import { useNetwork } from '../contexts/NetworkContext';
@@ -56,7 +58,132 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const [history, setHistory] = useState<MessageType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [tempo, setTempo] = useState<number>(0.75);
+  const [showStartButton, setShowStartButton] = useState<boolean>(true);
+  const [welcomeReady, setWelcomeReady] = useState<boolean>(false);
+  const [welcomeData, setWelcomeData] = useState<any>(null);
+  
+  // Initialize global references for audio settings if not already set
+  if (!(global as any).__SAVED_AUDIO_SETTINGS) {
+    (global as any).__SAVED_AUDIO_SETTINGS = {
+      tempo: PLAYER_SETTINGS.DEFAULT_TEMPO,
+      speechThreshold: AUDIO_SETTINGS.SPEECH_THRESHOLD,
+      silenceThreshold: AUDIO_SETTINGS.SILENCE_THRESHOLD,
+      silenceDuration: AUDIO_SETTINGS.SILENCE_DURATION,
+      isMuted: false
+    };
+    console.log('🔑 Initialized global audio settings reference');
+  }
+  
+  // Initialize tempo using a lazy initial state
+  const [tempo, setTempo] = useState<number>((global as any).__SAVED_AUDIO_SETTINGS.tempo || PLAYER_SETTINGS.DEFAULT_TEMPO);
+
+  // Load all audio settings from AsyncStorage as a backup to ensure we have the correct values
+  useEffect(() => {
+    const loadSavedAudioSettings = async () => {
+      try {
+        // First log the current global audio settings
+        console.log('🔍 [STARTUP] Current global audio settings before loading:', JSON.stringify((global as any).__SAVED_AUDIO_SETTINGS));
+        
+        // Create a batch of AsyncStorage calls to improve performance
+        const keys = [
+          PREFERENCE_KEYS.TEMPO,
+          PREFERENCE_KEYS.SPEECH_THRESHOLD,
+          PREFERENCE_KEYS.SILENCE_THRESHOLD,
+          PREFERENCE_KEYS.SILENCE_DURATION,
+          PREFERENCE_KEYS.IS_MUTED
+        ];
+        
+        const results = await AsyncStorage.multiGet(keys);
+        const savedValues: {[key: string]: any} = {};
+        
+        // Process the results
+        results.forEach(([key, value]) => {
+          if (value !== null) {
+            if (key === PREFERENCE_KEYS.IS_MUTED) {
+              savedValues[key] = value === 'true';
+            } else {
+              savedValues[key] = parseFloat(value);
+            }
+          }
+        });
+        
+        // Log all AsyncStorage values found
+        console.log('🔍 [STARTUP] Audio settings loaded from AsyncStorage:', JSON.stringify(savedValues));
+        
+        // Update tempo if found
+        if (savedValues[PREFERENCE_KEYS.TEMPO] !== undefined) {
+          const savedTempo = savedValues[PREFERENCE_KEYS.TEMPO];
+          console.log(`🎯 [STARTUP] Loaded tempo from AsyncStorage: ${savedTempo} (${Math.round(savedTempo * 100)}%)`);
+          
+          // Force state update with the AsyncStorage value
+          setTempo(savedTempo);
+          
+          // Always update global reference to match AsyncStorage
+          (global as any).__SAVED_AUDIO_SETTINGS.tempo = savedTempo;
+          console.log(`🔑 [STARTUP] Updated global audio settings tempo to: ${savedTempo}`);
+          
+          // Save to AsyncStorage again to ensure persistence
+          await saveSingleAudioSetting('TEMPO', savedTempo);
+        } else {
+          console.log(`📝 [STARTUP] No saved tempo found, saving default: ${PLAYER_SETTINGS.DEFAULT_TEMPO}`);
+          await saveSingleAudioSetting('TEMPO', PLAYER_SETTINGS.DEFAULT_TEMPO);
+          (global as any).__SAVED_AUDIO_SETTINGS.tempo = PLAYER_SETTINGS.DEFAULT_TEMPO;
+          setTempo(PLAYER_SETTINGS.DEFAULT_TEMPO);
+        }
+        
+        // Update speech threshold if found
+        if (savedValues[PREFERENCE_KEYS.SPEECH_THRESHOLD] !== undefined) {
+          const savedSpeechThreshold = savedValues[PREFERENCE_KEYS.SPEECH_THRESHOLD];
+          console.log(`🎯 Loaded speech threshold from AsyncStorage: ${savedSpeechThreshold}`);
+          setSpeechThreshold(savedSpeechThreshold);
+          (global as any).__SAVED_AUDIO_SETTINGS.speechThreshold = savedSpeechThreshold;
+        } else {
+          console.log(`📝 No saved speech threshold found, using default: ${AUDIO_SETTINGS.SPEECH_THRESHOLD}`);
+          (global as any).__SAVED_AUDIO_SETTINGS.speechThreshold = AUDIO_SETTINGS.SPEECH_THRESHOLD;
+        }
+        
+        // Update silence threshold if found
+        if (savedValues[PREFERENCE_KEYS.SILENCE_THRESHOLD] !== undefined) {
+          const savedSilenceThreshold = savedValues[PREFERENCE_KEYS.SILENCE_THRESHOLD];
+          console.log(`🎯 Loaded silence threshold from AsyncStorage: ${savedSilenceThreshold}`);
+          setSilenceThreshold(savedSilenceThreshold);
+          (global as any).__SAVED_AUDIO_SETTINGS.silenceThreshold = savedSilenceThreshold;
+        } else {
+          console.log(`📝 No saved silence threshold found, using default: ${AUDIO_SETTINGS.SILENCE_THRESHOLD}`);
+          (global as any).__SAVED_AUDIO_SETTINGS.silenceThreshold = AUDIO_SETTINGS.SILENCE_THRESHOLD;
+        }
+        
+        // Update silence duration if found
+        if (savedValues[PREFERENCE_KEYS.SILENCE_DURATION] !== undefined) {
+          const savedSilenceDuration = savedValues[PREFERENCE_KEYS.SILENCE_DURATION];
+          console.log(`🎯 Loaded silence duration from AsyncStorage: ${savedSilenceDuration}`);
+          setSilenceDuration(savedSilenceDuration);
+          (global as any).__SAVED_AUDIO_SETTINGS.silenceDuration = savedSilenceDuration;
+        } else {
+          console.log(`📝 No saved silence duration found, using default: ${AUDIO_SETTINGS.SILENCE_DURATION}`);
+          (global as any).__SAVED_AUDIO_SETTINGS.silenceDuration = AUDIO_SETTINGS.SILENCE_DURATION;
+        }
+        
+        // Update mute state if found
+        if (savedValues[PREFERENCE_KEYS.IS_MUTED] !== undefined) {
+          const savedIsMuted = savedValues[PREFERENCE_KEYS.IS_MUTED];
+          console.log(`🎯 Loaded muted state from AsyncStorage: ${savedIsMuted}`);
+          setIsMuted(savedIsMuted);
+          (global as any).__SAVED_AUDIO_SETTINGS.isMuted = savedIsMuted;
+        } else {
+          console.log(`📝 No saved muted state found, using default: false`);
+          (global as any).__SAVED_AUDIO_SETTINGS.isMuted = false;
+        }
+        
+        console.log('🔑 Updated global audio settings reference with AsyncStorage values');
+        
+      } catch (error) {
+        console.error('Error loading audio settings from AsyncStorage:', error);
+      }
+    };
+    
+    loadSavedAudioSettings();
+  }, []);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [voiceInputEnabled, setVoiceInputEnabled] = useState<boolean>(false);
   const [debugMode, setDebugMode] = useState<boolean>(false);
@@ -78,13 +205,21 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const [reconnectionAttempt, setReconnectionAttempt] = useState<number>(0);
   const [networkError, setNetworkError] = useState<string | null>(null);
 
-  // New state for customizable audio parameters
-  const [speechThreshold, setSpeechThreshold] = useState<number>(AUDIO_SETTINGS.SPEECH_THRESHOLD);
-  const [silenceThreshold, setSilenceThreshold] = useState<number>(AUDIO_SETTINGS.SILENCE_THRESHOLD);
-  const [silenceDuration, setSilenceDuration] = useState<number>(AUDIO_SETTINGS.SILENCE_DURATION);
+  // New state for customizable audio parameters - use global reference if available
+  const [speechThreshold, setSpeechThreshold] = useState<number>(
+    (global as any).__SAVED_AUDIO_SETTINGS?.speechThreshold || AUDIO_SETTINGS.SPEECH_THRESHOLD
+  );
+  const [silenceThreshold, setSilenceThreshold] = useState<number>(
+    (global as any).__SAVED_AUDIO_SETTINGS?.silenceThreshold || AUDIO_SETTINGS.SILENCE_THRESHOLD
+  );
+  const [silenceDuration, setSilenceDuration] = useState<number>(
+    (global as any).__SAVED_AUDIO_SETTINGS?.silenceDuration || AUDIO_SETTINGS.SILENCE_DURATION
+  );
 
   //state vars for muting
-  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [isMuted, setIsMuted] = useState<boolean>(
+    (global as any).__SAVED_AUDIO_SETTINGS?.isMuted || false
+  );
   const [showMuteInfoModal, setShowMuteInfoModal] = useState<boolean>(false);
 
   // Animation
@@ -134,32 +269,160 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     return getLanguageInfo(getTargetLanguage());
   };
 
-  // Load saved audio settings
+  // Load saved audio settings - this runs ONCE on component mount
   useEffect(() => {
     const loadSettings = async () => {
-      const savedSettings = await loadAudioSettings();
-      if (savedSettings) {
-        setSpeechThreshold(savedSettings.speechThreshold);
-        setSilenceThreshold(savedSettings.silenceThreshold);
-        setSilenceDuration(savedSettings.silenceDuration);
+      try {
+        // Get settings from AsyncStorage with highest priority
+        const savedSettings = await getAudioSettings();
+        if (savedSettings) {
+          console.log('🎛️ Loaded saved audio settings:', {
+            speechThreshold: savedSettings.speechThreshold,
+            silenceThreshold: savedSettings.silenceThreshold,
+            silenceDuration: savedSettings.silenceDuration,
+            tempo: savedSettings.tempo,
+            tempo_percent: Math.round(savedSettings.tempo * 100) + '%',
+            isMuted: savedSettings.isMuted
+          });
+          
+          // Only apply the non-tempo settings since we handle tempo separately
+          setSpeechThreshold(savedSettings.speechThreshold);
+          setSilenceThreshold(savedSettings.silenceThreshold);
+          setSilenceDuration(savedSettings.silenceDuration);
+          setIsMuted(savedSettings.isMuted);
+          
+          // DO NOT set tempo here as we handle it in a separate effect
+          // which has already run by this point. Setting it again would cause problems.
+          console.log(`⚙️ Skipping tempo update in loadSettings. Current tempo: ${tempo}`);
+          
+          // Check if our global reference is set
+          if (!(global as any).__SAVED_TEMPO) {
+            (global as any).__SAVED_TEMPO = savedSettings.tempo;
+            console.log(`🔑 Setting global tempo reference from settings: ${savedSettings.tempo}`);
+          }
+        } else {
+          console.log('⚠️ No saved audio settings found, using defaults');
+        }
+      } catch (error) {
+        console.error('Error loading audio settings:', error);
       }
     };
+    
     loadSettings();
+    
+    // No cleanup function needed here as we handle that in the main component unmount effect
   }, []);
 
-  // Save audio settings when they change
+  // Save audio settings when they change, but don't include tempo in dependencies
+  // as we handle tempo separately in its own useEffect
   useEffect(() => {
     // Only save if all values are valid
     if (speechThreshold >= silenceThreshold &&
         silenceThreshold >= 0 &&
         silenceDuration >= 500) {
-      saveAudioSettings({
-        speechThreshold,
-        silenceThreshold,
-        silenceDuration
-      });
+      
+      // Update global reference first to ensure it's always up-to-date
+      (global as any).__SAVED_AUDIO_SETTINGS.speechThreshold = speechThreshold;
+      (global as any).__SAVED_AUDIO_SETTINGS.silenceThreshold = silenceThreshold;
+      (global as any).__SAVED_AUDIO_SETTINGS.silenceDuration = silenceDuration;
+      (global as any).__SAVED_AUDIO_SETTINGS.isMuted = isMuted;
+      
+      // Use debounce to prevent too many saves
+      const timeoutId = setTimeout(() => {
+        console.log('📝 Saving audio settings (without tempo)');
+        console.log(`🔊 Speech Threshold: ${speechThreshold}`);
+        console.log(`🔇 Silence Threshold: ${silenceThreshold}`);
+        console.log(`⏱️ Silence Duration: ${silenceDuration}ms`);
+        console.log(`🔕 Muted: ${isMuted}`);
+        
+        saveAudioSettings({
+          speechThreshold,
+          silenceThreshold,
+          silenceDuration,
+          tempo, // Include tempo in the save, but don't trigger on tempo changes
+          isMuted
+        });
+        
+        // Update individual settings as well for reliability
+        saveSingleAudioSetting('SPEECH_THRESHOLD', speechThreshold);
+        saveSingleAudioSetting('SILENCE_THRESHOLD', silenceThreshold);
+        saveSingleAudioSetting('SILENCE_DURATION', silenceDuration);
+        saveSingleAudioSetting('IS_MUTED', isMuted);
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [speechThreshold, silenceThreshold, silenceDuration]);
+  }, [speechThreshold, silenceThreshold, silenceDuration, isMuted]); // Removed tempo from dependencies
+  
+  // Save tempo when it changes and log ALL changes to tempo
+  useEffect(() => {
+    // Skip saving during initial render to prevent overwriting AsyncStorage value
+    const saveTempoValue = async () => {
+      try {
+        // First check the global reference
+        const globalTempo = (global as any).__SAVED_AUDIO_SETTINGS?.tempo;
+        if (globalTempo !== tempo) {
+          console.log(`⚠️ Global tempo reference out of sync! Global: ${globalTempo}, State: ${tempo}. Updating global.`);
+          // Always update global reference first for consistency
+          (global as any).__SAVED_AUDIO_SETTINGS.tempo = tempo;
+        }
+        
+        // Then check AsyncStorage
+        const currentSavedStr = await AsyncStorage.getItem(PREFERENCE_KEYS.TEMPO);
+        const currentSaved = currentSavedStr ? parseFloat(currentSavedStr) : null;
+        
+        if (currentSaved !== tempo) {
+          console.log(`💾 Persisting tempo change: ${currentSaved} → ${tempo} (${Math.round(tempo * 100)}%)`);
+          
+          // Update AsyncStorage
+          await saveSingleAudioSetting('TEMPO', tempo);
+          
+          // Double-check that it was actually saved
+          const verifyStr = await AsyncStorage.getItem(PREFERENCE_KEYS.TEMPO);
+          const verifyVal = verifyStr ? parseFloat(verifyStr) : null;
+          console.log(`✅ Verify tempo saved: ${verifyVal} (${verifyVal ? Math.round(verifyVal * 100) : 'null'}%)`);
+          
+          // One final check to ensure everything is in sync
+          if ((global as any).__SAVED_AUDIO_SETTINGS.tempo !== tempo) {
+            console.log(`🛠️ Final sync check failed, forcing update to global reference`);
+            (global as any).__SAVED_AUDIO_SETTINGS.tempo = tempo;
+          }
+        } else {
+          console.log(`🔄 Tempo unchanged in AsyncStorage (${Math.round(tempo * 100)}%), still ensuring global is updated`);
+          // Even if AsyncStorage is already correct, make sure global ref is updated
+          (global as any).__SAVED_AUDIO_SETTINGS.tempo = tempo;
+        }
+        
+        // Log the final state of everything
+        console.log(`🔍 After save - State: ${tempo}, Global: ${(global as any).__SAVED_AUDIO_SETTINGS.tempo}, AsyncStorage: ${currentSaved || "unknown"}`);
+      } catch (error) {
+        console.error('Error saving tempo:', error);
+        // Even if save fails, update global reference
+        (global as any).__SAVED_AUDIO_SETTINGS.tempo = tempo;
+      }
+    };
+    
+    // Log with callstack to trace where tempo changes come from
+    const stack = new Error().stack;
+    console.log(`🎵 TEMPO CHANGE DETECTED: ${tempo} (${Math.round(tempo * 100)}%)`);
+    console.log(`🎵 Callstack for tempo change: ${stack?.split('\n').slice(0, 5).join('\n')}`);
+    
+    // Save to AsyncStorage for debugging persistence
+    AsyncStorage.setItem('DEBUG_LAST_TEMPO', JSON.stringify({
+      value: tempo,
+      timestamp: new Date().toISOString()
+    }));
+    
+    // Update global reference immediately
+    (global as any).__SAVED_AUDIO_SETTINGS.tempo = tempo;
+    
+    // Then do full persistence with a small delay
+    const timeoutId = setTimeout(() => {
+      saveTempoValue();
+    }, 50); // Small delay to batch rapid changes
+    
+    return () => clearTimeout(timeoutId);
+  }, [tempo]);
 
   // Use our custom voice recorder hook with settings from state values
   const voiceRecorder = useVoiceRecorder({
@@ -194,43 +457,119 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
   // Reset everything when component mounts or route params change
   useEffect(() => {
-  // Store current audio parameter values so we can restore them
-  const currentSpeechThreshold = speechThreshold;
-  const currentSilenceThreshold = silenceThreshold;
-  const currentSilenceDuration = silenceDuration;
-
-  // Reset conversation and UI state
-  setHistory([]);
-  setConversationId(null);
-  setIsLoading(false);
-  setTempo(0.75); // Reset to default tempo
-  setIsPlaying(false);
-  setVoiceInputEnabled(false);
-  setAutoSendEnabled(false);
-  setAutoRecordEnabled(false);
-  setIsListening(false);
-  setKeyboardVisible(false);
-
-  // Reset recorder state
-  resetRecording();
-
-  // Clean up any audio resources
-  cleanup();
-
-  // Restore audio parameters to their current values
-  // This ensures they persist between conversations
-  setSpeechThreshold(currentSpeechThreshold);
-  setSilenceThreshold(currentSilenceThreshold);
-  setSilenceDuration(currentSilenceDuration);
-
-  console.log("🔄 Conversation state reset with preserved audio parameters:", {
-    preservedAudioParams: {
-      speechThreshold: currentSpeechThreshold,
-      silenceThreshold: currentSilenceThreshold,
-      silenceDuration: currentSilenceDuration
-    }
-  });
-}, [route.params]); // This effect depends on route.params
+    // Get saved tempo directly from AsyncStorage to ensure we have the latest value
+    const loadLatestTempo = async () => {
+      try {
+        const savedTempoStr = await AsyncStorage.getItem(PREFERENCE_KEYS.TEMPO);
+        return savedTempoStr ? parseFloat(savedTempoStr) : tempo;
+      } catch (error) {
+        console.error('Error loading latest tempo:', error);
+        return tempo;
+      }
+    };
+    
+    // Perform the reset with the latest audio parameter values
+    const resetWithCurrentParams = async () => {
+      // Use our global reference as the source of truth for all audio parameters
+      let audioSettings = (global as any).__SAVED_AUDIO_SETTINGS || {
+        tempo: PLAYER_SETTINGS.DEFAULT_TEMPO,
+        speechThreshold: AUDIO_SETTINGS.SPEECH_THRESHOLD,
+        silenceThreshold: AUDIO_SETTINGS.SILENCE_THRESHOLD,
+        silenceDuration: AUDIO_SETTINGS.SILENCE_DURATION,
+        isMuted: false
+      };
+      
+      console.log(`🔑 Using global audio settings reference in reset:`, audioSettings);
+      
+      // If we don't have global values, try AsyncStorage as a backup
+      if (!audioSettings.tempo) {
+        audioSettings.tempo = await loadLatestTempo();
+      }
+      
+      console.log(`🔄 RESETTING CONVERSATION - Current settings:`, {
+        tempo: tempo,
+        speechThreshold: speechThreshold,
+        silenceThreshold: silenceThreshold,
+        silenceDuration: silenceDuration,
+        isMuted: isMuted
+      });
+      console.log(`🔄 Will restore to:`, audioSettings);
+      
+      // Reset conversation and UI state
+      setHistory([]);
+      setConversationId(null);
+      setIsLoading(false);
+      setIsPlaying(false);
+      setVoiceInputEnabled(false);
+      setAutoSendEnabled(false);
+      setAutoRecordEnabled(false);
+      setIsListening(false);
+      setKeyboardVisible(false);
+      
+      // Reset recorder state
+      resetRecording();
+      
+      // Clean up any audio resources
+      cleanup();
+      
+      // Debug log BEFORE restoring
+      console.log(`🔍 BEFORE RESTORING AUDIO PARAMETERS`);
+      
+      // Ensure values are within valid ranges
+      const validTempo = Math.max(0.6, Math.min(1.2, parseFloat(audioSettings.tempo.toString())));
+      const validSpeechThreshold = Math.max(0, Math.min(100, audioSettings.speechThreshold));
+      const validSilenceThreshold = Math.max(0, Math.min(validSpeechThreshold, audioSettings.silenceThreshold));
+      const validSilenceDuration = Math.max(500, Math.min(5000, audioSettings.silenceDuration));
+      
+      // Restore audio parameters to their saved values
+      // This ensures they persist between conversations
+      setSpeechThreshold(validSpeechThreshold);
+      setSilenceThreshold(validSilenceThreshold);
+      setSilenceDuration(validSilenceDuration);
+      setIsMuted(audioSettings.isMuted);
+      
+      // Set tempo in a separate update cycle to ensure it's not batched with other state updates
+      setTimeout(() => {
+        console.log(`🔍 SETTING TEMPO in setTimeout - Value: ${validTempo}`);
+        setTempo(validTempo);
+        
+        // Update global reference with all validated values
+        (global as any).__SAVED_AUDIO_SETTINGS = {
+          tempo: validTempo,
+          speechThreshold: validSpeechThreshold,
+          silenceThreshold: validSilenceThreshold,
+          silenceDuration: validSilenceDuration,
+          isMuted: audioSettings.isMuted
+        };
+        
+        // Ensure everything is also saved to AsyncStorage
+        Promise.all([
+          saveSingleAudioSetting('TEMPO', validTempo),
+          saveSingleAudioSetting('SPEECH_THRESHOLD', validSpeechThreshold),
+          saveSingleAudioSetting('SILENCE_THRESHOLD', validSilenceThreshold),
+          saveSingleAudioSetting('SILENCE_DURATION', validSilenceDuration),
+          saveSingleAudioSetting('IS_MUTED', audioSettings.isMuted)
+        ])
+          .then(() => console.log(`✅ All audio settings saved during reset`))
+          .catch(err => console.error('Error saving audio settings during reset:', err));
+      }, 0);
+      
+      // Log the preserved parameters for debugging
+      console.log("🔄 Conversation state reset with preserved audio parameters:", {
+        preservedAudioParams: {
+          speechThreshold: currentSpeechThreshold,
+          silenceThreshold: currentSilenceThreshold,
+          silenceDuration: currentSilenceDuration,
+          tempo: latestTempo,
+          isMuted: currentIsMuted
+        }
+      });
+    };
+    
+    // Execute the reset function
+    resetWithCurrentParams();
+    
+  }, [route.params]); // This effect depends on route.params
 
   // Add keyboard event listeners
   useEffect(() => {
@@ -282,11 +621,48 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     };
   }, []);
 
+  // Function to update any audio setting and ensure it's properly saved
+  const updateAudioSetting = (type: string, value: any) => {
+    // Update global reference immediately
+    (global as any).__SAVED_AUDIO_SETTINGS = {
+      ...(global as any).__SAVED_AUDIO_SETTINGS,
+      [type.toLowerCase()]: value
+    };
+    
+    console.log(`🔊 Updating ${type} to: ${value}`);
+    
+    // Update state based on setting type
+    switch (type) {
+      case 'tempo':
+        setTempo(value);
+        break;
+      case 'speechThreshold':
+        setSpeechThreshold(value);
+        break;
+      case 'silenceThreshold':
+        setSilenceThreshold(value);
+        break;
+      case 'silenceDuration':
+        setSilenceDuration(value);
+        break;
+      case 'isMuted':
+        setIsMuted(value);
+        break;
+      default:
+        console.warn(`Unknown audio setting type: ${type}`);
+    }
+    
+    // Save to AsyncStorage (this is handled by the useEffect hooks)
+  };
+
   // 3. Add toggle mute function
   const toggleMute = (muted: boolean) => {
     // Update mute state
     setIsMuted(muted);
-
+    
+    // Update global reference
+    (global as any).__SAVED_AUDIO_SETTINGS.isMuted = muted;
+    
     // Show info modal when muting for the first time
     if (muted && !showMuteInfoModal) {
       setShowMuteInfoModal(true);
@@ -304,6 +680,48 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         console.warn('Error in mute toggle:', error);
       }
     }
+  };
+  
+  // Handle the "Let's Go" button click
+  const handleStart = async () => {
+    if (!welcomeReady || !welcomeData) return;
+    
+    // Hide the start button
+    setShowStartButton(false);
+    
+    // Set the initial message from the stored welcome data but enhance it with hasAudio property
+    // This ensures the welcome message can be replayed
+    const enhancedHistory = welcomeData.history?.map((msg, index) => {
+      // Add hasAudio property to the assistant message (which should be the first one)
+      if (msg.role === 'assistant' && index === 0) {
+        return {
+          ...msg,
+          hasAudio: welcomeData.has_audio && !isMuted
+        };
+      }
+      return msg;
+    }) || [];
+    
+    setHistory(enhancedHistory);
+    
+    // Now that we're showing welcome message, we can set isLoading to false
+    // This ensures the typing indicator doesn't show separately
+    setIsLoading(false);
+    
+    // Play audio for the welcome message if available
+    if (welcomeData.has_audio && !isMuted) {
+      setStatusMessage('Preparing welcome audio...');
+      
+      // Small delay to ensure state updates have taken effect
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      console.log(`🔍 Playing welcome audio after clicking "Let's Go" button`);
+      setStatusMessage('Streaming welcome audio...');
+      await playAudio(welcomeData.conversation_id, 0); // Play the first message (welcome)
+    }
+    
+    // Make sure to scroll to the bottom to show the welcome message
+    setTimeout(() => scrollToBottom(true), 100);
   };
   // Toggle voice input
   const toggleVoiceInput = () => {
@@ -425,6 +843,52 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [route.params]); // Add route.params dependency to re-initialize if params change
 
+  // Animation refs for buffering dots
+  const bufferingDot1 = useRef(new Animated.Value(0)).current;
+  const bufferingDot2 = useRef(new Animated.Value(0)).current;
+  const bufferingDot3 = useRef(new Animated.Value(0)).current;
+  
+  // Animation for buffering dots in the empty state
+  useEffect(() => {
+    // Only run the animation when we're showing the buffering dots
+    if (showStartButton && !welcomeReady) {
+      // Create animations for each dot with different delays
+      const createDotAnimation = (dot: Animated.Value) => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(dot, {
+              toValue: 1,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+            Animated.timing(dot, {
+              toValue: 0,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+      
+      // Start animations with staggered delays
+      const anim1 = createDotAnimation(bufferingDot1);
+      const anim2 = createDotAnimation(bufferingDot2);
+      const anim3 = createDotAnimation(bufferingDot3);
+      
+      // Start the animations with staggered timing
+      anim1.start();
+      setTimeout(() => { anim2.start(); }, 200);
+      setTimeout(() => { anim3.start(); }, 400);
+      
+      // Cleanup function
+      return () => {
+        anim1.stop();
+        anim2.stop();
+        anim3.stop();
+      };
+    }
+  }, [showStartButton, welcomeReady, bufferingDot1, bufferingDot2, bufferingDot3]);
+  
   // Cleanup function for all recording-related resources
   const cleanup = () => {
     console.log('Running audio resource cleanup...');
@@ -533,6 +997,46 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       console.log("🧹 Component unmounting - cleaning up all audio resources");
       isMountedRef.current = false;
 
+      // Update global reference first for safety
+      (global as any).__SAVED_AUDIO_SETTINGS = {
+        tempo,
+        speechThreshold,
+        silenceThreshold,
+        silenceDuration,
+        isMuted
+      };
+      
+      // Save current audio settings to ensure they persist
+      console.log(`💾 Saving all audio settings on unmount`);
+      console.log(`🎵 Tempo: ${tempo} (${Math.round(tempo * 100)}%)`);
+      console.log(`🔊 Speech Threshold: ${speechThreshold}`);
+      console.log(`🔇 Silence Threshold: ${silenceThreshold}`);
+      console.log(`⏱️ Silence Duration: ${silenceDuration}ms`);
+      console.log(`🔕 Muted: ${isMuted}`);
+      
+      saveAudioSettings({
+        speechThreshold,
+        silenceThreshold,
+        silenceDuration,
+        tempo,
+        isMuted
+      }).then(() => {
+        console.log("✅ Audio settings saved on unmount");
+      }).catch(error => {
+        console.error("Error saving audio settings on unmount:", error);
+      });
+
+      // Save each parameter separately as well to ensure they're definitely saved
+      Promise.all([
+        saveSingleAudioSetting('TEMPO', tempo),
+        saveSingleAudioSetting('SPEECH_THRESHOLD', speechThreshold),
+        saveSingleAudioSetting('SILENCE_THRESHOLD', silenceThreshold),
+        saveSingleAudioSetting('SILENCE_DURATION', silenceDuration),
+        saveSingleAudioSetting('IS_MUTED', isMuted)
+      ])
+        .then(() => console.log(`✅ All audio parameters saved separately on unmount`))
+        .catch(err => console.error('Error saving parameters on unmount:', err));
+
       if (soundRef.current) {
         // First remove any status update callbacks to prevent further updates
         if (playbackCallbackRef.current) {
@@ -553,7 +1057,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 
       cleanup();
     };
-  }, []);
+  }, [tempo, speechThreshold, silenceThreshold, silenceDuration, isMuted]); // Add dependencies to ensure we have the latest values in the cleanup
 
   // Add navigation event listeners to stop audio when exiting the screen
   useEffect(() => {
@@ -615,30 +1119,71 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         return;
       }
 
+      // Always use the audio settings global reference
+      let audioSettings = (global as any).__SAVED_AUDIO_SETTINGS || {
+        tempo: PLAYER_SETTINGS.DEFAULT_TEMPO,
+        speechThreshold: AUDIO_SETTINGS.SPEECH_THRESHOLD,
+        silenceThreshold: AUDIO_SETTINGS.SILENCE_THRESHOLD,
+        silenceDuration: AUDIO_SETTINGS.SILENCE_DURATION,
+        isMuted: false
+      };
+      
+      // Get the current tempo from global reference
+      let currentTempo = audioSettings.tempo;
+      
+      // Double-check with AsyncStorage as a backup
+      try {
+        const savedTempoStr = await AsyncStorage.getItem(PREFERENCE_KEYS.TEMPO);
+        if (savedTempoStr) {
+          const savedTempo = parseFloat(savedTempoStr);
+          // If there's a mismatch, update both state and global reference
+          if (savedTempo !== currentTempo) {
+            console.log(`⚠️ Tempo mismatch detected! AsyncStorage: ${savedTempo}, Global: ${currentTempo}. Using AsyncStorage value.`);
+            currentTempo = savedTempo;
+            setTempo(savedTempo); // Update our state to match
+            
+            // Update global reference
+            (global as any).__SAVED_AUDIO_SETTINGS.tempo = savedTempo;
+            console.log(`🔄 Updated global audio settings with tempo: ${savedTempo}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting saved tempo before conversation init:', error);
+      }
+      
+      console.log(`🏆 Using tempo for conversation: ${currentTempo} (${Math.round(currentTempo * 100)}%)`);
+      console.log(`🔍 Current global audio settings:`, (global as any).__SAVED_AUDIO_SETTINGS);
+
+      // Force tempo to be the correct type and range
+      currentTempo = Math.max(0.6, Math.min(1.2, parseFloat(currentTempo.toString())));
+      
+      console.log(`🚀 Creating conversation with tempo: ${currentTempo} (${Math.round(currentTempo * 100)}%)`);
+
       // Call the new API endpoint to create a conversation
       const response = await api.createConversation({
         difficulty: getDifficulty(),
         nativeLanguage: getNativeLanguage(),
         targetLanguage: getTargetLanguage(),
         learningObjective: getLearningObjective(),
-        conversationMode: route.params.conversationMode, // Add this line
-        tempo: tempo,
+        conversationMode: route.params.conversationMode,
+        tempo: currentTempo,
         isMuted: isMuted
       });
 
       // Update state with the response data
       if (response) {
-        // Set conversation ID
+        // Set conversation ID only, but don't show welcome message yet
         setConversationId(response.conversation_id);
-
-        // Set initial message
-        setHistory(response.history || []);
-
-        // Play audio for the welcome message
-        if (response.has_audio) {
-          setStatusMessage('Streaming welcome audio...');
-          await playAudio(response.conversation_id, 0); // Play the first message (welcome)
-        }
+        
+        // Store the welcome data for when user clicks "Let's Go" button
+        setWelcomeData(response);
+        setWelcomeReady(true);
+        setShowStartButton(true);
+        
+        // Clean up loading state, but don't set isLoading to false yet
+        // We want to keep isLoading true until the user clicks "Let's Go"
+        // This prevents the typing indicator from showing separately
+        setStatusMessage('Ready to start');
       }
     } catch (error) {
       console.error('Error initializing conversation:', error);
@@ -672,7 +1217,11 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         setHistory([welcomeMessage]);
       }
     } finally {
-      setIsLoading(false);
+      // Only set isLoading to false if there was an error
+      // For successful initialization, we'll keep isLoading true until the user clicks "Let's Go"
+      if (!welcomeReady || !welcomeData) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -771,6 +1320,13 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
 const handleSubmit = async (inputMessage: string) => {
   hasProcessedCurrentRecordingRef.current = false;
   if (!inputMessage.trim() || isLoading) return;
+  
+  // Don't allow sending messages until welcome message is shown (regardless of mute state)
+  if (showStartButton) {
+    console.log("⛔ Blocked message - user must click Let's Go button first");
+    setStatusMessage("Click 'Let's Go' to start the conversation");
+    return;
+  }
 
   // Check if this is a repetition request - if so, handle specially
   if (checkRepetitionRequest(inputMessage, getTargetLanguage(), getNativeLanguage())) {
@@ -821,10 +1377,29 @@ const handleSubmit = async (inputMessage: string) => {
   setIsLoading(true);
 
   try {
+    // Get the latest tempo value from AsyncStorage
+    let currentTempo = tempo;
+    try {
+      const savedTempoStr = await AsyncStorage.getItem(PREFERENCE_KEYS.TEMPO);
+      if (savedTempoStr) {
+        const savedTempo = parseFloat(savedTempoStr);
+        if (savedTempo !== tempo) {
+          console.log(`⚠️ Tempo mismatch before sendTextMessage: Saved: ${savedTempo}, Current: ${tempo}. Using saved value.`);
+          currentTempo = savedTempo;
+          // Update the state for future requests
+          setTempo(savedTempo);
+        }
+      }
+    } catch (error) {
+      console.error('Error getting saved tempo before sendTextMessage:', error);
+    }
+    
+    console.log(`📨 Sending text message with tempo: ${currentTempo} (${Math.round(currentTempo * 100)}%)`);
+    
     const response = await api.sendTextMessage(
       inputMessage,
       conversationId,
-      tempo,
+      currentTempo, // Use verified tempo value
       getDifficulty(),
       getNativeLanguage(),
       getTargetLanguage(),
@@ -920,6 +1495,13 @@ const handleAudioData = async () => {
     setStatusMessage('No audio data recorded');
     return;
   }
+  
+  // Don't allow processing voice recordings until welcome message is shown (regardless of mute state)
+  if (showStartButton) {
+    console.log("⛔ Blocked voice recording - user must click Let's Go button first");
+    setStatusMessage("Click 'Let's Go' to start the conversation");
+    return;
+  }
 
   setIsLoading(true);
   setIsProcessing(true);
@@ -935,10 +1517,29 @@ const handleAudioData = async () => {
     };
     setHistory(prev => [...prev, tempMessage]);
 
+    // Get the latest tempo value from AsyncStorage
+    let currentTempo = tempo;
+    try {
+      const savedTempoStr = await AsyncStorage.getItem(PREFERENCE_KEYS.TEMPO);
+      if (savedTempoStr) {
+        const savedTempo = parseFloat(savedTempoStr);
+        if (savedTempo !== tempo) {
+          console.log(`⚠️ Tempo mismatch before voice recording: Saved: ${savedTempo}, Current: ${tempo}. Using saved value.`);
+          currentTempo = savedTempo;
+          // Update the state for future requests
+          setTempo(savedTempo);
+        }
+      }
+    } catch (error) {
+      console.error('Error getting saved tempo before voice recording:', error);
+    }
+    
+    console.log(`🎤 Sending voice recording with tempo: ${currentTempo} (${Math.round(currentTempo * 100)}%)`);
+
     const response = await api.sendVoiceRecording({
       audioUri,
       conversationId,
-      tempo,
+      tempo: currentTempo, // Use verified tempo value
       difficulty: getDifficulty(),
       nativeLanguage: getNativeLanguage(),
       targetLanguage: getTargetLanguage(),
@@ -1066,11 +1667,57 @@ const handleAudioData = async () => {
       });
       console.log("🎧 Audio session configured for playback");
 
-      // Build streaming URL
+      // Always use the audio settings global reference
+      let audioSettings = (global as any).__SAVED_AUDIO_SETTINGS || {
+        tempo: PLAYER_SETTINGS.DEFAULT_TEMPO,
+        speechThreshold: AUDIO_SETTINGS.SPEECH_THRESHOLD,
+        silenceThreshold: AUDIO_SETTINGS.SILENCE_THRESHOLD,
+        silenceDuration: AUDIO_SETTINGS.SILENCE_DURATION,
+        isMuted: false
+      };
+      
+      // Get the current tempo from global reference
+      let currentTempo = audioSettings.tempo;
+      
+      // Log the current state and global values for debugging
+      console.log(`🔍 Audio playback - State tempo: ${tempo}, Global tempo: ${currentTempo}`);
+      
+      // If there's a mismatch between state and global reference, update state
+      if (currentTempo !== tempo) {
+        console.log(`⚠️ Tempo mismatch detected before audio playback! State: ${tempo}, Global: ${currentTempo}. Using global value.`);
+        setTempo(currentTempo);
+      }
+      
+      // Double-check with AsyncStorage for complete safety
+      try {
+        const savedTempoStr = await AsyncStorage.getItem(PREFERENCE_KEYS.TEMPO);
+        if (savedTempoStr) {
+          const savedTempo = parseFloat(savedTempoStr);
+          // If AsyncStorage has a different value, update both state and global reference
+          if (savedTempo !== currentTempo) {
+            console.log(`⚠️ AsyncStorage tempo differs from global reference! AsyncStorage: ${savedTempo}, Global: ${currentTempo}`);
+            currentTempo = savedTempo;
+            setTempo(savedTempo);
+            
+            // Update global reference
+            (global as any).__SAVED_AUDIO_SETTINGS.tempo = savedTempo;
+            console.log(`🔄 Updated global audio settings with tempo from AsyncStorage: ${savedTempo}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking AsyncStorage tempo before audio playback:', error);
+      }
+      
+      // Ensure currentTempo is within valid range and is a number
+      currentTempo = Math.max(0.6, Math.min(1.2, parseFloat(currentTempo.toString())));
+      
+      console.log(`🎧 Using tempo for audio playback: ${currentTempo} (${Math.round(currentTempo * 100)}%)`);
+
+      // Build streaming URL with the verified tempo value
       const audioUrl = api.getAudioStreamUrl(
         conversationId,
         messageIndex,
-        tempo,
+        currentTempo, // Use verified tempo
         getTargetLanguage(), // Use current target language
         isMuted // Pass the muted state to the API
       );
@@ -1356,6 +2003,13 @@ const handleAudioData = async () => {
       setStatusMessage('Please wait for audio to finish playing');
       return;
     }
+    
+    // Don't allow recording until welcome message is shown (regardless of mute state)
+    if (showStartButton) {
+      console.log("⛔ Blocked voice recording - user must click Let's Go button first");
+      setStatusMessage("Click 'Let's Go' to start the conversation");
+      return;
+    }
     // Clean up any active recording/pre-buffering
     cleanup();
 
@@ -1403,26 +2057,95 @@ const renderMessages = () => {
         <Text style={styles.welcomeText}>
           {getWelcomeSubtitle(getTargetLanguage())}
         </Text>
+        
+        {/* Show loading indicator while welcome data is loading */}
+        {showStartButton && !welcomeReady && (
+          <View style={styles.loadingContainer}>
+            <View style={styles.buffering}>
+              <Animated.View 
+                style={[
+                  styles.bufferingDot,
+                  {
+                    opacity: bufferingDot1.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.2, 1]
+                    }),
+                    transform: [{
+                      scale: bufferingDot1.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.7, 1.2]
+                      })
+                    }]
+                  }
+                ]} 
+              />
+              <Animated.View 
+                style={[
+                  styles.bufferingDot,
+                  {
+                    opacity: bufferingDot2.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.2, 1]
+                    }),
+                    transform: [{
+                      scale: bufferingDot2.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.7, 1.2]
+                      })
+                    }]
+                  }
+                ]} 
+              />
+              <Animated.View 
+                style={[
+                  styles.bufferingDot,
+                  {
+                    opacity: bufferingDot3.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.2, 1]
+                    }),
+                    transform: [{
+                      scale: bufferingDot3.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.7, 1.2]
+                      })
+                    }]
+                  }
+                ]} 
+              />
+            </View>
+            <Text style={styles.bufferingText}>Preparing your conversation...</Text>
+          </View>
+        )}
+        
+        {/* Show the "Let's Go" button if welcome data is ready */}
+        {showStartButton && welcomeReady && (
+          <TouchableOpacity 
+            style={styles.startButton}
+            onPress={handleStart}
+          >
+            <Text style={styles.startButtonText}>Let's Go!</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
 
   return history.map((msg, index) => {
-    // Determine if this is the latest assistant message that can be replayed
+    // Determine if this is the latest assistant message for display purposes
     const isLatestAssistantMessage =
       msg.role === 'assistant' &&
       index === history.findLastIndex(m => m.role === 'assistant');
 
-    // Only show replay button if:
-    // 1. This is the latest assistant message
-    // 2. The message has audio available (was generated when not muted)
-    // 3. Audio is not currently muted
-    // 4. We have a valid conversation ID and message index for replay
+    // Only allow the latest assistant message with audio to be replayed
     const canReplayThisMessage =
       isLatestAssistantMessage &&
       msg.hasAudio === true &&  // Must explicitly check for true
       !isMuted &&
       canReplayLastMessage;
+
+    // If this is the latest assistant message, set up the replay handler
+    const replayHandler = canReplayThisMessage ? handleReplayLastMessage : undefined;
 
     return (
       <Message
@@ -1432,7 +2155,7 @@ const renderMessages = () => {
           // hasAudio is already part of the message object now
         }}
         isLatestAssistantMessage={isLatestAssistantMessage}
-        onRequestReplay={canReplayThisMessage ? handleReplayLastMessage : undefined}
+        onRequestReplay={replayHandler}
         isPlaying={isPlaying}
         isMuted={isMuted}
       />
@@ -1616,7 +2339,8 @@ const renderMessages = () => {
         >
           {renderMessages()}
 
-          {isLoading && (
+          {/* Only show typing indicator if we're not still in the welcome state */}
+          {isLoading && !showStartButton && (
             <View style={styles.loadingMessage}>
               <View style={styles.typingIndicator}>
                 <View style={styles.typingDot} />
@@ -1627,8 +2351,16 @@ const renderMessages = () => {
           )}
         </ScrollView>
 
-        <View style={styles.inputContainer}>
-          {voiceInputEnabled ? (
+        {/* Only show input container after clicking Let's Go button */}
+        {showStartButton ? (
+          <View style={styles.startButtonHint}>
+            <Text style={styles.startButtonHintText}>
+              Click 'Let's Go' above to start the conversation
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.inputContainer}>
+            {voiceInputEnabled ? (
             <View style={styles.voiceInputControls}>
               <TouchableOpacity
                   style={[
@@ -1742,9 +2474,11 @@ const renderMessages = () => {
               disabled={isLoading}
               isPlaying={isPlaying} // Pass the isPlaying state
               targetLanguage={getTargetLanguage()}
+              isMuted={isMuted} // Pass the mute state to allow sending when muted
             />
           )}
         </View>
+        )}
       </KeyboardAvoidingView>
     </SafeView>
   );
@@ -1843,6 +2577,49 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.gray600,
     textAlign: 'center',
+    marginBottom: 32,
+  },
+  startButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  startButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    marginTop: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buffering: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 50,
+  },
+  bufferingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+    marginHorizontal: 5,
+  },
+  bufferingText: {
+    color: colors.gray600,
+    marginTop: 8,
+    fontSize: 14,
   },
   loadingMessage: {
     alignSelf: 'flex-start',
@@ -2056,6 +2833,18 @@ const styles = StyleSheet.create({
   },
   audioControlText: {
     color: 'white',
+    fontSize: 14,
+  },
+  startButtonHint: {
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: colors.gray300,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startButtonHintText: {
+    color: colors.gray600,
     fontSize: 14,
   },
 

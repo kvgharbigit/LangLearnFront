@@ -28,7 +28,7 @@ const LanguageTutorInitializer: React.FC<LanguageTutorInitializerProps> = ({
   difficulty,
   conversationMode,
   learningObjective = '',
-  tempo = 0.8,
+  tempo = 0.9, // Default to 90% speed
   isMuted = false,
   onConversationCreated
 }) => {
@@ -52,6 +52,14 @@ const LanguageTutorInitializer: React.FC<LanguageTutorInitializerProps> = ({
         return 'Content Learning';
       case 'free_conversation':
         return 'Free Conversation';
+      case 'interview':
+        return 'Interview';
+      case 'verb_challenge':
+        return 'Verb Challenge';
+      case 'noun_challenge':
+        return 'Noun Challenge';
+      case 'situation_simulation':
+        return 'Situation Simulation';
       default:
         return 'Conversation';
     }

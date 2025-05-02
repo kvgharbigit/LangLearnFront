@@ -195,7 +195,7 @@ export const updateOfflineQueueItem = async (
 export const sendTextMessage = async (
   message: string,
   conversationId: string | null = null,
-  tempo: number = 0.75,
+  tempo: number = 0.9, // Default to 90% speed
   difficulty: string = 'beginner',
   nativeLanguage: string = 'en',
   targetLanguage: string = 'es',
@@ -382,7 +382,7 @@ export const sendTextMessage = async (
 export const getAudioStreamUrl = (
   conversationId: string,
   messageIndex: number = -1,
-  tempo: number = 0.75,
+  tempo: number = 0.9, // Default to 90% speed
   targetLanguage: string = 'es',
   isMuted: boolean = false
 ) => {
@@ -395,7 +395,7 @@ export const getAudioStreamUrl = (
 export const sendVoiceRecording = async ({
   audioUri,
   conversationId = null,
-  tempo = 0.75,
+  tempo = 0.9, // Default to 90% speed
   difficulty = 'beginner',
   nativeLanguage = 'en',
   targetLanguage = 'es',
@@ -824,7 +824,7 @@ export const createConversation = async ({
       target_language: targetLanguage,
       learning_objective: learningObjective || '',
       conversation_mode: conversationMode,
-      tempo: tempo || 0.75,
+      tempo: tempo ?? 0.9, // Use 0.9 (90%) as default if tempo is undefined
       is_muted: isMuted
     };
 

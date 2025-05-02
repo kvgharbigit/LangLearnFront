@@ -89,14 +89,14 @@ export const resetAudioSettings = async () => {
 // Default audio player settings
 export const PLAYER_SETTINGS = {
   // Default playback speed
-  DEFAULT_TEMPO: 0.75,
+  DEFAULT_TEMPO: 0.9,
 
   // Min/max tempo range
-  MIN_TEMPO: 0.5,
-  MAX_TEMPO: 1.5,
+  MIN_TEMPO: 0.6,  // 60%
+  MAX_TEMPO: 1.2,  // 120%
 
   // Tempo step size
-  TEMPO_STEP: 0.1,
+  TEMPO_STEP: 0.05,
 };
 
 // API configuration

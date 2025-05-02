@@ -234,16 +234,21 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       return;
     }
 
-    // Check if audio is currently playing and exit if it is
+    // Skip audio mode check since getAudioModeAsync is not available
+    // This was causing TypeError: _expoAv.Audio.getAudioModeAsync is not a function
     try {
-      const audioMode = await Audio.getAudioModeAsync();
-      if (!audioMode.allowsRecordingIOS && audioMode.playsInSilentModeIOS) {
-        console.log('Audio appears to be playing, ignoring pre-buffer request');
-        setStatusMessage('Please wait for audio to finish playing');
-        return;
-      }
+      // Instead, just set a new audio mode explicitly
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        interruptionModeIOS: 1, // 1 = DoNotMix
+        interruptionModeAndroid: 1, // 1 = DoNotMix
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+      });
     } catch (error) {
-      console.log('Error checking audio mode:', error);
+      console.log('Error setting audio mode:', error);
       // Continue anyway since this is just a precaution
     }
 
@@ -470,16 +475,21 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       return;
     }
 
-    // Check if audio is currently playing and exit if it is
+    // Skip audio mode check since getAudioModeAsync is not available
+    // This was causing TypeError: _expoAv.Audio.getAudioModeAsync is not a function
     try {
-      const audioMode = await Audio.getAudioModeAsync();
-      if (!audioMode.allowsRecordingIOS && audioMode.playsInSilentModeIOS) {
-        console.log('Audio appears to be playing, ignoring recording request');
-        setStatusMessage('Please wait for audio to finish playing');
-        return;
-      }
+      // Instead, just set a new audio mode explicitly
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        interruptionModeIOS: 1, // 1 = DoNotMix
+        interruptionModeAndroid: 1, // 1 = DoNotMix
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+      });
     } catch (error) {
-      console.log('Error checking audio mode:', error);
+      console.log('Error setting audio mode:', error);
       // Continue anyway since this is just a precaution
     }
 
