@@ -13,7 +13,7 @@ import {
   ScrollView,
   Animated
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -157,7 +157,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeView style={styles.container}>
       <StatusBar style="dark" />
 
       <View style={styles.header}>
@@ -384,7 +384,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeView>
   );
 };
 

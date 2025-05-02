@@ -16,7 +16,7 @@ import {
 import { hasAvailableQuota } from '../services/usageService';
 import QuotaExceededModal from '../components/QuotaExceededModal';
 import { Audio } from 'expo-av';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeView from '../components/SafeView';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Message as MessageType } from '../types/messages';
@@ -1443,7 +1443,7 @@ const renderMessages = () => {
 
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeView style={styles.container}>
       <TutorHeader
       targetLanguage={getTargetLanguage()}
       targetInfo={getTargetInfo()}
@@ -1746,7 +1746,7 @@ const renderMessages = () => {
           )}
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeView>
   );
 };
 

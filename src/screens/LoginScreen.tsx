@@ -15,7 +15,7 @@ import {
   Image,
   Animated
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { loginUser, resetPassword } from '../services/authService';
@@ -154,7 +154,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeView style={styles.container}>
       <StatusBar style="dark" />
 
       {/* Background decorations */}
@@ -341,7 +341,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeView>
   );
 };
 

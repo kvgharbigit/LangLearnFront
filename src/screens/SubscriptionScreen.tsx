@@ -11,7 +11,7 @@ import {
   Animated,
   Dimensions
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 // Remove expo-linear-gradient dependency as it's not installed
@@ -310,7 +310,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeView style={styles.container}>
       <StatusBar style="dark" />
       
       <View style={styles.header}>
@@ -432,7 +432,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
           </Animated.View>
         </ScrollView>
       )}
-    </SafeAreaView>
+    </SafeView>
   );
 };
 

@@ -1,7 +1,6 @@
 import React, {useEffect, useState, useRef} from 'react';
 import {
   Platform, 
-  SafeAreaView, 
   ScrollView, 
   StyleSheet, 
   Text, 
@@ -19,6 +18,7 @@ import {RootStackParamList} from '../types/navigation';
 import {AUDIO_SETTINGS} from '../constants/settings';
 import {Ionicons} from '@expo/vector-icons';
 import colors from '../styles/colors';
+import SafeView from '../components/SafeView';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AudioTest'>;
 const { width } = Dimensions.get('window');
@@ -336,7 +336,7 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeView style={styles.container}>
       <StatusBar style="dark" />
 
       <View style={styles.header}>
@@ -533,7 +533,7 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </Animated.View>
       </ScrollView>
-    </SafeAreaView>
+    </SafeView>
   );
 };
 

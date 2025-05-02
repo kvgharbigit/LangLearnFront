@@ -13,7 +13,7 @@ import {
   KeyboardAvoidingView,
   Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
@@ -203,19 +203,19 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
+      <SafeView style={styles.loadingContainer}>
         <Image
           source={require('../../assets/transparent_background_icon.png')}
           style={styles.loadingLogo}
         />
         <ActivityIndicator size="large" color={colors.primary} style={styles.loadingIndicator} />
         <Text style={styles.loadingText}>Loading your language settings...</Text>
-      </SafeAreaView>
+      </SafeView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeView style={styles.container}>
       <StatusBar style="dark" />
 
       {/* Decorative background elements */}
@@ -318,7 +318,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeView>
   );
 };
 
