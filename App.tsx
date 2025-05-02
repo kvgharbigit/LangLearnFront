@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { useAuth } from './src/contexts/AuthContext';
+import { LanguageProvider } from './src/contexts/LanguageContext';
+import { configureGoogleSignIn } from './src/services/compatGoogleAuthService';
 
 // Import auth screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -12,6 +14,7 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import SubscriptionScreen from './src/screens/SubscriptionScreen';
+import AppLanguageScreen from './src/screens/AppLanguageScreen';
 
 // Import existing screens
 import LanguageLanding from './src/screens/LanguageLanding';
@@ -74,6 +77,10 @@ const MainNavigator = () => {
         name="Subscription"
         component={SubscriptionScreen}
       />
+      <Stack.Screen
+        name="AppLanguage"
+        component={AppLanguageScreen}
+      />
     </Stack.Navigator>
   );
 };
@@ -96,11 +103,18 @@ const RootNavigator = () => {
 
 // Main App component
 export default function App() {
+  // Initialize Google Sign-In on app start
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <AuthProvider>
-        <RootNavigator />
+        <LanguageProvider>
+          <RootNavigator />
+        </LanguageProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

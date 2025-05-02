@@ -6,6 +6,19 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "confluency",
+    "intentFilters": [
+      {
+        "action": "VIEW",
+        "autoVerify": true,
+        "data": [
+          {
+            "scheme": "confluency"
+          }
+        ],
+        "category": ["BROWSABLE", "DEFAULT"]
+      }
+    ],
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -17,7 +30,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.github.kvgharbigit.langlearn",
-      "googleServicesFile": "./ios/GoogleService-Info.plist"
+      "googleServicesFile": "./ios/GoogleService-Info.plist",
+      "config": {
+        "googleSignIn": {
+          "reservedClientId": "com.googleusercontent.apps.984417336702-dhfmjetmjmn5lrp91erart3ouopipthc"
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -32,7 +50,9 @@
     },
     "newArchEnabled": true,
     "plugins": [
-      "@react-native-firebase/app"
+      "@react-native-firebase/app",
+      "expo-web-browser",
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "eas": {

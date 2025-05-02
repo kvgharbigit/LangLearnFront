@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { logoutUser } from '../services/authService';
 import { ProfileStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
@@ -22,20 +23,21 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileMain'>;
 
 const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
+  const { appLanguage, translate, getLanguageName } = useLanguage();
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const handleLogout = async () => {
     Alert.alert(
-      'Confirm Logout',
-      'Are you sure you want to log out?',
+      translate('profile.logout.confirm.title'),
+      translate('profile.logout.confirm.message'),
       [
         {
-          text: 'Cancel',
+          text: translate('profile.logout.confirm.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Log Out',
+          text: translate('profile.logout.confirm.logout'),
           style: 'destructive',
           onPress: async () => {
             setIsLoading(true);
@@ -74,7 +76,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Confluency</Text>
+        <Text style={styles.headerTitle}>{translate('profile.title')}</Text>
         <View style={styles.placeholderButton} />
       </View>
 
@@ -103,7 +105,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         {/* Subscription Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Subscription</Text>
+            <Text style={styles.sectionTitle}>{translate('profile.section.subscription')}</Text>
           </View>
 
           <TouchableOpacity 
@@ -111,12 +113,11 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
             onPress={() => {
               // Ensure correct navigation to nested screen
               navigation.navigate('Subscription');
-              console.log('Navigating to Subscription screen');
             }}
           >
             <View style={styles.menuItemContent}>
               <Ionicons name="star" size={22} color="#FFB300" style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>Manage Subscription</Text>
+              <Text style={styles.menuItemTitle}>{translate('profile.manage.subscription')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
           </TouchableOpacity>
@@ -125,32 +126,19 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         {/* Preferences Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Preferences</Text>
+            <Text style={styles.sectionTitle}>{translate('profile.section.preferences')}</Text>
           </View>
 
           <TouchableOpacity 
             style={styles.menuItem}
+            onPress={() => navigation.navigate('AppLanguage')}
           >
             <View style={styles.menuItemContent}>
               <Ionicons name="language" size={22} color="#4CAF50" style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>App Language</Text>
+              <Text style={styles.menuItemTitle}>{translate('profile.app.language')}</Text>
             </View>
             <View style={styles.menuItemRight}>
-              <Text style={styles.menuItemValue}>English</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-            </View>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('LanguageLanding')}
-          >
-            <View style={styles.menuItemContent}>
-              <Ionicons name="school" size={22} color="#3F51B5" style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>Learning Languages</Text>
-            </View>
-            <View style={styles.menuItemRight}>
-              <Text style={styles.menuItemValue}>Change</Text>
+              <Text style={styles.menuItemValue}>{getLanguageName(appLanguage)}</Text>
               <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
             </View>
           </TouchableOpacity>
@@ -159,13 +147,13 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         {/* Support Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Support</Text>
+            <Text style={styles.sectionTitle}>{translate('profile.section.support')}</Text>
           </View>
 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemContent}>
               <Ionicons name="mail" size={22} color="#2196F3" style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>Contact Support</Text>
+              <Text style={styles.menuItemTitle}>{translate('profile.contact.support')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
           </TouchableOpacity>
@@ -174,7 +162,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         {/* Account Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Account</Text>
+            <Text style={styles.sectionTitle}>{translate('profile.section.account')}</Text>
           </View>
 
           <TouchableOpacity
@@ -187,7 +175,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
             ) : (
               <>
                 <Ionicons name="log-out" size={22} color={colors.danger} style={styles.menuIcon} />
-                <Text style={[styles.menuItemTitle, styles.logoutText]}>Log Out</Text>
+                <Text style={[styles.menuItemTitle, styles.logoutText]}>{translate('profile.logout')}</Text>
               </>
             )}
           </TouchableOpacity>

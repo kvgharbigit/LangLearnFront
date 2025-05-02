@@ -1,5 +1,5 @@
 // Enhanced LoginScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { loginUser, resetPassword } from '../services/authService';
 import { AuthStackParamList } from '../types/navigation';
+import { signInWithGoogle, configureGoogleSignIn } from '../services/compatGoogleAuthService';
 import { Ionicons } from '@expo/vector-icons';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
@@ -29,8 +30,14 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [googleLoading, setGoogleLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
+  
+  // Initialize Google Auth
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
 
   const handleLogin = async () => {
     // Clear previous errors
@@ -95,6 +102,34 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const togglePasswordVisibility = () => {
     setPasswordVisible(prev => !prev);
+  };
+  
+  // Handle Google Sign-In using native implementation
+  const handleGoogleSignIn = async () => {
+    try {
+      setGoogleLoading(true);
+      setErrorMessage(null);
+      
+      // Use the native Google Sign-In
+      const { user, error, cancelled } = await signInWithGoogle();
+      
+      if (cancelled) {
+        console.log('Google sign in was cancelled');
+        return;
+      }
+      
+      if (error) {
+        console.error('Google sign in error:', error);
+        setErrorMessage('Failed to sign in with Google. Please try again.');
+      }
+      
+      // Auth state observer in AuthContext will handle navigation on successful sign-in
+    } catch (error) {
+      console.error('Google sign in error:', error);
+      setErrorMessage('An unexpected error occurred during Google sign in');
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -213,9 +248,22 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
           <View style={styles.socialLoginContainer}>
-            <TouchableOpacity style={styles.socialButton}>
-              <Ionicons name="logo-google" size={20} color={colors.gray800} />
-              <Text style={styles.socialButtonText}>Continue with Google</Text>
+            <TouchableOpacity 
+              style={[styles.socialButton, googleLoading && styles.socialButtonLoading]}
+              onPress={handleGoogleSignIn}
+              disabled={googleLoading}
+            >
+              {googleLoading ? (
+                <>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.socialButtonText}>Signing in...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color={colors.gray800} />
+                  <Text style={styles.socialButtonText}>Continue with Google</Text>
+                </>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialButton}>
               <Ionicons name="logo-apple" size={20} color={colors.gray800} />
@@ -463,6 +511,10 @@ const styles = StyleSheet.create({
     color: colors.gray800,
     fontSize: 15,
     fontWeight: '500',
+  },
+  socialButtonLoading: {
+    backgroundColor: colors.gray100,
+    borderColor: colors.primary,
   },
   signupContainer: {
     flexDirection: 'row',

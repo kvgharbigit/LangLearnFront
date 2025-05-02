@@ -15,6 +15,7 @@ export type RootStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
   Subscription: undefined;
+  AppLanguage: undefined;
   // Keep other screen types if you have any
 };
 

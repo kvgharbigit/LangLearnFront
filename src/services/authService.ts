@@ -9,6 +9,8 @@ import {
   reauthenticateWithCredential,
   updatePassword,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithCredential,
   User,
   UserCredential,
   Auth,
@@ -17,6 +19,10 @@ import {
   Unsubscribe
 } from 'firebase/auth';
 import { auth } from '../firebase/config';
+import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import * as AuthSession from 'expo-auth-session';
 
 // Type definitions for auth service responses
 export interface AuthResponse {
@@ -129,4 +135,46 @@ export const getCurrentUser = (): User | null => {
 // Auth state observer
 export const subscribeToAuthChanges = (callback: NextOrObserver<User>): Unsubscribe => {
   return onAuthStateChanged(auth, callback);
+};
+
+// Google Auth configuration
+// These are example values - update with your actual values from Google Cloud Console
+const ANDROID_CLIENT_ID = '205296109732-9j0a2h3b3qjvmf6gddd1t41rjt8a62p3.apps.googleusercontent.com';
+const IOS_CLIENT_ID = '205296109732-p98kdu02d8jva57j5oef4m3hgv09ufv7.apps.googleusercontent.com';
+const EXPO_CLIENT_ID = '205296109732-tiqvf6lkojlc2bj6gtp38h6p9v0a84rr.apps.googleusercontent.com';
+
+// Initialize WebBrowser for authentication
+WebBrowser.maybeCompleteAuthSession();
+
+// Function to get Google Auth configuration
+export const useGoogleAuth = () => {
+  // Create the redirect URI
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: 'confluency',
+    path: 'auth'
+  });
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: ANDROID_CLIENT_ID,
+    iosClientId: IOS_CLIENT_ID,
+    expoClientId: EXPO_CLIENT_ID,
+    redirectUri: redirectUri
+  });
+
+  return { request, response, promptAsync };
+};
+
+// Sign in with Google
+export const signInWithGoogle = async (accessToken: string): Promise<AuthResponse> => {
+  try {
+    // Create a Google credential with the token
+    const credential = GoogleAuthProvider.credential(null, accessToken);
+
+    // Sign in with the credential
+    const userCredential = await signInWithCredential(auth, credential);
+    return { user: userCredential.user };
+  } catch (error) {
+    console.error('Google sign in error:', error);
+    return { error: error as AuthError };
+  }
 };
