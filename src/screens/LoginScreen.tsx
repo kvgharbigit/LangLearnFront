@@ -182,7 +182,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
             {/* Logo and title section */}
             <View style={styles.logoContainer}>
               <Image
-                source={require('../../assets/transparent_background_mascot_icon.png')}
+                source={require('../../assets/transparent_background_icon.png')}
                 style={styles.logoImage}
               />
               <View>

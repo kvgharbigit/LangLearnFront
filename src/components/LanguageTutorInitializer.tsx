@@ -139,6 +139,11 @@ const LanguageTutorInitializer: React.FC<LanguageTutorInitializerProps> = ({
         setStatus(`Preparing your ${targetInfo.name} tutor...`);
 
         try {
+          // Start a timer to detect slow initialization
+          const slowInitTimer = setTimeout(() => {
+            setStatus(`Still preparing your ${targetInfo.name} tutor...\nEstablishing connection to server...`);
+          }, 3000);
+          
           // Create the conversation with network error handling
           const response = await createConversation({
             difficulty,
@@ -149,6 +154,9 @@ const LanguageTutorInitializer: React.FC<LanguageTutorInitializerProps> = ({
             tempo,
             isMuted
           });
+          
+          // Clear the slow init timer
+          clearTimeout(slowInitTimer);
 
           if (!response.conversation_id) {
             throw new Error('Failed to get conversation ID');

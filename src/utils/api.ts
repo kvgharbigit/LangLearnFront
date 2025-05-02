@@ -30,6 +30,45 @@ const getUserAuthHeaders = async () => {
   }
 };
 
+// Warm up the API connection
+let warmupPromise: Promise<void> | null = null;
+export const preconnectToAPI = async (): Promise<void> => {
+  if (warmupPromise) return warmupPromise;
+  
+  warmupPromise = new Promise<void>(async (resolve) => {
+    try {
+      console.log("🔌 Preconnecting to API server...");
+      
+      // Get network state
+      const networkState = await import('@react-native-community/netinfo')
+        .then(module => module.default.fetch());
+      
+      if (!networkState.isConnected || networkState.isInternetReachable === false) {
+        console.log("⚠️ Network unavailable, skipping API preconnection");
+        resolve();
+        return;
+      }
+      
+      // Send a lightweight request to establish connection
+      const response = await fetch(`${API_URL}/ping`, {
+        method: 'HEAD',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      console.log(`🔌 API preconnection ${response.ok ? 'successful' : 'failed'} (${response.status})`);
+      resolve();
+    } catch (error) {
+      console.log("⚠️ API preconnection error:", error);
+      resolve(); // Resolve anyway to not block the app
+    }
+  });
+  
+  return warmupPromise;
+};
+
 // Update the ChatParams interface to include isMuted and conversationMode
 interface ChatParams {
   message: string;
@@ -878,5 +917,7 @@ export default {
   sendVoiceRecording,
   downloadAudio,
   createConversation,
-  getAudioStreamUrl
+  preconnectToAPI,
+  getAudioStreamUrl,
+  preconnectToAPI
 };

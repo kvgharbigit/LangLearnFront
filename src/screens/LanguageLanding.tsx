@@ -1,5 +1,5 @@
 // src/screens/LanguageLanding.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
+import api from '../utils/api';
 import { Ionicons } from '@expo/vector-icons';
 import LanguageSelector from '../components/LanguageSelector';
 import ConversationModeSelector, { ConversationMode } from '../components/ConversationModeSelector';
@@ -49,9 +50,20 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(20)).current;
 
+  // Reference to track API preconnection status
+  const apiPreconnected = useRef(false);
+  
   // Load saved language preferences when component mounts
   useEffect(() => {
     loadSavedPreferences();
+    
+    // Preconnect to the API in the background to speed up first message
+    if (!apiPreconnected.current) {
+      apiPreconnected.current = true;
+      api.preconnectToAPI().catch(err => {
+        console.log("API preconnection error (non-critical):", err);
+      });
+    }
 
     // Run entrance animation
     Animated.parallel([
@@ -193,7 +205,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <Image
-          source={require('../../assets/transparent_background_mascot_icon.png')}
+          source={require('../../assets/transparent_background_icon.png')}
           style={styles.loadingLogo}
         />
         <ActivityIndicator size="large" color={colors.primary} style={styles.loadingIndicator} />
@@ -243,12 +255,12 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
             <View style={styles.header}>
               <View style={styles.logoContainer}>
                 <Image
-                  source={require('../../assets/transparent_background_mascot_icon.png')}
+                  source={require('../../assets/transparent_background_icon.png')}
                   style={styles.logoImage}
                 />
                 <View>
                   <Text style={styles.title}>Confluency</Text>
-                  <Text style={styles.tagline}>Your Multilingual AI Pal</Text>
+                  <Text style={styles.tagline}>Your Multilingual AI Companion</Text>
                 </View>
               </View>
             </View>
@@ -312,16 +324,16 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
 
 // Enhanced color palette
 const colors = {
-  primary: '#5468FF',
-  primaryGradientStart: '#7B86FF',
-  primaryLight: '#EEF0FF',
-  primaryDark: '#3A46CF',
-  secondary: '#FF6B6B',
-  accent: '#FFD166',
-  success: '#06D6A0',
-  danger: '#FF5252',
-  warning: '#FFC107',
-  info: '#03A9F4',
+  primary: '#2A9D8F',
+  primaryGradientStart: '#40B4A7',
+  primaryLight: '#E8F5F3',
+  primaryDark: '#1E7268',
+  secondary: '#E76F51',
+  accent: '#F4A261',
+  success: '#2A9D8F',
+  danger: '#E76F51',
+  warning: '#F4A261',
+  info: '#4D908E',
   gray50: '#f8f9fa',
   gray100: '#f1f3f5',
   gray200: '#e9ecef',
@@ -333,7 +345,7 @@ const colors = {
   gray800: '#343a40',
   gray900: '#212529',
   white: '#ffffff',
-  background: '#F9FAFF',
+  background: '#F9FAFB',
   cardBackground: '#ffffff',
 };
 
@@ -352,7 +364,7 @@ const styles = StyleSheet.create({
     height: 350,
     borderRadius: 175,
     backgroundColor: colors.primaryLight,
-    opacity: 0.4,
+    opacity: 0.3,
     top: -100,
     right: -100,
   },
@@ -361,8 +373,8 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderRadius: 125,
-    backgroundColor: colors.primaryLight,
-    opacity: 0.3,
+    backgroundColor: colors.accent,
+    opacity: 0.1,
     bottom: -50,
     left: -100,
   },
@@ -408,16 +420,17 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   title: {
-    fontSize: 34,
-    fontWeight: '800',
+    fontSize: 28,
+    fontWeight: '700',
     color: colors.primary,
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    letterSpacing: 0.8,
+    marginBottom: 6,
   },
   tagline: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.gray600,
-    letterSpacing: 0.2,
+    letterSpacing: 1.2,
+    fontWeight: '400',
   },
   card: {
     backgroundColor: colors.cardBackground,
