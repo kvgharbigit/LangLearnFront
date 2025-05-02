@@ -83,7 +83,7 @@ export const getOfferings = async (): Promise<PurchasesPackage[]> => {
           product: {
             identifier: plan.id,
             title: `${plan.name} Plan`,
-            description: `${plan.name} subscription with ${plan.monthlyCredits} credits per month`,
+            description: `${plan.name} subscription with ${plan.monthlyTokens} tokens per month`,
             price: plan.price,
             priceString: `$${plan.price.toFixed(2)}`,
             currencyCode: 'USD',
@@ -169,11 +169,12 @@ export const getCurrentSubscription = async (): Promise<{
     if (isExpoGo()) {
       console.log('Returning mock subscription in Expo Go');
       // Check local storage for any mock subscription set during testing
-      // For simplicity, we'll just return the free tier here
+      // In Expo Go, return a premium tier for development testing
+      console.log('Returning mock premium subscription in Expo Go');
       return {
-        tier: 'free',
-        expirationDate: null,
-        isActive: false
+        tier: 'premium',
+        expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        isActive: true
       };
     }
 

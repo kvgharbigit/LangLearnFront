@@ -6,7 +6,10 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { useAuth } from './src/contexts/AuthContext';
 import { LanguageProvider } from './src/contexts/LanguageContext';
+import { NetworkProvider } from './src/contexts/NetworkContext';
 import { configureGoogleSignIn } from './src/services/compatGoogleAuthService';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import NetworkStatusBar from './src/components/NetworkStatusBar';
 
 // Import auth screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -96,6 +99,10 @@ const RootNavigator = () => {
 
   return (
     <NavigationContainer>
+      {/* Always show network status */}
+      <NetworkStatusBar />
+      
+      {/* Main navigation based on authentication state */}
       {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
@@ -109,13 +116,17 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <AuthProvider>
-        <LanguageProvider>
-          <RootNavigator />
-        </LanguageProvider>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <NetworkProvider>
+        <SafeAreaProvider>
+          <StatusBar style="dark" />
+          <AuthProvider>
+            <LanguageProvider>
+              <RootNavigator />
+            </LanguageProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </NetworkProvider>
+    </ErrorBoundary>
   );
 }

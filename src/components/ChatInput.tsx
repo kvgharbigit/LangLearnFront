@@ -1,6 +1,6 @@
 // src/components/ChatInput.tsx
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -27,6 +27,39 @@ const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLangu
   const [message, setMessage] = useState<string>('');
   const [showSpecialChars, setShowSpecialChars] = useState<boolean>(false);
   const inputRef = useRef<TextInput>(null);
+  const lastKeyPressTime = useRef<number>(0);
+  const shiftKeyPressed = useRef<boolean>(false);
+  
+  // Force-clear input field on submit
+  const clearInputField = () => {
+    // Clear React state
+    setMessage('');
+    
+    // Directly manipulate the native component if possible
+    if (inputRef.current) {
+      // Using various methods to ensure clearing works across platforms
+      inputRef.current.clear?.();
+      inputRef.current.setNativeProps?.({ text: '' });
+      
+      // For Android/iOS specific issues
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.clear?.();
+          // Another attempt with a delay
+          inputRef.current.setNativeProps?.({ text: '' });
+        }
+      }, 50);
+    }
+  };
+  
+  // This effect ensures the input field is properly cleared when needed
+  useEffect(() => {
+    if (message === '' && inputRef.current) {
+      // Double check that the input is really cleared
+      inputRef.current.clear?.();
+      inputRef.current.setNativeProps?.({ text: '' });
+    }
+  }, [message]);
 
   const handleSubmit = () => {
     // Check if audio is playing - show alert if it is
@@ -46,14 +79,65 @@ const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLangu
       return;
     }
 
-    onSubmit(message);
-    setMessage('');
+    // Store the message in a local variable
+    const messageToSubmit = message;
+    
+    // Clear the input field immediately and thoroughly
+    clearInputField();
+
+    // Then submit the message
+    onSubmit(messageToSubmit);
+    
     // Blur the input to hide keyboard on iOS
     if (Platform.OS === 'ios') {
       inputRef.current?.blur();
     } else {
       // On Android, dismiss the keyboard
       Keyboard.dismiss();
+    }
+  };
+  
+  // Enhanced text change handler to detect Enter key press
+  const handleTextChange = (text: string) => {
+    // Detect if Enter was just pressed (message ends with newline)
+    const endsWithNewline = 
+      text.endsWith('\n') && 
+      !message.endsWith('\n') &&
+      text.length === message.length + 1;
+      
+    // Check if it's a very recent keystroke to prevent duplicate submits
+    const now = Date.now();
+    const isRecentKeystroke = now - lastKeyPressTime.current < 300;
+    lastKeyPressTime.current = now;
+    
+    if (endsWithNewline && !isRecentKeystroke && !shiftKeyPressed.current) {
+      // Remove the newline character
+      const textWithoutNewline = text.slice(0, -1);
+      
+      // If valid message, submit it and clear immediately
+      if (textWithoutNewline.trim() && !disabled && !isPlaying) {
+        console.log('Enter key detected, clearing input and submitting message');
+        
+        // Store message to submit
+        const messageToSend = textWithoutNewline;
+        
+        // Clear the input field immediately
+        setMessage('');
+        
+        // Process the message
+        requestAnimationFrame(() => {
+          onSubmit(messageToSend);
+        });
+        
+        // Return early to prevent further processing
+        return;
+      } else {
+        // Set the message without the newline if not submitting
+        setMessage(textWithoutNewline);
+      }
+    } else {
+      // Normal text change
+      setMessage(text);
     }
   };
 
@@ -106,13 +190,68 @@ const ChatInput: React.FC<Props> = ({ onSubmit, disabled, isPlaying, targetLangu
           ref={inputRef}
           style={[styles.input, !hasSpecialChars && styles.inputWithoutCharButton]}
           value={message}
-          onChangeText={setMessage}
+          onChangeText={handleTextChange}
           placeholder={getPlaceholderText()}
           placeholderTextColor={colors.gray500}
           returnKeyType="send"
-          onSubmitEditing={handleSubmit}
+          onSubmitEditing={() => {
+            console.log('onSubmitEditing triggered');
+            if (message.trim() && !disabled && !isPlaying) {
+              const messageToSend = message.trim();
+              // Clear the input immediately and thoroughly
+              clearInputField();
+              // Submit the message
+              requestAnimationFrame(() => {
+                onSubmit(messageToSend);
+              });
+            }
+          }}
           editable={!disabled} // User can still type when audio is playing, but can't when processing
           multiline
+          blurOnSubmit={false}
+          // Track key down events for shift key detection
+          onKeyDown={(e) => {
+            if (e.nativeEvent.key === 'Shift') {
+              shiftKeyPressed.current = true;
+            }
+          }}
+          // Track key up events to detect when shift is released
+          onKeyUp={(e) => {
+            if (e.nativeEvent.key === 'Shift') {
+              shiftKeyPressed.current = false;
+            }
+          }}
+          // This handler for all environments
+          onKeyPress={(e) => {
+            // Check for Enter key
+            if (e.nativeEvent.key === 'Enter') {
+              console.log('Enter key pressed in onKeyPress');
+              
+              // Check if shift key is pressed (for new line)
+              const isShiftPressed = e.nativeEvent.shiftKey || shiftKeyPressed.current;
+              
+              // If not pressing shift and not disabled/playing, submit
+              if (!isShiftPressed && !disabled && !isPlaying && message.trim()) {
+                console.log('Processing Enter key submission');
+                
+                // Prevent default behavior
+                e.preventDefault?.(); // Prevent default behavior if supported
+                
+                // Store message to submit
+                const textToSubmit = message.trim();
+                
+                // Clear input immediately and thoroughly
+                requestAnimationFrame(() => {
+                  clearInputField();
+                });
+                
+                // Submit the stored message with slight delay
+                setTimeout(() => {
+                  onSubmit(textToSubmit);
+                }, 20);
+              }
+            }
+          }}
         />
         <TouchableOpacity
           style={[

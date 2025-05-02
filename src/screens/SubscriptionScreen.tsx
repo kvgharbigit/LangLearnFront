@@ -7,26 +7,30 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Platform
+  Platform,
+  Animated,
+  Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+// Remove expo-linear-gradient dependency as it's not installed
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
 import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '../types/subscription';
-import { MonthlyUsage } from '../types/usage';
+import { MonthlyUsage, creditsToTokens } from '../types/usage';
 import { 
   getCurrentSubscription, 
   getOfferings, 
   purchasePackage,
   restorePurchases
 } from '../services/revenueCatService';
-import { getUserUsage } from '../services/usageService';
+import { getUserUsage, getUserUsageInTokens } from '../services/usageService';
 import { isExpoGo, getStoreText } from '../utils/deviceInfo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
+const { width } = Dimensions.get('window');
 
 const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -34,10 +38,29 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const [currentTier, setCurrentTier] = useState<string>('free');
   const [expirationDate, setExpirationDate] = useState<Date | null>(null);
   const [usage, setUsage] = useState<MonthlyUsage | null>(null);
+  const [tokenUsage, setTokenUsage] = useState<{usedTokens: number, tokenLimit: number, percentageUsed: number} | null>(null);
   const [packages, setPackages] = useState<any[]>([]);
+  
+  // Animation values
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const translateY = React.useRef(new Animated.Value(15)).current;
 
   useEffect(() => {
     loadData();
+    
+    // Start animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      })
+    ]).start();
   }, []);
 
   const loadData = async () => {
@@ -52,6 +75,10 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       // Load usage data
       const usageData = await getUserUsage();
       setUsage(usageData);
+      
+      // Load token usage data
+      const tokenData = await getUserUsageInTokens();
+      setTokenUsage(tokenData);
       
       // Load available packages
       const offerings = await getOfferings();
@@ -164,33 +191,54 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const renderUsageProgress = () => {
-    if (!usage) return null;
+    if (!usage || !tokenUsage) return null;
     
-    const { percentageUsed } = usage;
-    const progressWidth = `${percentageUsed}%`;
+    const { percentageUsed } = tokenUsage;
+    const progressWidth = `${Math.min(percentageUsed, 100)}%`;
     
     let progressColor = colors.primary;
+    
     if (percentageUsed > 90) {
       progressColor = colors.danger;
     } else if (percentageUsed > 70) {
-      progressColor = '#FFB300'; // amber/warning color
+      progressColor = '#FFC107';
     }
     
     return (
       <View style={styles.usageContainer}>
         <View style={styles.usageHeader}>
-          <Text style={styles.usageTitle}>Confluency Credits Usage</Text>
-          <Text style={styles.usagePercentage}>{Math.round(percentageUsed)}%</Text>
+          <View style={styles.usageTitleContainer}>
+            <Ionicons name="analytics-outline" size={20} color={colors.primary} style={styles.usageIcon} />
+            <Text style={styles.usageTitle}>Token Usage</Text>
+          </View>
+          <View style={styles.usagePercentageContainer}>
+            <Text style={[
+              styles.usagePercentage, 
+              percentageUsed > 90 ? {color: colors.danger} : 
+              percentageUsed > 70 ? {color: '#FFB300'} : 
+              {color: colors.primary}
+            ]}>
+              {Math.round(percentageUsed)}%
+            </Text>
+          </View>
         </View>
         
         <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarBackground} />
           <View
             style={[
               styles.progressBar,
-              { width: progressWidth, backgroundColor: progressColor }
+              { 
+                width: progressWidth,
+                backgroundColor: progressColor
+              }
             ]}
           />
         </View>
+        
+        <Text style={styles.tokenCount}>
+          {Math.round(tokenUsage.usedTokens)} of {tokenUsage.tokenLimit} tokens used
+        </Text>
         
         <Text style={styles.usageNote}>
           Resets on {formatDate(new Date(usage.currentPeriodEnd))}
@@ -230,7 +278,9 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.planFeatures}>
             {plan.features.map((feature, index) => (
               <View key={index} style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.primary} style={styles.featureIcon} />
+                <View style={styles.checkmarkContainer}>
+                  <Ionicons name="checkmark" size={16} color="white" />
+                </View>
                 <Text style={styles.featureText}>{feature}</Text>
               </View>
             ))}
@@ -244,6 +294,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             ]}
             onPress={() => handlePurchase(plan)}
             disabled={isCurrentPlan || purchasing}
+            accessibilityLabel={isCurrentPlan ? "Current Plan" : `Upgrade to ${plan.name}`}
           >
             {purchasing ? (
               <ActivityIndicator size="small" color="white" />
@@ -266,11 +317,12 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Confluency Credits</Text>
-        <View style={styles.backButton} />
+        <Text style={styles.headerTitle}>Conversation Tokens</Text>
+        <View style={styles.placeholderButton} />
       </View>
       
       {loading ? (
@@ -279,77 +331,105 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.loaderText}>Loading subscription details...</Text>
         </View>
       ) : (
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-          {/* Current Plan Summary */}
-          <View style={styles.currentPlanSection}>
-            <Text style={styles.sectionTitle}>Current Plan</Text>
-            <View style={styles.currentPlanInfo}>
-              <Text style={styles.currentPlanName}>
-                {SUBSCRIPTION_PLANS.find(p => p.tier === currentTier)?.name || 'Free'}
-              </Text>
-              {expirationDate && (
-                <Text style={styles.expirationText}>
-                  Expires: {formatDate(expirationDate)}
-                </Text>
-              )}
-            </View>
-          </View>
-          
-          {/* Usage Progress */}
-          {renderUsageProgress()}
-          
-          {/* Available Plans */}
-          <View style={styles.plansSection}>
-            <Text style={styles.sectionTitle}>Available Plans</Text>
-            <View style={styles.plansContainer}>
-              {renderSubscriptionPlans()}
-            </View>
-          </View>
-          
-          {/* Restore Purchases Button */}
-          <TouchableOpacity
-            style={styles.restoreButton}
-            onPress={async () => {
-              try {
-                setLoading(true);
-                await restorePurchases(); // Call the actual restore function
-                await loadData();
-                Alert.alert('Success', 'Your purchases have been successfully restored!');
-              } catch (error) {
-                console.error('Error restoring purchases:', error);
-                Alert.alert('Error', 'Failed to restore purchases. Please try again.');
-              } finally {
-                setLoading(false);
-              }
-            }}
-            disabled={loading || purchasing}
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View
+            style={[
+              { opacity: fadeAnim, transform: [{ translateY }] }
+            ]}
           >
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+            {/* Current Plan Summary */}
+            <View style={styles.currentPlanSection}>
+              <View style={styles.currentPlanHeader}>
+                <Ionicons name="card-outline" size={22} color={colors.primary} style={styles.sectionIcon} />
+                <Text style={styles.sectionTitle}>Current Plan</Text>
+              </View>
+              <View style={styles.currentPlanInfo}>
+                <View style={styles.currentPlanDetails}>
+                  <Text style={styles.currentPlanName}>
+                    {SUBSCRIPTION_PLANS.find(p => p.tier === currentTier)?.name || 'Free'}
+                  </Text>
+                  {expirationDate && (
+                    <Text style={styles.expirationText}>
+                      Expires: {formatDate(expirationDate)}
+                    </Text>
+                  )}
+                </View>
+                {currentTier !== 'free' && (
+                  <View style={styles.currentPlanBadge}>
+                    <Text style={styles.currentPlanBadgeText}>ACTIVE</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            
+            {/* Usage Progress */}
+            {renderUsageProgress()}
+            
+            {/* Available Plans */}
+            <View style={styles.plansSection}>
+              <View style={styles.sectionHeaderContainer}>
+                <Ionicons name="pricetags-outline" size={22} color={colors.primary} style={styles.sectionIcon} />
+                <Text style={styles.sectionTitle}>Available Plans</Text>
+              </View>
+              
+              <View style={styles.plansContainer}>
+                {renderSubscriptionPlans()}
+              </View>
+            </View>
+            
+            {/* Restore Purchases Button */}
+            <TouchableOpacity
+              style={styles.restoreButton}
+              onPress={async () => {
+                try {
+                  setLoading(true);
+                  await restorePurchases(); // Call the actual restore function
+                  await loadData();
+                  Alert.alert('Success', 'Your purchases have been successfully restored!');
+                } catch (error) {
+                  console.error('Error restoring purchases:', error);
+                  Alert.alert('Error', 'Failed to restore purchases. Please try again.');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading || purchasing}
+              accessibilityLabel="Restore Purchases"
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <>
+                  <Ionicons name="refresh" size={18} color={colors.primary} style={styles.restoreIcon} />
+                  <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            
+            {/* Subscription Info */}
+            {/* Display notice for Expo Go (development mode) */}
+            {isExpoGo() && (
+              <View style={styles.expoGoNotice}>
+                <Ionicons name="information-circle" size={22} color="#F59E0B" style={{ marginRight: 8 }} />
+                <Text style={styles.expoGoText}>
+                  Running in development mode. Purchases are simulated and not charged.
+                </Text>
+              </View>
             )}
-          </TouchableOpacity>
-          
-          {/* Subscription Info */}
-          {/* Display notice for Expo Go (development mode) */}
-          {isExpoGo() && (
-            <View style={styles.expoGoNotice}>
-              <Ionicons name="information-circle" size={22} color="#F59E0B" style={{ marginRight: 8 }} />
-              <Text style={styles.expoGoText}>
-                Running in development mode. Purchases are simulated and not charged.
+
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoText}>
+                Subscriptions will automatically renew unless auto-renew is turned off at least 24 hours before the end of the current period.
+              </Text>
+              <Text style={styles.infoText}>
+                You can manage your subscriptions in your {getStoreText()} account settings after purchase.
               </Text>
             </View>
-          )}
-
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoText}>
-              Subscriptions will automatically renew unless auto-renew is turned off at least 24 hours before the end of the current period.
-            </Text>
-            <Text style={styles.infoText}>
-              You can manage your subscriptions in your {getStoreText()} account settings after purchase.
-            </Text>
-          </View>
+          </Animated.View>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -359,24 +439,35 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F8F9FE',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    zIndex: 10,
   },
   backButton: {
+    padding: 8,
+    width: 40,
+  },
+  placeholderButton: {
     width: 40,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.gray800,
+    flex: 1,
+    textAlign: 'center',
   },
   loaderContainer: {
     flex: 1,
@@ -393,41 +484,58 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     paddingBottom: 32,
   },
   currentPlanSection: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  currentPlanHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionIcon: {
+    marginRight: 10,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.gray800,
-    marginBottom: 12,
   },
   currentPlanInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  currentPlanDetails: {
+    flex: 1,
+  },
   currentPlanName: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 17,
+    fontWeight: '600',
     color: colors.primary,
+    marginBottom: 4,
+  },
+  currentPlanBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  currentPlanBadgeText: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: '700',
   },
   expirationText: {
     fontSize: 14,
@@ -435,75 +543,98 @@ const styles = StyleSheet.create({
   },
   usageContainer: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   usageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  usageTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  usageIcon: {
+    marginRight: 8,
   },
   usageTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: colors.gray800,
   },
+  usagePercentageContainer: {
+    backgroundColor: 'rgba(84, 104, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
   usagePercentage: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: colors.primary,
   },
   progressBarContainer: {
-    height: 8,
-    backgroundColor: colors.gray200,
-    borderRadius: 4,
+    height: 10,
+    borderRadius: 5,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 12,
+    backgroundColor: '#E9ECEF',
+    position: 'relative',
+  },
+  progressBarBackground: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#E9ECEF',
+    borderRadius: 5,
   },
   progressBar: {
     height: '100%',
     backgroundColor: colors.primary,
+    borderRadius: 5,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
   },
   usageNote: {
-    fontSize: 12,
+    fontSize: 13,
     color: colors.gray600,
-    marginTop: 4,
   },
   plansSection: {
     marginBottom: 16,
+  },
+  sectionHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingLeft: 4,
   },
   plansContainer: {
     marginBottom: 16,
   },
   planCard: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
   },
   currentPlanCard: {
     borderWidth: 2,
@@ -514,54 +645,61 @@ const styles = StyleSheet.create({
     top: 0,
     right: 0,
     backgroundColor: colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderTopRightRadius: 12,
-    borderBottomLeftRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 12,
   },
   popularText: {
     color: 'white',
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   planHeader: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   planName: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: colors.gray800,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   planPrice: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: colors.primary,
+    marginBottom: 4,
   },
   monthlyCredit: {
     fontSize: 14,
     fontWeight: '400',
     color: colors.gray600,
-    marginTop: 4,
   },
   planFeatures: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  featureIcon: {
-    marginRight: 8,
+  checkmarkContainer: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
   featureText: {
     fontSize: 14,
     color: colors.gray700,
+    flex: 1,
   },
   planButton: {
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -581,21 +719,28 @@ const styles = StyleSheet.create({
   },
   restoreButton: {
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  restoreIcon: {
+    marginRight: 8,
   },
   restoreButtonText: {
     fontSize: 16,
     color: colors.primary,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   infoContainer: {
     padding: 16,
-    backgroundColor: colors.gray100,
-    borderRadius: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
   },
   infoText: {
-    fontSize: 12,
+    fontSize: 13,
     color: colors.gray600,
     marginBottom: 8,
   },
@@ -603,7 +748,7 @@ const styles = StyleSheet.create({
     marginVertical: 16,
     padding: 12,
     backgroundColor: '#FEF3C7', // Amber/yellow light background
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#F59E0B', // Amber/yellow border
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 // src/screens/ProfileScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,10 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform,
+  Animated,
+  Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -21,11 +24,33 @@ import colors from '../styles/colors';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileMain'>;
 
+const { width } = Dimensions.get('window');
+
 const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
   const { appLanguage, translate, getLanguageName } = useLanguage();
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  
+  // Animation values
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const translateY = React.useRef(new Animated.Value(15)).current;
+  
+  useEffect(() => {
+    // Run entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, []);
 
   const handleLogout = async () => {
     Alert.alert(
@@ -59,20 +84,46 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   // Format email for display (truncate if too long)
   const formatEmail = (email: string | null | undefined): string => {
     if (!email) return '';
-    if (email.length > 25) {
-      return email.substring(0, 22) + '...';
+    if (email.length > 28) {
+      return email.substring(0, 25) + '...';
     }
     return email;
+  };
+
+  // Helper function to generate a gradient color based on the first letter of name
+  const getAvatarColor = (name: string | null | undefined): string => {
+    if (!name || name.length === 0) return colors.primary;
+    
+    const letter = name.charAt(0).toLowerCase();
+    const position = letter.charCodeAt(0) - 97; // a is 0, b is 1, etc.
+    
+    const gradientColors = [
+      '#5468FF', // primary blue
+      '#FF6B6B', // red
+      '#06D6A0', // green
+      '#FFD166', // yellow
+      '#9C27B0', // purple
+      '#3F51B5', // indigo
+      '#2196F3', // blue
+      '#00BCD4', // cyan
+      '#009688', // teal
+      '#4CAF50'  // green
+    ];
+    
+    const index = Math.abs(position) % gradientColors.length;
+    return gradientColors[index];
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
@@ -80,110 +131,155 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.placeholderButton} />
       </View>
 
-      <ScrollView style={styles.scrollView}>
-        {/* User Info Section */}
-        <View style={styles.userSection}>
-          <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
-              {user?.displayName ? user.displayName.charAt(0).toUpperCase() : '?'}
-            </Text>
-          </View>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <Animated.View
+          style={[
+            { opacity: fadeAnim, transform: [{ translateY }] }
+          ]}
+        >
+          {/* User Info Section */}
+          <View style={styles.profileCard}>
+            <View style={styles.userSection}>
+              <View 
+                style={[
+                  styles.avatarContainer, 
+                  { backgroundColor: getAvatarColor(user?.displayName) }
+                ]}
+              >
+                <Text style={styles.avatarText}>
+                  {user?.displayName ? user.displayName.charAt(0).toUpperCase() : '?'}
+                </Text>
+              </View>
 
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.displayName || 'User'}</Text>
-            <Text style={styles.userEmail}>{formatEmail(user?.email)}</Text>
-          </View>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{user?.displayName || 'User'}</Text>
+                <Text style={styles.userEmail}>{formatEmail(user?.email)}</Text>
+              </View>
 
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => navigation.navigate('EditProfile')}
-          >
-            <Ionicons name="pencil" size={20} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Subscription Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{translate('profile.section.subscription')}</Text>
-          </View>
-
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => {
-              // Ensure correct navigation to nested screen
-              navigation.navigate('Subscription');
-            }}
-          >
-            <View style={styles.menuItemContent}>
-              <Ionicons name="star" size={22} color="#FFB300" style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>{translate('profile.manage.subscription')}</Text>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => navigation.navigate('EditProfile')}
+                accessibilityLabel="Edit profile"
+              >
+                <Ionicons name="pencil" size={20} color="white" />
+              </TouchableOpacity>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Preferences Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{translate('profile.section.preferences')}</Text>
           </View>
 
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('AppLanguage')}
-          >
-            <View style={styles.menuItemContent}>
-              <Ionicons name="language" size={22} color="#4CAF50" style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>{translate('profile.app.language')}</Text>
+          {/* Subscription Section */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="star" size={22} color={colors.primary} style={styles.sectionIcon} />
+              <Text style={styles.sectionTitle}>{translate('profile.section.subscription')}</Text>
             </View>
-            <View style={styles.menuItemRight}>
-              <Text style={styles.menuItemValue}>{getLanguageName(appLanguage)}</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-            </View>
-          </TouchableOpacity>
-        </View>
 
-        {/* Support Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{translate('profile.section.support')}</Text>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('Subscription')}
+              accessibilityLabel="Manage subscription"
+            >
+              <View style={styles.menuItemContent}>
+                <Ionicons name="card-outline" size={20} color="#FFB300" style={styles.menuIcon} />
+                <Text style={styles.menuItemTitle}>{translate('profile.manage.subscription')}</Text>
+              </View>
+              <View style={styles.chevronContainer}>
+                <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+              </View>
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemContent}>
-              <Ionicons name="mail" size={22} color="#2196F3" style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>{translate('profile.contact.support')}</Text>
+          {/* Preferences Section */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="settings-outline" size={22} color={colors.primary} style={styles.sectionIcon} />
+              <Text style={styles.sectionTitle}>{translate('profile.section.preferences')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-          </TouchableOpacity>
-        </View>
 
-        {/* Account Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{translate('profile.section.account')}</Text>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('AppLanguage')}
+              accessibilityLabel="App language settings"
+            >
+              <View style={styles.menuItemContent}>
+                <Ionicons name="language" size={20} color="#4CAF50" style={styles.menuIcon} />
+                <Text style={styles.menuItemTitle}>{translate('profile.app.language')}</Text>
+              </View>
+              <View style={styles.menuItemRight}>
+                <Text style={styles.menuItemValue}>{getLanguageName(appLanguage)}</Text>
+                <View style={styles.chevronContainer}>
+                  <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+                </View>
+              </View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('AudioTest')}
+              accessibilityLabel="Audio test"
+            >
+              <View style={styles.menuItemContent}>
+                <Ionicons name="mic-outline" size={20} color="#2196F3" style={styles.menuIcon} />
+                <Text style={styles.menuItemTitle}>Audio Test</Text>
+              </View>
+              <View style={styles.chevronContainer}>
+                <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+              </View>
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={[styles.menuItem, styles.logoutMenuItem]}
-            onPress={handleLogout}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color={colors.danger} />
-            ) : (
-              <>
-                <Ionicons name="log-out" size={22} color={colors.danger} style={styles.menuIcon} />
-                <Text style={[styles.menuItemTitle, styles.logoutText]}>{translate('profile.logout')}</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+          {/* Support Section */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="help-circle-outline" size={22} color={colors.primary} style={styles.sectionIcon} />
+              <Text style={styles.sectionTitle}>{translate('profile.section.support')}</Text>
+            </View>
 
-        <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Version 1.0.0</Text>
-        </View>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              accessibilityLabel="Contact support"
+            >
+              <View style={styles.menuItemContent}>
+                <Ionicons name="mail-outline" size={20} color="#2196F3" style={styles.menuIcon} />
+                <Text style={styles.menuItemTitle}>{translate('profile.contact.support')}</Text>
+              </View>
+              <View style={styles.chevronContainer}>
+                <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Account Section */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="person-outline" size={22} color={colors.primary} style={styles.sectionIcon} />
+              <Text style={styles.sectionTitle}>{translate('profile.section.account')}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.menuItem, styles.logoutMenuItem]}
+              onPress={handleLogout}
+              disabled={isLoading}
+              accessibilityLabel="Log out"
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color={colors.danger} />
+              ) : (
+                <>
+                  <Ionicons name="log-out-outline" size={20} color={colors.danger} style={styles.menuIcon} />
+                  <Text style={[styles.menuItemTitle, styles.logoutText]}>{translate('profile.logout')}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.versionContainer}>
+            <Text style={styles.versionText}>Version 1.0.0</Text>
+          </View>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -192,26 +288,32 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F8F9FE',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    zIndex: 10,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.gray800,
     flex: 1,
     textAlign: 'center',
   },
   backButton: {
     padding: 8,
+    borderRadius: 8,
     width: 40,
   },
   placeholderButton: {
@@ -221,25 +323,45 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 40,
+  },
+  profileCard: {
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   userSection: {
-    backgroundColor: 'white',
-    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
   },
   avatarContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   avatarText: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: 'white',
   },
@@ -247,47 +369,58 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.gray800,
-    marginBottom: 4,
+    fontSize: 22,
+    fontWeight: '700',
+    color: 'white',
+    marginBottom: 6,
   },
   userEmail: {
     fontSize: 14,
-    color: colors.gray600,
-    marginBottom: 8,
+    color: 'rgba(255, 255, 255, 0.9)',
   },
   editButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  section: {
-    backgroundColor: 'white',
-    marginTop: 16,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.gray200,
+  sectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    overflow: 'hidden',
   },
   sectionHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  sectionIcon: {
+    marginRight: 10,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: colors.gray700,
+    color: colors.gray800,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
-  },
-  subMenuItem: {
-    paddingLeft: 50,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   menuItemContent: {
     flexDirection: 'row',
@@ -298,10 +431,6 @@ const styles = StyleSheet.create({
     marginRight: 16,
     width: 24,
     textAlign: 'center',
-  },
-  menuIconPlaceholder: {
-    width: 24,
-    marginRight: 16,
   },
   menuItemTitle: {
     fontSize: 16,
@@ -316,6 +445,11 @@ const styles = StyleSheet.create({
     color: colors.gray600,
     marginRight: 8,
   },
+  chevronContainer: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   logoutMenuItem: {
     borderBottomWidth: 0,
     justifyContent: 'flex-start',
@@ -324,11 +458,11 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
   versionContainer: {
-    padding: 16,
+    marginTop: 8,
     alignItems: 'center',
   },
   versionText: {
-    fontSize: 12,
+    fontSize: 13,
     color: colors.gray500,
   },
 });

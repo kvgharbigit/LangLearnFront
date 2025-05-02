@@ -18,6 +18,7 @@ const PREFERENCE_KEYS = {
   DIFFICULTY_LEVEL: 'pref_difficulty_level',
   // Session preferences
   LAST_LEARNING_OBJECTIVE: 'pref_last_learning_objective',
+  CONVERSATION_MODE: 'pref_conversation_mode',
 };
 
 /**

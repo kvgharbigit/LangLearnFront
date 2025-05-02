@@ -132,6 +132,16 @@ export const getCurrentUser = (): User | null => {
   return auth.currentUser;
 };
 
+// Get ID token for the current user
+export const getIdToken = async (user: User, forceRefresh: boolean = false): Promise<string> => {
+  try {
+    return await user.getIdToken(forceRefresh);
+  } catch (error) {
+    console.error('Error getting ID token:', error);
+    throw error;
+  }
+};
+
 // Auth state observer
 export const subscribeToAuthChanges = (callback: NextOrObserver<User>): Unsubscribe => {
   return onAuthStateChanged(auth, callback);

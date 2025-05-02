@@ -21,9 +21,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import LanguageSelector from '../components/LanguageSelector';
 import ConversationModeSelector, { ConversationMode } from '../components/ConversationModeSelector';
-import { DIFFICULTY_LEVELS } from '../constants/languages';
+import DifficultyLevelSelector from '../components/DifficultyLevelSelector';
+import { DIFFICULTY_LEVELS, DifficultyLevel } from '../constants/languages';
 import { getLanguagePreferences, saveLanguagePreferences } from '../utils/languageStorage';
 import { getLanguageInfo } from '../constants/languages';
+import userPreferences from '../utils/userPreferences';
 
 // Get screen dimensions for responsive design
 const { width, height } = Dimensions.get('window');
@@ -37,8 +39,8 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   // State
   const [nativeLanguage, setNativeLanguage] = useState<string>('en');
   const [targetLanguage, setTargetLanguage] = useState<string>('');
-  const [difficulty, setDifficulty] = useState<string>('beginner');
-  const [conversationMode, setConversationMode] = useState<ConversationMode>('language_lesson');
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>('beginner');
+  const [conversationMode, setConversationMode] = useState<ConversationMode>('free_conversation');
   const [learningObjective, setLearningObjective] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -70,6 +72,8 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   const loadSavedPreferences = async () => {
     try {
       setIsLoading(true);
+      
+      // Load language preferences
       const { targetLanguage: savedTarget, nativeLanguage: savedNative } = await getLanguagePreferences();
 
       if (savedNative) {
@@ -79,8 +83,23 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
       if (savedTarget) {
         setTargetLanguage(savedTarget.code);
       }
+      
+      // Load difficulty level and learning objective
+      const learningPrefs = await userPreferences.getLearningPreferences();
+      if (learningPrefs.difficultyLevel) {
+        setDifficulty(learningPrefs.difficultyLevel as DifficultyLevel);
+      }
+      
+      if (learningPrefs.lastLearningObjective) {
+        setLearningObjective(learningPrefs.lastLearningObjective);
+      }
+      
+      // Load saved conversation mode
+      const savedMode = await userPreferences.getSingleSetting('CONVERSATION_MODE', 'free_conversation');
+      setConversationMode(savedMode as ConversationMode);
+      
     } catch (error) {
-      console.error('Error loading saved language preferences:', error);
+      console.error('Error loading saved preferences:', error);
     } finally {
       setIsLoading(false);
     }
@@ -150,7 +169,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   // Handle start learning button press
   const handleStartLearning = (): void => {
     // Basic validation
-    if (!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage) {
+    if (!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage || isSaving) {
       return;
     }
 
@@ -229,17 +248,12 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
                 />
                 <View>
                   <Text style={styles.title}>Confluency</Text>
-                  <Text style={styles.tagline}>AI-powered language learning</Text>
+                  <Text style={styles.tagline}>Your Multilingual AI Pal</Text>
                 </View>
               </View>
             </View>
 
             <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Conversation Settings</Text>
-                <View style={styles.cardDivider} />
-              </View>
-
               {/* Native Language Selection - Using LanguageSelector */}
               <LanguageSelector
                 title="I speak:"
@@ -255,40 +269,11 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
                 excludeLanguage={nativeLanguage} // Don't show the native language
               />
 
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>My level:</Text>
-                <View style={styles.difficultyContainer}>
-                  {DIFFICULTY_LEVELS.map(level => (
-                    <TouchableOpacity
-                      key={level.level}
-                      style={[
-                        styles.difficultyOption,
-                        difficulty === level.level && styles.selectedDifficulty
-                      ]}
-                      onPress={() => setDifficulty(level.level)}
-                      accessibilityLabel={level.label}
-                      accessibilityHint={`Set your proficiency level to ${level.label}`}
-                    >
-                      <View style={[
-                        styles.difficultyIconContainer,
-                        difficulty === level.level && styles.selectedDifficultyIcon
-                      ]}>
-                        <Text style={styles.difficultyIcon}>{level.icon}</Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.difficultyText,
-                          difficulty === level.level && styles.selectedDifficultyText
-                        ]}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {level.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+              {/* Difficulty Level Selector - Using DifficultyLevelSelector */}
+              <DifficultyLevelSelector
+                selectedLevel={difficulty}
+                onSelectLevel={setDifficulty}
+              />
 
               {/* Conversation Mode Selector */}
               <ConversationModeSelector
@@ -296,6 +281,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
                 onSelectMode={handleConversationModeSelect}
                 promptText={learningObjective}
                 onChangePromptText={setLearningObjective}
+                onPromptSubmit={handleStartLearning}
               />
 
               <TouchableOpacity
@@ -470,61 +456,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontWeight: '600',
     letterSpacing: 0.2,
-  },
-  difficultyContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  difficultyOption: {
-    backgroundColor: colors.white,
-    borderWidth: 2,
-    borderColor: colors.gray200,
-    borderRadius: 16,
-    padding: 12,
-    alignItems: 'center',
-    width: '32%', // Slightly increased from 31%
-    shadowColor: colors.gray400,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  selectedDifficulty: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  difficultyIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    shadowColor: colors.gray300,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  selectedDifficultyIcon: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  difficultyIcon: {
-    fontSize: 22,
-  },
-  difficultyText: {
-    fontWeight: '600',
-    color: colors.gray700,
-    textAlign: 'center',
-    fontSize: 13, // Reduced from 14 to better fit
-    flexWrap: 'nowrap', // Prevent text from wrapping
-  },
-  selectedDifficultyText: {
-    color: colors.primary,
-    fontWeight: '700',
   },
   startButton: {
     backgroundColor: colors.primary,

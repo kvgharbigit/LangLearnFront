@@ -44,10 +44,10 @@ const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({ visible, onClos
                 <Ionicons name="alert-circle" size={60} color={colors.primary} />
               </View>
               
-              <Text style={styles.title}>Credit Limit Reached</Text>
+              <Text style={styles.title}>Token Limit Reached</Text>
               
               <Text style={styles.message}>
-                You've reached your monthly credit limit for language learning.
+                You've reached your monthly token limit for language learning.
                 Upgrade your subscription to continue learning without limits.
               </Text>
               

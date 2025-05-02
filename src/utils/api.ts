@@ -3,6 +3,9 @@ import * as FileSystem from 'expo-file-system';
 import { ConversationMode } from '../components/ConversationModeSelector';
 import usageService from '../services/usageService';
 import { getCurrentUser, getIdToken } from '../services/authService';
+import { fetchWithRetry, classifyApiError, parseErrorResponse } from './apiHelpers';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import offlineAssets from './offlineAssets';
 
 // Update this to your actual API URL
 const API_URL = 'https://language-tutor-984417336702.asia-east1.run.app';
@@ -53,6 +56,99 @@ interface VoiceParams {
   conversationMode?: ConversationMode;
 }
 
+// Key for the offline message queue
+const OFFLINE_MESSAGE_QUEUE_KEY = '@confluency:offline_message_queue';
+
+// Interface for queued messages
+interface QueuedMessage {
+  id: string;
+  type: 'text' | 'voice';
+  params: any;
+  timestamp: number;
+  attempts: number;
+}
+
+/**
+ * Queue a message for sending when back online
+ */
+export const queueOfflineMessage = async (
+  type: 'text' | 'voice',
+  params: any
+): Promise<string> => {
+  try {
+    // Generate a unique ID for this message
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create the queued message object
+    const queuedMessage: QueuedMessage = {
+      id: messageId,
+      type,
+      params,
+      timestamp: Date.now(),
+      attempts: 0
+    };
+    
+    // Get existing queue
+    const queueString = await AsyncStorage.getItem(OFFLINE_MESSAGE_QUEUE_KEY);
+    const queue: QueuedMessage[] = queueString ? JSON.parse(queueString) : [];
+    
+    // Add new message to queue
+    queue.push(queuedMessage);
+    
+    // Save updated queue
+    await AsyncStorage.setItem(OFFLINE_MESSAGE_QUEUE_KEY, JSON.stringify(queue));
+    
+    return messageId;
+  } catch (error) {
+    console.error('Error queuing offline message:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get all queued offline messages
+ */
+export const getOfflineMessageQueue = async (): Promise<QueuedMessage[]> => {
+  try {
+    const queueString = await AsyncStorage.getItem(OFFLINE_MESSAGE_QUEUE_KEY);
+    return queueString ? JSON.parse(queueString) : [];
+  } catch (error) {
+    console.error('Error getting offline message queue:', error);
+    return [];
+  }
+};
+
+/**
+ * Remove a message from the offline queue
+ */
+export const removeFromOfflineQueue = async (messageId: string): Promise<void> => {
+  try {
+    const queue = await getOfflineMessageQueue();
+    const updatedQueue = queue.filter(msg => msg.id !== messageId);
+    await AsyncStorage.setItem(OFFLINE_MESSAGE_QUEUE_KEY, JSON.stringify(updatedQueue));
+  } catch (error) {
+    console.error('Error removing message from offline queue:', error);
+  }
+};
+
+/**
+ * Update a message in the offline queue
+ */
+export const updateOfflineQueueItem = async (
+  messageId: string, 
+  updates: Partial<QueuedMessage>
+): Promise<void> => {
+  try {
+    const queue = await getOfflineMessageQueue();
+    const updatedQueue = queue.map(msg => 
+      msg.id === messageId ? { ...msg, ...updates } : msg
+    );
+    await AsyncStorage.setItem(OFFLINE_MESSAGE_QUEUE_KEY, JSON.stringify(updatedQueue));
+  } catch (error) {
+    console.error('Error updating offline queue item:', error);
+  }
+};
+
 /**
  * Send a text message to the language tutor API
  */
@@ -68,10 +164,47 @@ export const sendTextMessage = async (
   conversationMode: ConversationMode = 'language_lesson'
 ) => {
   try {
-    // Check if user has available quota before making the request
-    const hasQuota = await usageService.hasAvailableQuota();
-    if (!hasQuota) {
-      throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+    // Check for network connectivity first
+    const networkState = await import('@react-native-community/netinfo')
+      .then(module => module.default.fetch());
+    
+    // In development mode, always assume connected
+    if (!__DEV__ && (!networkState.isConnected || networkState.isInternetReachable === false)) {
+      console.log('No network connection, queuing message for later');
+      
+      // Queue the message for later sending
+      const messageId = await queueOfflineMessage('text', {
+        message,
+        conversationId,
+        tempo,
+        difficulty,
+        nativeLanguage,
+        targetLanguage,
+        learningObjective,
+        isMuted,
+        conversationMode
+      });
+      
+      // Return an offline response with the queued message ID
+      throw {
+        offline: true,
+        queuedMessageId: messageId,
+        message: 'Message queued for sending when back online'
+      };
+    }
+    
+    // Skip quota check in Expo Go development mode
+    if (!__DEV__) {
+      // Check if user has available quota before making the request  
+      try {
+        const hasQuota = await usageService.hasAvailableQuota();
+        if (!hasQuota) {
+          throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+        }
+      } catch (quotaError) {
+        console.log('Error checking quota, proceeding anyway in development mode:', quotaError);
+        // In case of quota check error, proceed with the request
+      }
     }
     
     // Get user's auth headers
@@ -90,10 +223,13 @@ export const sendTextMessage = async (
     };
 
     // Add debug logging
-    console.log("🔍 Debug - API sendTextMessage params:", JSON.stringify(params, null, 2));
-    console.log("🔍 Debug - conversation_mode value:", conversationMode);
+    if (__DEV__) {
+      console.log("🔍 Debug - API sendTextMessage params:", JSON.stringify(params, null, 2));
+      console.log("🔍 Debug - conversation_mode value:", conversationMode);
+    }
 
-    const response = await fetch(`${API_URL}/chat`, {
+    // Use fetchWithRetry instead of fetch
+    const response = await fetchWithRetry(`${API_URL}/chat`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -110,7 +246,9 @@ export const sendTextMessage = async (
         throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
       }
       
-      throw new Error(`Server responded with status: ${response.status}`);
+      // Get detailed error message from response
+      const errorMessage = await parseErrorResponse(response);
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -120,6 +258,24 @@ export const sendTextMessage = async (
       // Find the index of the last assistant message
       const lastAssistantIndex = data.history.length - 1;
       data.message_index = lastAssistantIndex;
+    }
+    
+    // Cache audio response if available
+    if (data.has_audio && data.audio_url && conversationId) {
+      try {
+        const cacheKey = `audio_${conversationId}_${data.message_index || 0}`;
+        const audioUrl = data.audio_url.startsWith('http') 
+          ? data.audio_url 
+          : `${API_URL}${data.audio_url.startsWith('/') ? data.audio_url : '/' + data.audio_url}`;
+        
+        // Cache in background
+        offlineAssets.cacheAudioFile(audioUrl, cacheKey, {
+          conversationId,
+          messageIndex: data.message_index || 0
+        }).catch(error => console.log('Background audio caching failed:', error));
+      } catch (error) {
+        console.log('Error caching audio response:', error);
+      }
     }
     
     // Track Claude API usage locally
@@ -138,9 +294,47 @@ export const sendTextMessage = async (
     }
 
     return data;
-  } catch (error) {
+  } catch (error: any) {
+    // If it's already a structured offline error, just rethrow it
+    if (error.offline) {
+      throw error;
+    }
+    
     console.error('API Error:', error);
-    throw error;
+    
+    // Classify and enhance the error
+    const classifiedError = classifyApiError(error);
+    
+    // For network errors, try to queue the message
+    if (classifiedError.type === 'network' || classifiedError.type === 'timeout') {
+      try {
+        const messageId = await queueOfflineMessage('text', {
+          message,
+          conversationId,
+          tempo,
+          difficulty,
+          nativeLanguage,
+          targetLanguage,
+          learningObjective,
+          isMuted,
+          conversationMode
+        });
+        
+        throw {
+          offline: true,
+          queuedMessageId: messageId,
+          message: classifiedError.message,
+          type: classifiedError.type
+        };
+      } catch (queueError) {
+        console.error('Failed to queue offline message:', queueError);
+      }
+    }
+    
+    throw {
+      ...classifiedError,
+      originalError: error
+    };
   }
 };
 
@@ -170,10 +364,47 @@ export const sendVoiceRecording = async ({
   conversationMode = 'language_lesson'
 }: VoiceParams) => {
   try {
-    // Check if user has available quota before making the request
-    const hasQuota = await usageService.hasAvailableQuota();
-    if (!hasQuota) {
-      throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+    // Check for network connectivity first
+    const networkState = await import('@react-native-community/netinfo')
+      .then(module => module.default.fetch());
+    
+    // In development mode, always assume connected
+    if (!__DEV__ && (!networkState.isConnected || networkState.isInternetReachable === false)) {
+      console.log('No network connection, queuing voice message for later');
+      
+      // Queue the message for later sending
+      const messageId = await queueOfflineMessage('voice', {
+        audioUri,
+        conversationId,
+        tempo,
+        difficulty,
+        nativeLanguage,
+        targetLanguage,
+        learningObjective,
+        isMuted,
+        conversationMode
+      });
+      
+      // Return an offline response with the queued message ID
+      throw {
+        offline: true,
+        queuedMessageId: messageId,
+        message: 'Voice message queued for sending when back online'
+      };
+    }
+    
+    // Skip quota check in Expo Go development mode
+    if (!__DEV__) {
+      // Check if user has available quota before making the request  
+      try {
+        const hasQuota = await usageService.hasAvailableQuota();
+        if (!hasQuota) {
+          throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+        }
+      } catch (quotaError) {
+        console.log('Error checking quota, proceeding anyway in development mode:', quotaError);
+        // In case of quota check error, proceed with the request
+      }
     }
     
     // Get user's auth headers
@@ -213,27 +444,79 @@ export const sendVoiceRecording = async ({
       formData.append('user_id', userId);
     }
 
-    const response = await fetch(`${API_URL}/voice-input`, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        ...authHeaders
-      },
-    });
+    // Use fetchWithRetry, but we need to handle form data differently
+    // since fetchWithRetry uses regular fetch under the hood
+    let response;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+      try {
+        response = await fetch(`${API_URL}/voice-input`, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            ...authHeaders
+          },
+        });
+        
+        // If successful, break the loop
+        break;
+      } catch (error: any) {
+        retryCount++;
+        
+        // Only retry network errors
+        if (error.message.includes('network') || error.message.includes('connection')) {
+          if (retryCount >= maxRetries) {
+            throw error;
+          }
+          
+          // Exponential backoff
+          const delay = 1000 * Math.pow(2, retryCount - 1) + Math.random() * 1000;
+          console.log(`Retrying voice upload (${retryCount}/${maxRetries}) after ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          // Non-network errors should not be retried
+          throw error;
+        }
+      }
+    }
 
-    if (!response.ok) {
+    if (!response || !response.ok) {
       // Special handling for quota exceeded (403)
-      if (response.status === 403) {
+      if (response && response.status === 403) {
         // Force local quota check to sync with server
         await usageService.forceQuotaExceeded();
         throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
       }
       
-      throw new Error(`Server error: ${response.status}`);
+      const errorMsg = response 
+        ? `Server error: ${response.status}` 
+        : 'Failed to send voice recording after multiple retries';
+      throw new Error(errorMsg);
     }
 
     const data = await response.json();
+    
+    // Cache audio response if available
+    if (data.has_audio && data.audio_url && conversationId) {
+      try {
+        const messageIndex = data.history ? data.history.length - 1 : 0;
+        const cacheKey = `audio_${conversationId}_${messageIndex}`;
+        const audioUrl = data.audio_url.startsWith('http') 
+          ? data.audio_url 
+          : `${API_URL}${data.audio_url.startsWith('/') ? data.audio_url : '/' + data.audio_url}`;
+        
+        // Cache in background
+        offlineAssets.cacheAudioFile(audioUrl, cacheKey, {
+          conversationId,
+          messageIndex
+        }).catch(error => console.log('Background audio caching failed:', error));
+      } catch (error) {
+        console.log('Error caching audio response:', error);
+      }
+    }
     
     // Track Whisper usage locally (estimate audio duration from file size)
     // Audio files are typically ~16KB per second of audio at standard quality
@@ -258,21 +541,83 @@ export const sendVoiceRecording = async ({
     }
 
     return data;
-  } catch (error) {
-    console.error('API Error:', error);
-    throw error;
+  } catch (error: any) {
+    // If it's already a structured offline error, just rethrow it
+    if (error.offline) {
+      throw error;
+    }
+    
+    console.error('Voice API Error:', error);
+    
+    // Classify and enhance the error
+    const classifiedError = classifyApiError(error);
+    
+    // For network errors, try to queue the message
+    if (classifiedError.type === 'network' || classifiedError.type === 'timeout') {
+      try {
+        const messageId = await queueOfflineMessage('voice', {
+          audioUri,
+          conversationId,
+          tempo,
+          difficulty,
+          nativeLanguage,
+          targetLanguage,
+          learningObjective,
+          isMuted,
+          conversationMode
+        });
+        
+        throw {
+          offline: true,
+          queuedMessageId: messageId,
+          message: classifiedError.message,
+          type: classifiedError.type
+        };
+      } catch (queueError) {
+        console.error('Failed to queue offline voice message:', queueError);
+      }
+    }
+    
+    throw {
+      ...classifiedError,
+      originalError: error
+    };
   }
 };
 
 /**
- * Downloads an audio file from the API server with improved error handling and format support
+ * Downloads an audio file from the API server with improved error handling and offline support
  */
-export const downloadAudio = async (audioUrl: string): Promise<string> => {
+export const downloadAudio = async (
+  audioUrl: string, 
+  options?: { conversationId?: string, messageIndex?: number }
+): Promise<string> => {
   try {
     const fullUrl = audioUrl.startsWith('http')
       ? audioUrl
       : `${API_URL}${audioUrl.startsWith('/') ? audioUrl : '/' + audioUrl}`;
 
+    // Generate a cache key for this audio file
+    const urlHash = fullUrl.split('/').pop() || `audio_${Date.now()}`;
+    const cacheKey = options?.conversationId 
+      ? `audio_${options.conversationId}_${options.messageIndex || 0}`
+      : `audio_${urlHash}`;
+    
+    // Check if we already have this audio file cached
+    const cachedAudio = await offlineAssets.getCachedAudioFile(cacheKey);
+    if (cachedAudio) {
+      console.log(`Using cached audio: ${cachedAudio}`);
+      return cachedAudio;
+    }
+
+    // Check network connectivity
+    const networkState = await import('@react-native-community/netinfo')
+      .then(module => module.default.fetch());
+    
+    if (!networkState.isConnected || networkState.isInternetReachable === false) {
+      throw new Error('Cannot download audio while offline');
+    }
+    
     console.log("Downloading audio from:", fullUrl);
 
     // Extract file extension from URL
@@ -299,9 +644,15 @@ export const downloadAudio = async (audioUrl: string): Promise<string> => {
     const fileName = `audio_${Date.now()}.${fileExtension}`;
     const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
 
-    // First check if the URL is accessible
+    // First check if the URL is accessible using fetchWithRetry with timeout
     try {
-      const headResponse = await fetch(fullUrl, { method: 'HEAD' });
+      const headResponse = await fetchWithRetry(fullUrl, { 
+        method: 'HEAD',
+        headers: {
+          'Accept': contentType,
+        }
+      }, 2); // 2 retries for HEAD request
+      
       if (!headResponse.ok) {
         throw new Error(`Server returned ${headResponse.status} ${headResponse.statusText}`);
       }
@@ -320,27 +671,58 @@ export const downloadAudio = async (audioUrl: string): Promise<string> => {
       headers: {
         'Accept': contentType,
         'Content-Type': contentType,
-      }
+      },
+      // Add options for resumable downloads when Expo supports it
+      // Use a different timeout for large files
+      timeout: 30000 // 30 seconds timeout for audio files
     };
 
     // Download the file
-    const downloadResult = await FileSystem.downloadAsync(fullUrl, fileUri, downloadOptions);
+    try {
+      const downloadResult = await FileSystem.downloadAsync(fullUrl, fileUri, downloadOptions);
 
-    if (downloadResult.status !== 200) {
-      throw new Error(`Failed to download audio: ${downloadResult.status}`);
+      if (downloadResult.status !== 200) {
+        throw new Error(`Failed to download audio: ${downloadResult.status}`);
+      }
+
+      // Verify the downloaded file exists and has content
+      const fileInfo = await FileSystem.getInfoAsync(fileUri);
+      if (!fileInfo.exists || fileInfo.size === 0) {
+        throw new Error('Downloaded file is empty or does not exist');
+      }
+
+      console.log(`Audio downloaded successfully: ${fileUri} (${fileInfo.size} bytes)`);
+      
+      // Cache the audio file for offline use
+      await offlineAssets.cacheAudioFile(fullUrl, cacheKey, options);
+      
+      return fileUri;
+    } catch (downloadError: any) {
+      console.error('Download error:', downloadError);
+      
+      // For some specific connection errors, we might want to retry automatically
+      if (downloadError.message.includes('network') || 
+          downloadError.message.includes('timeout') ||
+          downloadError.message.includes('connection')) {
+        
+        // Implement exponential backoff retry logic for downloads
+        // This is handled separately from fetchWithRetry since we're using FileSystem.downloadAsync
+        throw new Error(`Failed to download audio: ${downloadError.message}`);
+      }
+      
+      throw downloadError;
     }
-
-    // Verify the downloaded file exists and has content
-    const fileInfo = await FileSystem.getInfoAsync(fileUri);
-    if (!fileInfo.exists || fileInfo.size === 0) {
-      throw new Error('Downloaded file is empty or does not exist');
-    }
-
-    console.log(`Audio downloaded successfully: ${fileUri} (${fileInfo.size} bytes)`);
-    return fileUri;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Audio download error:', error);
-    throw error;
+    
+    // Classify the error
+    const errorInfo = classifyApiError(error);
+    
+    // Enhanced error with more details
+    throw {
+      ...errorInfo,
+      originalError: error
+    };
   }
 };
 
@@ -365,10 +747,31 @@ export const createConversation = async ({
   isMuted?: boolean;
 }) => {
   try {
-    // Check if user has available quota before creating a new conversation
-    const hasQuota = await usageService.hasAvailableQuota();
-    if (!hasQuota) {
-      throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+    // Check for network connectivity first
+    const networkState = await import('@react-native-community/netinfo')
+      .then(module => module.default.fetch());
+    
+    // In development mode, always assume connected
+    if (!__DEV__ && (!networkState.isConnected || networkState.isInternetReachable === false)) {
+      console.log('No network connection while trying to create conversation');
+      throw {
+        offline: true,
+        message: 'Cannot create a new conversation while offline. Please check your internet connection and try again.'
+      };
+    }
+    
+    // Skip quota check in Expo Go development mode
+    if (!__DEV__) {
+      // Check if user has available quota before creating a new conversation
+      try {
+        const hasQuota = await usageService.hasAvailableQuota();
+        if (!hasQuota) {
+          throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+        }
+      } catch (quotaError) {
+        console.log('Error checking quota, proceeding anyway in development mode:', quotaError);
+        // In case of quota check error, proceed with the request
+      }
     }
     
     // Get user's auth headers
@@ -386,10 +789,13 @@ export const createConversation = async ({
     };
 
     // Add debug logging
-    console.log("🔍 Debug - createConversation request body:", JSON.stringify(requestBody, null, 2));
-    console.log("🔍 Debug - conversation_mode value:", conversationMode);
+    if (__DEV__) {
+      console.log("🔍 Debug - createConversation request body:", JSON.stringify(requestBody, null, 2));
+      console.log("🔍 Debug - conversation_mode value:", conversationMode);
+    }
 
-    const response = await fetch(`${API_URL}/create-conversation`, {
+    // Use fetchWithRetry instead of fetch
+    const response = await fetchWithRetry(`${API_URL}/create-conversation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -406,12 +812,30 @@ export const createConversation = async ({
         throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
       }
       
-      const errorData = await response.json();
-      console.error('Error creating conversation:', errorData);
-      throw new Error(errorData.detail || 'Failed to create conversation');
+      // Get detailed error from response
+      const errorMessage = await parseErrorResponse(response);
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
+    
+    // Cache audio response if available
+    if (data.has_audio && data.audio_url && data.conversation_id) {
+      try {
+        const cacheKey = `audio_${data.conversation_id}_0`;
+        const audioUrl = data.audio_url.startsWith('http') 
+          ? data.audio_url 
+          : `${API_URL}${data.audio_url.startsWith('/') ? data.audio_url : '/' + data.audio_url}`;
+        
+        // Cache in background
+        offlineAssets.cacheAudioFile(audioUrl, cacheKey, {
+          conversationId: data.conversation_id,
+          messageIndex: 0
+        }).catch(error => console.log('Background audio caching failed:', error));
+      } catch (error) {
+        console.log('Error caching initial conversation audio:', error);
+      }
+    }
     
     // Track Claude API usage for the welcome message
     if (data.history && data.history.length > 0) {
@@ -431,9 +855,21 @@ export const createConversation = async ({
     }
 
     return data;
-  } catch (error) {
+  } catch (error: any) {
+    // If it's already a structured offline error, just rethrow it
+    if (error.offline) {
+      throw error;
+    }
+    
     console.error('Create conversation error:', error);
-    throw error;
+    
+    // Classify and enhance the error
+    const classifiedError = classifyApiError(error);
+    
+    throw {
+      ...classifiedError,
+      originalError: error
+    };
   }
 };
 

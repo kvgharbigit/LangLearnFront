@@ -28,6 +28,7 @@ export interface MonthlyUsage {
   usageDetails: UsageDetails;
   calculatedCosts: UsageCosts;
   creditLimit: number;
+  tokenLimit: number; // New field for token limit (creditLimit * 100)
   percentageUsed: number;
   dailyUsage: Record<string, DailyUsage>; // Keyed by date string
   subscriptionTier: string;
@@ -61,6 +62,16 @@ export const estimateTokens = (text: string): number => {
 export const getTodayDateString = (): string => {
   const today = new Date();
   return today.toISOString().split('T')[0]; // YYYY-MM-DD
+};
+
+// Convert credits to tokens (100x multiplier)
+export const creditsToTokens = (credits: number): number => {
+  return Math.round(credits * 100);
+};
+
+// Convert tokens to credits (divide by 100)
+export const tokensToCredits = (tokens: number): number => {
+  return tokens / 100;
 };
 
 // Get current monthly period based on user's subscription date

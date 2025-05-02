@@ -3,14 +3,24 @@ import { View, Text, StyleSheet } from 'react-native';
 
 interface StatusPillProps {
   active: boolean;
-  icon: string;
+  icon: React.ReactNode | string;
   label: string;
 }
 
 const StatusPill: React.FC<StatusPillProps> = ({ active, icon, label }) => {
+  // Handle icon differently based on type
+  const renderIcon = () => {
+    // If icon is a string (emoji or text), wrap it in a Text component
+    if (typeof icon === 'string') {
+      return <Text style={styles.icon}>{icon}</Text>;
+    }
+    // If it's already a React node, render it directly
+    return icon;
+  };
+
   return (
     <View style={[styles.container, active && styles.activeContainer]}>
-      <Text style={styles.icon}>{icon}</Text>
+      {renderIcon()}
       <Text style={[styles.label, active && styles.activeLabel]}>{label}</Text>
     </View>
   );

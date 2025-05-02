@@ -10,7 +10,9 @@ import {
   calculateCosts, 
   estimateTokens,
   getTodayDateString,
-  getMonthlyPeriod
+  getMonthlyPeriod,
+  creditsToTokens,
+  tokensToCredits
 } from '../types/usage';
 import { SUBSCRIPTION_PLANS } from '../types/subscription';
 
@@ -52,6 +54,7 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
       usageDetails: emptyUsage,
       calculatedCosts: costs,
       creditLimit,
+      tokenLimit: creditsToTokens(creditLimit), // Convert credits to tokens
       percentageUsed: 0,
       dailyUsage: {},
       subscriptionTier: tier
@@ -136,6 +139,7 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
       usageDetails: emptyUsage,
       calculatedCosts: costs,
       creditLimit,
+      tokenLimit: creditsToTokens(creditLimit), // Convert credits to tokens
       percentageUsed: 0,
       dailyUsage: {}, // Reset daily usage for new period
       subscriptionTier: tier
@@ -268,6 +272,35 @@ export const trackTTSUsage = async (text: string): Promise<void> => {
 };
 
 /**
+ * Get user's usage information in token format (for display)
+ */
+export const getUserUsageInTokens = async (): Promise<{
+  usedTokens: number;
+  tokenLimit: number;
+  percentageUsed: number;
+} | null> => {
+  try {
+    const user = getCurrentUser();
+    if (!user) return null;
+    
+    const usage = await getUserUsage(user.uid);
+    if (!usage) return null;
+    
+    // Calculate used tokens (costs * 100)
+    const usedTokens = creditsToTokens(usage.calculatedCosts.totalCost);
+    
+    return {
+      usedTokens: Math.round(usedTokens),
+      tokenLimit: usage.tokenLimit || creditsToTokens(usage.creditLimit),
+      percentageUsed: usage.percentageUsed
+    };
+  } catch (error) {
+    console.error('Error getting usage in tokens:', error);
+    return null;
+  }
+};
+
+/**
  * Check if user has available quota for a new conversation
  */
 export const hasAvailableQuota = async (): Promise<boolean> => {
@@ -289,31 +322,41 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
     
     // Optionally verify with server (every 5 minutes)
     // This helps sync local usage data with server data
-    const lastServerCheck = localStorage.getItem('lastServerQuotaCheck');
     const now = Date.now();
-    if (!lastServerCheck || (now - parseInt(lastServerCheck)) > 5 * 60 * 1000) {
-      try {
-        // Get token for auth
-        const token = await getIdToken(user, true);
-        
-        // Verify with server
-        const response = await fetch(`${API_URL}/verify-subscription?user_id=${user.uid}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          localStorage.setItem('lastServerQuotaCheck', now.toString());
-          
-          // Return server's decision on quota
-          return data.has_quota;
+    
+    // Use AsyncStorage instead of localStorage in React Native
+    try {
+      // In Expo Go development mode, skip server verification
+      if (__DEV__) {
+        // For development environment, check subscription tier and set appropriate quota
+        const { tier } = await getCurrentSubscription();
+        if (tier !== 'free') {
+          return true; // In dev mode, paid tiers always have quota
+        } else {
+          // In dev mode with free tier, check local percentage
+          return usage.percentageUsed < 100;
         }
-      } catch (error) {
-        console.error('Error verifying quota with server:', error);
-        // Fall back to local decision if server check fails
       }
+      
+      // Get token for auth (for production)
+      const token = await getIdToken(user, true);
+      
+      // Verify with server
+      const response = await fetch(`${API_URL}/verify-subscription?user_id=${user.uid}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Return server's decision on quota
+        return data.has_quota;
+      }
+    } catch (error) {
+      console.error('Error verifying quota with server:', error);
+      // Fall back to local decision if server check fails
     }
     
     // Default to local decision
@@ -381,6 +424,7 @@ export const verifySubscriptionWithServer = async (): Promise<boolean> => {
 
 export default {
   getUserUsage,
+  getUserUsageInTokens,
   trackApiUsage,
   trackWhisperUsage,
   trackClaudeUsage,

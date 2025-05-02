@@ -1,15 +1,30 @@
-import React, {useEffect, useState} from 'react';
-import {Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import React, {useEffect, useState, useRef} from 'react';
+import {
+  Platform, 
+  SafeAreaView, 
+  ScrollView, 
+  StyleSheet, 
+  Text, 
+  TouchableOpacity, 
+  View,
+  Animated,
+  Dimensions,
+  ActivityIndicator
+} from 'react-native';
 import {StatusBar} from 'expo-status-bar';
 import {Audio, InterruptionModeAndroid, InterruptionModeIOS} from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../types/navigation';
 import {AUDIO_SETTINGS} from '../constants/settings';
+import {Ionicons} from '@expo/vector-icons';
+import colors from '../styles/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AudioTest'>;
+const { width } = Dimensions.get('window');
 
 const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
+  // Recording states
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
@@ -18,9 +33,28 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
   const [logs, setLogs] = useState<Array<{message: string, timestamp: string, isError: boolean}>>([]);
   const [permissionStatus, setPermissionStatus] = useState<string | null>(null);
   const [currentLevel, setCurrentLevel] = useState<number>(0);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(15)).current;
+  const levelAnim = useRef(new Animated.Value(0)).current;
 
   // Initialize and request permissions
   useEffect(() => {
+    // Run entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      })
+    ]).start();
+    
     (async () => {
       try {
         addLog('Requesting audio recording permissions...');
@@ -62,6 +96,16 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
       }
     };
   }, []);
+  
+  // Update level animation when currentLevel changes
+  useEffect(() => {
+    Animated.spring(levelAnim, {
+      toValue: currentLevel,
+      useNativeDriver: false,
+      friction: 7,
+      tension: 40
+    }).start();
+  }, [currentLevel]);
 
   // Helper for logging with timestamps
   const addLog = (message: string, isError = false) => {
@@ -293,126 +337,201 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="auto" />
+      <StatusBar style="dark" />
 
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
         >
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Audio Recorder Test</Text>
+        <Text style={styles.headerTitle}>Audio Recorder Test</Text>
+        <View style={styles.placeholderButton} />
       </View>
 
-      <Text style={styles.status}>
-        Permission: {permissionStatus || 'Checking...'}
-      </Text>
-
-      <View style={styles.platformInfo}>
-        <Text style={styles.platformText}>
-          Platform: <Text style={styles.platformValue}>{Platform.OS.toUpperCase()}</Text>
-        </Text>
-        <Text style={styles.platformText}>
-          Silence Threshold: <Text style={styles.platformValue}>{AUDIO_SETTINGS.SILENCE_THRESHOLD}</Text>
-        </Text>
-        <Text style={styles.platformText}>
-          Speech Threshold: <Text style={styles.platformValue}>{AUDIO_SETTINGS.SPEECH_THRESHOLD}</Text>
-        </Text>
-        <Text style={styles.platformText}>
-          Silence Duration: <Text style={styles.platformValue}>{AUDIO_SETTINGS.SILENCE_DURATION}ms</Text>
-        </Text>
-      </View>
-
-      {isRecording && (
-        <View style={styles.levelIndicator}>
-          <Text style={styles.levelLabel}>Current Level:</Text>
-          <View style={styles.levelBarContainer}>
-            <View
-              style={[
-                styles.levelBar,
-                {
-                  width: `${currentLevel}%`,
-                  backgroundColor: getAudioLevelColor()
-                }
-              ]}
-            />
-          </View>
-          <View style={styles.thresholdMarkers}>
-            <View
-              style={[
-                styles.thresholdMarker,
-                {
-                  left: `${AUDIO_SETTINGS.SILENCE_THRESHOLD}%`,
-                  backgroundColor: '#ff9800'
-                }
-              ]}
-            />
-            <View
-              style={[
-                styles.thresholdMarker,
-                {
-                  left: `${AUDIO_SETTINGS.SPEECH_THRESHOLD}%`,
-                  backgroundColor: '#4caf50'
-                }
-              ]}
-            />
-          </View>
-          <View style={styles.thresholdLabels}>
-            <Text style={[styles.thresholdLabel, {left: `${AUDIO_SETTINGS.SILENCE_THRESHOLD}%`}]}>
-              Silence
-            </Text>
-            <Text style={[styles.thresholdLabel, {left: `${AUDIO_SETTINGS.SPEECH_THRESHOLD}%`}]}>
-              Speech
-            </Text>
-          </View>
-          <Text style={styles.levelValue}>{currentLevel.toFixed(1)}</Text>
-        </View>
-      )}
-
-      <View style={styles.controls}>
-        {isRecording ? (
-          <TouchableOpacity
-            style={[styles.button, styles.stopButton]}
-            onPress={stopRecording}
-          >
-            <Text style={styles.buttonText}>Stop Recording</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.button, styles.recordButton]}
-            onPress={startRecording}
-            disabled={isPlaying}
-          >
-            <Text style={styles.buttonText}>Start Recording</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View
           style={[
-            styles.button,
-            styles.playButton,
-            (!recordingUri || isRecording || isPlaying) && styles.disabledButton
+            { opacity: fadeAnim, transform: [{ translateY }] }
           ]}
-          onPress={playRecording}
-          disabled={!recordingUri || isRecording || isPlaying}
         >
-          <Text style={styles.buttonText}>
-            {isPlaying ? 'Playing...' : 'Play Recording'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.statusCard}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="mic" size={22} color={colors.primary} style={styles.cardHeaderIcon} />
+              <Text style={styles.cardHeaderTitle}>Microphone Status</Text>
+            </View>
+            
+            <View style={styles.statusItem}>
+              <Text style={styles.statusLabel}>Permission:</Text>
+              <View style={[
+                styles.statusPill, 
+                permissionStatus === 'granted' ? styles.statusPillSuccess : 
+                permissionStatus === 'denied' ? styles.statusPillError : 
+                styles.statusPillPending
+              ]}>
+                <Text style={styles.statusPillText}>{permissionStatus || 'Checking...'}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.divider} />
+            
+            <View style={styles.platformInfo}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Platform:</Text>
+                <Text style={styles.infoValue}>{Platform.OS.toUpperCase()}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Silence Threshold:</Text>
+                <Text style={styles.infoValue}>{AUDIO_SETTINGS.SILENCE_THRESHOLD}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Speech Threshold:</Text>
+                <Text style={styles.infoValue}>{AUDIO_SETTINGS.SPEECH_THRESHOLD}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Silence Duration:</Text>
+                <Text style={styles.infoValue}>{AUDIO_SETTINGS.SILENCE_DURATION}ms</Text>
+              </View>
+            </View>
+          </View>
 
-      <Text style={styles.logsTitle}>Debug Logs:</Text>
-      <ScrollView style={styles.logsContainer}>
-        {logs.map((log, index) => (
-          <Text
-            key={index}
-            style={[styles.logEntry, log.isError && styles.errorLog]}
-          >
-            [{log.timestamp}] {log.message}
-          </Text>
-        ))}
+          {isRecording && (
+            <View style={styles.levelIndicatorCard}>
+              <View style={styles.cardHeader}>
+                <Ionicons name="analytics" size={22} color={colors.primary} style={styles.cardHeaderIcon} />
+                <Text style={styles.cardHeaderTitle}>Audio Level</Text>
+                <View style={styles.levelValueContainer}>
+                  <Text style={styles.levelValue}>{currentLevel.toFixed(1)}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.levelIndicator}>
+                <View style={styles.levelBarContainer}>
+                  <Animated.View
+                    style={[
+                      styles.levelBar,
+                      {
+                        width: levelAnim.interpolate({
+                          inputRange: [0, 100],
+                          outputRange: ['0%', '100%'],
+                        }),
+                        backgroundColor: getAudioLevelColor()
+                      }
+                    ]}
+                  />
+                </View>
+                
+                <View style={styles.thresholdMarkersContainer}>
+                  <View style={styles.thresholdMarkers}>
+                    <View
+                      style={[
+                        styles.thresholdMarker,
+                        {
+                          left: `${AUDIO_SETTINGS.SILENCE_THRESHOLD}%`,
+                          backgroundColor: '#ff9800'
+                        }
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.thresholdMarker,
+                        {
+                          left: `${AUDIO_SETTINGS.SPEECH_THRESHOLD}%`,
+                          backgroundColor: '#4caf50'
+                        }
+                      ]}
+                    />
+                  </View>
+                  
+                  <View style={styles.thresholdLabels}>
+                    <Text style={[styles.thresholdLabel, {left: `${AUDIO_SETTINGS.SILENCE_THRESHOLD}%`}]}>
+                      Silence
+                    </Text>
+                    <Text style={[styles.thresholdLabel, {left: `${AUDIO_SETTINGS.SPEECH_THRESHOLD}%`}]}>
+                      Speech
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.controlsCard}>
+            <View style={styles.controls}>
+              {isRecording ? (
+                <TouchableOpacity
+                  style={[styles.button, styles.stopButton]}
+                  onPress={stopRecording}
+                  accessibilityLabel="Stop Recording"
+                >
+                  <Ionicons name="stop" size={24} color="white" style={styles.buttonIcon} />
+                  <Text style={styles.buttonText}>Stop Recording</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.button, styles.recordButton]}
+                  onPress={startRecording}
+                  disabled={isPlaying}
+                  accessibilityLabel="Start Recording"
+                >
+                  <Ionicons name="mic" size={24} color="white" style={styles.buttonIcon} />
+                  <Text style={styles.buttonText}>Start Recording</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  styles.playButton,
+                  (!recordingUri || isRecording || isPlaying) && styles.disabledButton
+                ]}
+                onPress={playRecording}
+                disabled={!recordingUri || isRecording || isPlaying}
+                accessibilityLabel="Play Recording"
+              >
+                {isPlaying ? (
+                  <>
+                    <ActivityIndicator color="white" size="small" style={styles.buttonIcon} />
+                    <Text style={styles.buttonText}>Playing...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="play" size={24} color="white" style={styles.buttonIcon} />
+                    <Text style={styles.buttonText}>Play Recording</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.logsCard}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="list" size={22} color={colors.primary} style={styles.cardHeaderIcon} />
+              <Text style={styles.cardHeaderTitle}>Debug Logs</Text>
+            </View>
+            
+            <View style={styles.logsContainer}>
+              {logs.length === 0 ? (
+                <Text style={styles.noLogsText}>No logs yet. Start recording to see logs.</Text>
+              ) : (
+                logs.map((log, index) => (
+                  <Text
+                    key={index}
+                    style={[styles.logEntry, log.isError && styles.errorLog]}
+                  >
+                    <Text style={styles.logTimestamp}>[{log.timestamp}]</Text> {log.message}
+                  </Text>
+                ))
+              )}
+            </View>
+          </View>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -421,86 +540,195 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8F9FE',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    zIndex: 10,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.gray800,
+    flex: 1,
+    textAlign: 'center',
   },
   backButton: {
-    marginRight: 15,
+    padding: 8,
+    borderRadius: 8,
+    width: 40,
   },
-  backButtonText: {
-    fontSize: 16,
-    color: '#5d6af8',
+  placeholderButton: {
+    width: 40,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  scrollView: {
     flex: 1,
   },
-  status: {
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 30,
+  },
+  // Cards
+  statusCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  levelIndicatorCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  controlsCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  logsCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  cardHeaderIcon: {
+    marginRight: 8,
+  },
+  cardHeaderTitle: {
     fontSize: 16,
-    margin: 16,
-    marginBottom: 0,
-    textAlign: 'center',
-    color: '#555',
+    fontWeight: '600',
+    color: colors.gray800,
+    flex: 1,
   },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginVertical: 8,
+  },
+  // Status
+  statusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  statusLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.gray700,
+  },
+  statusPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  statusPillSuccess: {
+    backgroundColor: '#E8F5E9',
+  },
+  statusPillError: {
+    backgroundColor: '#FFEBEE',
+  },
+  statusPillPending: {
+    backgroundColor: '#E3F2FD',
+  },
+  statusPillText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Platform info
   platformInfo: {
-    margin: 16,
-    padding: 12,
-    backgroundColor: '#f0f7ff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d0e1f9',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  platformText: {
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  infoLabel: {
     fontSize: 14,
-    marginBottom: 4,
-    color: '#333',
+    color: colors.gray600,
   },
-  platformValue: {
-    fontWeight: 'bold',
-    color: '#0066cc',
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
+  // Level indicator
   levelIndicator: {
-    margin: 20,
-    padding: 10,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    padding: 16,
   },
-  levelLabel: {
+  levelValueContainer: {
+    backgroundColor: 'rgba(93, 106, 248, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  levelValue: {
     fontSize: 14,
-    marginBottom: 8,
-    color: '#555',
+    fontWeight: '700',
+    color: colors.primary,
   },
   levelBarContainer: {
     height: 24,
     backgroundColor: '#eeeeee',
     borderRadius: 12,
     overflow: 'hidden',
+    marginBottom: 16,
   },
   levelBar: {
     height: '100%',
     backgroundColor: '#4caf50',
   },
-  levelValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginTop: 8,
+  thresholdMarkersContainer: {
+    marginBottom: 8,
   },
   thresholdMarkers: {
     position: 'relative',
     height: 16,
-    marginTop: 4,
   },
   thresholdMarker: {
     position: 'absolute',
@@ -515,26 +743,32 @@ const styles = StyleSheet.create({
   },
   thresholdLabel: {
     position: 'absolute',
-    fontSize: 10,
-    color: '#555',
+    fontSize: 12,
+    color: colors.gray600,
     transform: [{ translateX: -20 }],
   },
+  // Controls
   controls: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    marginBottom: 24,
+    gap: 12,
   },
   button: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    minWidth: 150,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
-    marginHorizontal: 5,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
   recordButton: {
-    backgroundColor: '#5d6af8',
+    backgroundColor: colors.primary,
   },
   stopButton: {
     backgroundColor: '#f44336',
@@ -543,30 +777,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#4caf50',
   },
   disabledButton: {
-    backgroundColor: '#cccccc',
+    backgroundColor: colors.gray400,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   buttonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontWeight: '600',
     fontSize: 16,
   },
-  logsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginHorizontal: 20,
-    marginBottom: 8,
-  },
+  // Logs
   logsContainer: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-    margin: 20,
-    padding: 10,
-    borderRadius: 5,
+    padding: 16,
+    maxHeight: 300,
+  },
+  noLogsText: {
+    textAlign: 'center',
+    color: colors.gray500,
+    fontStyle: 'italic',
+    padding: 20,
   },
   logEntry: {
-    fontSize: 14,
-    marginBottom: 4,
+    fontSize: 13,
+    marginBottom: 8,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    color: colors.gray800,
+  },
+  logTimestamp: {
+    color: colors.gray500,
+    fontSize: 12,
+    fontWeight: '500',
   },
   errorLog: {
     color: '#f44336',

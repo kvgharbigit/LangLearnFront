@@ -7,6 +7,7 @@ export interface SubscriptionPlan {
   tier: SubscriptionTier;
   price: number;
   monthlyCredits: number;
+  monthlyTokens: number; // New field for tokens (credits * 100)
   features: string[];
   isPopular?: boolean;
 }
@@ -27,8 +28,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     tier: 'free',
     price: 0,
     monthlyCredits: 1.5, // $1.50 worth of usage
+    monthlyTokens: 150, // 1.5 credits * 100
     features: [
-      '$1.50 in Confluency Credits per month',
+      '150 Conversation Tokens per month',
       'Basic language learning tools',
       'Text-to-speech capabilities',
       'Access to 5 languages'
@@ -40,9 +42,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     tier: 'basic',
     price: 4.50,
     monthlyCredits: 3, // $3 worth of usage
+    monthlyTokens: 300, // 3 credits * 100
     features: [
       'All Free features',
-      '$3.00 in Confluency Credits per month',
+      '300 Conversation Tokens per month',
       'Advanced grammar corrections',
       'Access to 10 languages',
       'Priority support'
@@ -54,10 +57,11 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     tier: 'premium',
     price: 11.00,
     monthlyCredits: 8, // $8 worth of usage
+    monthlyTokens: 800, // 8 credits * 100
     isPopular: true,
     features: [
       'All Basic features',
-      '$8.00 in Confluency Credits per month',
+      '800 Conversation Tokens per month',
       'Conversation mode options',
       'Instant voice recognition',
       'Personalized learning paths',
@@ -70,9 +74,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     tier: 'pro',
     price: 20.00,
     monthlyCredits: 16, // $16 worth of usage
+    monthlyTokens: 1600, // 16 credits * 100
     features: [
       'All Premium features',
-      '$16.00 in Confluency Credits per month',
+      '1,600 Conversation Tokens per month',
       'Expert language tutoring',
       'Custom vocabulary sets',
       'Progress analytics',

@@ -10,6 +10,8 @@ import {
   Animated,
   KeyboardAvoidingView,
   Keyboard,
+  Alert,
+  BackHandler,
 } from 'react-native';
 import { hasAvailableQuota } from '../services/usageService';
 import QuotaExceededModal from '../components/QuotaExceededModal';
@@ -21,6 +23,10 @@ import { Message as MessageType } from '../types/messages';
 import { AUDIO_SETTINGS, PLAYER_SETTINGS, API_CONFIG, loadAudioSettings, saveAudioSettings } from '../constants/settings';
 import MuteInfoModal from '../components/MuteInfoModal';
 import ReplayButton from '../components/ReplayButton';
+import { useNetwork } from '../contexts/NetworkContext';
+import NetworkStatusBar from '../components/NetworkStatusBar';
+import OfflineWarning from '../components/OfflineWarning';
+import { getOfflineMessageQueue, removeFromOfflineQueue } from '../utils/api';
 
 // Import components
 import Message from '../components/Message';
@@ -65,6 +71,12 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   // Quota state
   const [showQuotaExceededModal, setShowQuotaExceededModal] = useState<boolean>(false);
 
+  // Network state
+  const { isConnected, isInternetReachable } = useNetwork();
+  const [showOfflineWarning, setShowOfflineWarning] = useState<boolean>(false);
+  const [pendingMessages, setPendingMessages] = useState<MessageType[]>([]);
+  const [reconnectionAttempt, setReconnectionAttempt] = useState<number>(0);
+  const [networkError, setNetworkError] = useState<string | null>(null);
 
   // New state for customizable audio parameters
   const [speechThreshold, setSpeechThreshold] = useState<number>(AUDIO_SETTINGS.SPEECH_THRESHOLD);
@@ -542,6 +554,42 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       cleanup();
     };
   }, []);
+
+  // Add navigation event listeners to stop audio when exiting the screen
+  useEffect(() => {
+    // Function to stop audio playback
+    const stopAudioPlayback = async () => {
+      console.log("⏹️ Screen blur/navigation - stopping audio playback");
+      
+      if (isPlaying && soundRef.current) {
+        try {
+          await soundRef.current.stopAsync();
+          setIsPlaying(false);
+        } catch (error) {
+          console.error('Error stopping audio on screen blur:', error);
+        }
+      }
+    };
+
+    // Setup listeners for screen blur and hardware back button
+    const unsubscribeBlur = navigation.addListener('blur', stopAudioPlayback);
+    const unsubscribeFocus = navigation.addListener('focus', () => {
+      console.log("🔍 Screen focused");
+    });
+    
+    // Add back button handler (for Android)
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      stopAudioPlayback();
+      return false; // Don't prevent default back button behavior
+    });
+
+    // Cleanup listeners when component unmounts
+    return () => {
+      unsubscribeBlur();
+      unsubscribeFocus();
+      backHandler.remove();
+    };
+  }, [navigation, isPlaying]);
 
   // Add this new function to initialize conversations
   const initializeConversation = async () => {
@@ -1536,7 +1584,7 @@ const renderMessages = () => {
               />
               {silenceDetected && silenceCountdown !== null && (
                 <View style={styles.countdownTimer}>
-                  <Text style={styles.countdownText}>{silenceCountdown}s</Text>
+                  <Text style={styles.countdownText}>{String(silenceCountdown)}s</Text>
                 </View>
               )}
             </View>
@@ -1579,7 +1627,6 @@ const renderMessages = () => {
           )}
         </ScrollView>
 
-      )}
         <View style={styles.inputContainer}>
           {voiceInputEnabled ? (
             <View style={styles.voiceInputControls}>
