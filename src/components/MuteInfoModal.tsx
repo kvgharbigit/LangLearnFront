@@ -34,6 +34,11 @@ const MuteInfoModal: React.FC<MuteInfoModalProps> = ({ visible, onClose }) => {
 
             <View style={styles.benefitsList}>
               <View style={styles.benefitItem}>
+                <Ionicons name="wallet-outline" size={20} color={colors.success} />
+                <Text style={styles.benefitText}>Reduces credit usage by 50%</Text>
+              </View>
+              
+              <View style={styles.benefitItem}>
                 <Ionicons name="battery-full" size={20} color={colors.success} />
                 <Text style={styles.benefitText}>Reduces battery usage</Text>
               </View>
@@ -43,7 +48,6 @@ const MuteInfoModal: React.FC<MuteInfoModalProps> = ({ visible, onClose }) => {
                 <Text style={styles.benefitText}>Saves data usage</Text>
               </View>
 
-              {/* Add this new benefit item */}
               <View style={styles.benefitItem}>
                 <Ionicons name="flash-outline" size={20} color={colors.success} />
                 <Text style={styles.benefitText}>Increases reply speed</Text>

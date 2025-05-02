@@ -34,21 +34,21 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
           id: 'language_lesson' as ConversationMode,
           label: 'Grammar Lesson',
           icon: 'book-outline',
-          description: 'Focus on language learning concepts (grammar, vocabulary, etc.)',
+          description: 'Master specific grammar rules, verb forms, and language structures with focused guidance.',
           placeholder: '• The Subjunctive Mood\n• Conjugating the Preterite \n• Common Verbs'
         },
         {
           id: 'verb_challenge' as ConversationMode,
           label: 'Verb Challenge',
           icon: 'flash-outline',
-          description: 'AI gives you important/common verbs for you to use in a sentence in varying tenses.',
+          description: 'Practice constructing sentences with essential verbs in different tenses and moods.',
           placeholder: '• Specific verb tenses to practice\n• Difficulty level preferences\n• Types of verbs'
         },
         {
           id: 'noun_challenge' as ConversationMode,
           label: 'Noun Challenge',
           icon: 'cube-outline',
-          description: 'AI gives you important/common nouns for you to use in a sentence.',
+          description: 'Build vocabulary and sentence skills using important nouns from your areas of interest.',
           placeholder: '• Categories of nouns\n• Specific topics\n• Difficulty preferences'
         }
       ]
@@ -58,30 +58,30 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
       modes: [
         {
           id: 'topic_lesson' as ConversationMode,
-          label: 'Non-Language Lesson',
+          label: 'Special Topic Lesson',
           icon: 'school-outline',
-          description: 'Learn about non-language topics in the language of your choice!',
+          description: 'Explore fascinating topics in your target language - history, culture, sport, geopolitics...',
           placeholder: '• History of Rome\n• Dog Training Tips\n• Modern Art Movements'
         },
         {
           id: 'free_conversation' as ConversationMode,
           label: 'Free Conversation',
           icon: 'chatbubbles-outline',
-          description: 'Have a chat about anything with an AI who knows everything!',
+          description: 'Engage in natural, unstructured conversations about any topic that interests you.',
           placeholder: '• Game of Thrones\n• Golfing Tips\n• Holiday Destinations'
         },
         {
           id: 'interview' as ConversationMode,
           label: 'Interview',
           icon: 'person-outline',
-          description: 'Answer questions from the AI about yourself!',
+          description: 'Express yourself naturally while answering questions about your interests, experiences and opinions.',
           placeholder: '• Your Hobbies\n• Travel Experiences\n• Life Goals'
         },
         {
           id: 'situation_simulation' as ConversationMode,
           label: 'Situation Simulation',
           icon: 'theatre-outline',
-          description: 'Pick an imaginary scenario in which you are having a conversation.',
+          description: 'Practice real-life conversations in common scenarios like restaurants, travel, and shopping.',
           placeholder: '• At a restaurant\n• Job interview\n• Airport check-in\n• Shopping for clothes'
         }
       ]
