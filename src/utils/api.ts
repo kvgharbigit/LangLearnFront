@@ -5,7 +5,9 @@ import { ConversationMode } from '../components/ConversationModeSelector';
 // Update this to your actual API URL
 //const API_URL = 'https://language-tutor-984417336702.asia-east1.run.app';
 //const API_URL = 'http://192.168.86.26:8004';
-const API_URL = 'http://192.168.86.241:8004';
+//const API_URL = 'http://192.168.86.241:8004';
+const API_URL = 'https://a84f-128-250-0-218.ngrok-free.app'; //work
+
 // Update the ChatParams interface to include isMuted and conversationMode
 interface ChatParams {
   message: string;
