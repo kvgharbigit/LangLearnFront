@@ -55,6 +55,9 @@ interface Props {
   // Prop for mute functionality
   isMuted: boolean;
   setIsMuted: (muted: boolean) => void;
+  // Prop for stopping audio playback
+  isPlaying: boolean;
+  stopAudio: () => void;
   navigation: any;
 }
 
@@ -72,16 +75,19 @@ const TutorHeader: React.FC<Props> = ({
   setAutoRecordEnabled,
   debugMode,
   setDebugMode,
-  // New props
+  // Audio parameters props
   speechThreshold,
   setSpeechThreshold,
   silenceThreshold,
   setSilenceThreshold,
   silenceDuration,
   setSilenceDuration,
-  // New mute props
+  // Mute props
   isMuted,
   setIsMuted,
+  // Audio playback props
+  isPlaying,
+  stopAudio,
   navigation,
 }) => {
   // State
@@ -104,7 +110,8 @@ const TutorHeader: React.FC<Props> = ({
   useEffect(() => {
     setSpeechThresholdText(speechThreshold.toString());
     setSilenceThresholdText(silenceThreshold.toString());
-    setSilenceDurationText(silenceDuration.toString());
+    // Convert milliseconds to seconds for display
+    setSilenceDurationText((silenceDuration / 1000).toFixed(1));
   }, [speechThreshold, silenceThreshold, silenceDuration, settingsModalVisible]);
 
   // Save settings when they change and modal is closed
@@ -226,16 +233,30 @@ const TutorHeader: React.FC<Props> = ({
   const updateSilenceDuration = (value: string) => {
     setSilenceDurationText(value);
     const numValue = parseInt(value);
-    if (!isNaN(numValue) && numValue >= 500 && numValue <= 5000) {
-      setSilenceDuration(numValue);
-      saveSettingChange('SILENCE_DURATION', numValue);
+    if (!isNaN(numValue) && numValue >= 0.5 && numValue <= 5) {
+      // Convert seconds to milliseconds for internal use
+      const durationMs = numValue * 1000;
+      setSilenceDuration(durationMs);
+      saveSettingChange('SILENCE_DURATION', durationMs);
     }
   };
 
   // Update tempo and save it
   const handleTempoChange = (newTempo: number) => {
+    // First update tempo state to ensure UI is responsive
     setTempo(newTempo);
     saveSettingChange('TEMPO', newTempo);
+    
+    // Then stop any currently playing audio if user changes tempo
+    // This ensures the audio state updates happen after the tempo change
+    if (isPlaying && stopAudio) {
+      console.log('Stopping audio playback due to tempo change');
+      // Pass true to preserve the last message index so the replay button still works
+      // Wrap in setTimeout to avoid state update conflicts
+      setTimeout(() => {
+        stopAudio(true); // Pass true to preserve the audio message for replay
+      }, 0);
+    }
   };
 
   // Increment/Decrement functions
@@ -279,7 +300,8 @@ const TutorHeader: React.FC<Props> = ({
     if (silenceDuration < 5000) {
       const newValue = silenceDuration + 100;
       setSilenceDuration(newValue);
-      setSilenceDurationText(newValue.toString());
+      // Convert to seconds for display
+      setSilenceDurationText((newValue / 1000).toFixed(1));
       saveSettingChange('SILENCE_DURATION', newValue);
     }
   };
@@ -288,7 +310,8 @@ const TutorHeader: React.FC<Props> = ({
     if (silenceDuration > 500) {
       const newValue = silenceDuration - 100;
       setSilenceDuration(newValue);
-      setSilenceDurationText(newValue.toString());
+      // Convert to seconds for display
+      setSilenceDurationText((newValue / 1000).toFixed(1));
       saveSettingChange('SILENCE_DURATION', newValue);
     }
   };
@@ -319,12 +342,15 @@ const TutorHeader: React.FC<Props> = ({
   };
 
   const handleSilenceDurationBlur = () => {
-    const numValue = parseInt(silenceDurationText);
-    if (isNaN(numValue) || numValue < 500 || numValue > 5000) {
-      setSilenceDurationText(silenceDuration.toString());
+    const numValue = parseFloat(silenceDurationText);
+    if (isNaN(numValue) || numValue < 0.5 || numValue > 5) {
+      // Convert back to seconds for display
+      setSilenceDurationText((silenceDuration / 1000).toString());
     } else {
-      setSilenceDuration(numValue);
-      saveSettingChange('SILENCE_DURATION', numValue);
+      // Convert seconds to milliseconds for internal use
+      const durationMs = numValue * 1000;
+      setSilenceDuration(durationMs);
+      saveSettingChange('SILENCE_DURATION', durationMs);
     }
   };
 
@@ -522,7 +548,7 @@ const TutorHeader: React.FC<Props> = ({
                   <View style={styles.sliderContainer}>
                     <Slider
                       style={styles.slider}
-                      minimumValue={0.6}  // 60%
+                      minimumValue={0.5}  // 50%
                       maximumValue={1.2}  // 120%
                       step={0.05}
                       value={tempo}
@@ -634,7 +660,7 @@ const TutorHeader: React.FC<Props> = ({
                   <View style={styles.audioParamContainer}>
                     <Text style={styles.audioParamLabel}>Auto-Send Duration</Text>
                     <Text style={styles.audioParamHint}>
-                      Silence time before auto-send (500-5000ms)
+                      Silence time before auto-send (0.5-5 seconds)
                     </Text>
                     <View style={styles.numericInputContainer}>
                       <TouchableOpacity
@@ -653,8 +679,8 @@ const TutorHeader: React.FC<Props> = ({
                         value={silenceDurationText}
                         onChangeText={updateSilenceDuration}
                         onBlur={handleSilenceDurationBlur}
-                        keyboardType="number-pad"
-                        maxLength={4}
+                        keyboardType="decimal-pad"
+                        maxLength={3}
                         selectTextOnFocus
                       />
                       <TouchableOpacity

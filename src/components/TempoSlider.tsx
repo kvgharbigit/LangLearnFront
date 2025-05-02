@@ -12,10 +12,10 @@ const TempoSlider: React.FC<Props> = ({ tempo, setTempo }) => {
   // Helper function to get descriptive text based on tempo value
   const getTempoDescription = (value: number): string => {
     if (value <= 0.55) return 'Very Slow';
-    if (value <= 0.65) return 'Slow';
+    if (value <= 0.7) return 'Slow';
     if (value <= 0.85) return 'Normal';
     if (value <= 1.0) return 'Fast';
-    if (value <= 1.25) return 'Very Fast';
+    if (value <= 1.1) return 'Very Fast';
     return 'Super Fast';
   };
 
@@ -25,7 +25,7 @@ const TempoSlider: React.FC<Props> = ({ tempo, setTempo }) => {
         <Slider
           style={styles.slider}
           minimumValue={0.5}
-          maximumValue={1.5}
+          maximumValue={1.2}
           step={0.05}
           value={tempo}
           onValueChange={setTempo}

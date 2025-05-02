@@ -516,7 +516,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       console.log(`🔍 BEFORE RESTORING AUDIO PARAMETERS`);
       
       // Ensure values are within valid ranges
-      const validTempo = Math.max(0.6, Math.min(1.2, parseFloat(audioSettings.tempo.toString())));
+      const validTempo = Math.max(0.5, Math.min(1.2, parseFloat(audioSettings.tempo.toString())));
       const validSpeechThreshold = Math.max(0, Math.min(100, audioSettings.speechThreshold));
       const validSilenceThreshold = Math.max(0, Math.min(validSpeechThreshold, audioSettings.silenceThreshold));
       const validSilenceDuration = Math.max(500, Math.min(5000, audioSettings.silenceDuration));
@@ -935,13 +935,100 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     setIsListening(false);
   };
 
+  // Function to stop any playing audio
+  const stopAudio = async (preserveLastMessage = false) => {
+    console.log(`🔇 Attempt to stop audio playback (preserveLastMessage: ${preserveLastMessage})`);
+    
+    // Guard against component unmounting or race conditions
+    if (!isMountedRef.current) {
+      console.log("🔇 Component unmounted, cannot stop audio");
+      return;
+    }
+    
+    // Check if audio is actually playing
+    if (!isPlaying) {
+      console.log("🔇 No audio playing, nothing to stop");
+      return;
+    }
+    
+    try {
+      console.log("🔇 Stopping audio playback on user request");
+      
+      // Reset isPlaying state first to ensure UI updates immediately
+      // This prevents "Playing" buttons from staying green
+      setIsPlaying(false);
+      
+      // Only clear the lastAudioMessageIndex if we don't want to preserve it
+      // This allows the replay button to still work after audio is stopped
+      if (!preserveLastMessage) {
+        setLastAudioMessageIndex(null);
+      }
+      
+      // Force a message list re-render
+      setHistory(prev => [...prev]);
+      
+      // Then handle the actual audio stopping
+      if (soundRef.current) {
+        // Remove any status update callbacks first
+        if (playbackCallbackRef.current) {
+          soundRef.current.setOnPlaybackStatusUpdate(null);
+          playbackCallbackRef.current = null;
+        }
+        
+        try {
+          await soundRef.current.stopAsync();
+          console.log("🔇 Audio stopped successfully");
+        } catch (audioError) {
+          console.log("🔇 Error stopping audio object:", audioError);
+          // Continue with cleanup even if the audio object errors out
+        }
+        
+        // Clear the sound reference, but don't set to null since we might need it for replay
+        if (!preserveLastMessage) {
+          soundRef.current = null;
+        }
+      }
+      
+      setStatusMessage('Audio playback stopped');
+    } catch (error) {
+      console.error('Error in stopAudio function:', error);
+      
+      // Even if there's an error, make sure UI state is reset
+      setIsPlaying(false);
+      
+      // Only reset the lastAudioMessageIndex if we don't want to preserve it
+      if (!preserveLastMessage) {
+        setLastAudioMessageIndex(null);
+      }
+    }
+  };
+
   //Replay
   const handleReplayLastMessage = async () => {
-    if (!lastAudioConversationId || lastAudioMessageIndex === null || isMuted || isPlaying) {
+    console.log(`🔄 Replay requested. lastAudioConversationId: ${lastAudioConversationId}, lastAudioMessageIndex: ${lastAudioMessageIndex}, isMuted: ${isMuted}, isPlaying: ${isPlaying}`);
+    
+    // Check if we can play audio
+    if (isMuted) {
+      console.log("🔇 Audio is muted, can't replay");
+      setStatusMessage('Audio is muted');
+      return;
+    }
+    
+    // If already playing, stop first
+    if (isPlaying) {
+      console.log("🔄 Already playing audio, stopping first");
+      await stopAudio(true); // Stop but preserve message index
+    }
+    
+    // Verify we have the necessary info to replay
+    if (!lastAudioConversationId || lastAudioMessageIndex === null) {
+      console.log("🔄 Missing audio reference info, can't replay");
+      setStatusMessage('No audio to replay');
       return;
     }
 
     try {
+      console.log(`🔄 Replaying message at index ${lastAudioMessageIndex}`);
       setStatusMessage('Replaying last message...');
 
       // Use the existing playAudio function with the saved conversation ID and message index
@@ -1155,7 +1242,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       console.log(`🔍 Current global audio settings:`, (global as any).__SAVED_AUDIO_SETTINGS);
 
       // Force tempo to be the correct type and range
-      currentTempo = Math.max(0.6, Math.min(1.2, parseFloat(currentTempo.toString())));
+      currentTempo = Math.max(0.5, Math.min(1.2, parseFloat(currentTempo.toString())));
       
       console.log(`🚀 Creating conversation with tempo: ${currentTempo} (${Math.round(currentTempo * 100)}%)`);
 
@@ -1709,7 +1796,7 @@ const handleAudioData = async () => {
       }
       
       // Ensure currentTempo is within valid range and is a number
-      currentTempo = Math.max(0.6, Math.min(1.2, parseFloat(currentTempo.toString())));
+      currentTempo = Math.max(0.5, Math.min(1.2, parseFloat(currentTempo.toString())));
       
       console.log(`🎧 Using tempo for audio playback: ${currentTempo} (${Math.round(currentTempo * 100)}%)`);
 
@@ -2190,6 +2277,9 @@ const renderMessages = () => {
       // Mute functionality
       isMuted={isMuted}
       setIsMuted={toggleMute}
+      // Audio playback control
+      isPlaying={isPlaying}
+      stopAudio={stopAudio}
       navigation={navigation}
     />
       <MuteInfoModal

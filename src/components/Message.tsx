@@ -331,18 +331,18 @@ const Message: React.FC<MessageProps> = ({
             <TouchableOpacity
               style={[
                 styles.replayButton,
-                isPlaying && styles.replayButtonPlaying
+                isPlaying === true && styles.replayButtonPlaying // Explicit check
               ]}
               onPress={onRequestReplay}
-              disabled={isPlaying}
+              disabled={isPlaying === true} // Explicit check
             >
-              {isPlaying ? (
+              {isPlaying === true ? ( // Explicit check
                 <Ionicons name="volume-high" size={16} color="#ffffff" />
               ) : (
                 <Ionicons name="play" size={16} color="#ffffff" />
               )}
               <Text style={styles.replayButtonText}>
-                {isPlaying ? 'Playing...' : 'Replay'}
+                {isPlaying === true ? 'Playing...' : 'Replay'} {/* Explicit check */}
               </Text>
             </TouchableOpacity>
           </View>
@@ -544,6 +544,12 @@ const styles = StyleSheet.create({
 // Export the component with memo for optimization
 // This needs to be outside any functions/blocks at the top level
 export default React.memo(Message, (prev, next) => {
+  // Always re-render when isPlaying changes to ensure UI updates
+  if (prev.isPlaying !== next.isPlaying) {
+    return false; // Return false to indicate it should re-render
+  }
+  
+  // Otherwise, check other props
   return (
     prev.message.content === next.message.content &&
     prev.message.corrected === next.message.corrected &&
@@ -551,7 +557,6 @@ export default React.memo(Message, (prev, next) => {
     prev.message.translation === next.message.translation &&
     prev.originalUserMessage === next.originalUserMessage &&
     prev.isLatestAssistantMessage === next.isLatestAssistantMessage &&
-    prev.isPlaying === next.isPlaying &&
     prev.isMuted === next.isMuted
   );
 });
