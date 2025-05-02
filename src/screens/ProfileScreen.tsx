@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  Switch,
   ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,9 +24,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
-  const [dailyReminderEnabled, setDailyReminderEnabled] = useState<boolean>(true);
-  const [weeklyProgressEnabled, setWeeklyProgressEnabled] = useState<boolean>(true);
 
   const handleLogout = async () => {
     Alert.alert(
@@ -72,7 +68,14 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
       <StatusBar style="dark" />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Confluency</Text>
+        <View style={styles.placeholderButton} />
       </View>
 
       <ScrollView style={styles.scrollView}>
@@ -97,62 +100,57 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
+        {/* Subscription Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Subscription</Text>
+          </View>
+
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => {
+              // Ensure correct navigation to nested screen
+              navigation.navigate('Subscription');
+              console.log('Navigating to Subscription screen');
+            }}
+          >
+            <View style={styles.menuItemContent}>
+              <Ionicons name="star" size={22} color="#FFB300" style={styles.menuIcon} />
+              <Text style={styles.menuItemTitle}>Manage Subscription</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+          </TouchableOpacity>
+        </View>
+
         {/* Preferences Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Preferences</Text>
           </View>
 
-          <View style={styles.menuItem}>
-            <View style={styles.menuItemContent}>
-              <Ionicons name="notifications" size={22} color={colors.secondary} style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>Notifications</Text>
-            </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
-              trackColor={{ false: colors.gray300, true: colors.primaryLight }}
-              thumbColor={notificationsEnabled ? colors.primary : colors.gray100}
-            />
-          </View>
-
-          {notificationsEnabled && (
-            <>
-              <View style={[styles.menuItem, styles.subMenuItem]}>
-                <View style={styles.menuItemContent}>
-                  <View style={styles.menuIconPlaceholder} />
-                  <Text style={styles.menuItemTitle}>Daily Reminder</Text>
-                </View>
-                <Switch
-                  value={dailyReminderEnabled}
-                  onValueChange={setDailyReminderEnabled}
-                  trackColor={{ false: colors.gray300, true: colors.primaryLight }}
-                  thumbColor={dailyReminderEnabled ? colors.primary : colors.gray100}
-                />
-              </View>
-
-              <View style={[styles.menuItem, styles.subMenuItem]}>
-                <View style={styles.menuItemContent}>
-                  <View style={styles.menuIconPlaceholder} />
-                  <Text style={styles.menuItemTitle}>Weekly Progress</Text>
-                </View>
-                <Switch
-                  value={weeklyProgressEnabled}
-                  onValueChange={setWeeklyProgressEnabled}
-                  trackColor={{ false: colors.gray300, true: colors.primaryLight }}
-                  thumbColor={weeklyProgressEnabled ? colors.primary : colors.gray100}
-                />
-              </View>
-            </>
-          )}
-
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+          >
             <View style={styles.menuItemContent}>
               <Ionicons name="language" size={22} color="#4CAF50" style={styles.menuIcon} />
               <Text style={styles.menuItemTitle}>App Language</Text>
             </View>
             <View style={styles.menuItemRight}>
               <Text style={styles.menuItemValue}>English</Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('LanguageLanding')}
+          >
+            <View style={styles.menuItemContent}>
+              <Ionicons name="school" size={22} color="#3F51B5" style={styles.menuIcon} />
+              <Text style={styles.menuItemTitle}>Learning Languages</Text>
+            </View>
+            <View style={styles.menuItemRight}>
+              <Text style={styles.menuItemValue}>Change</Text>
               <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
             </View>
           </TouchableOpacity>
@@ -166,32 +164,8 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemContent}>
-              <Ionicons name="help-circle" size={22} color="#FF9800" style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>Help Center</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemContent}>
               <Ionicons name="mail" size={22} color="#2196F3" style={styles.menuIcon} />
               <Text style={styles.menuItemTitle}>Contact Support</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemContent}>
-              <Ionicons name="document-text" size={22} color="#9C27B0" style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>Privacy Policy</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemContent}>
-              <Ionicons name="document-text" size={22} color="#9C27B0" style={styles.menuIcon} />
-              <Text style={styles.menuItemTitle}>Terms of Service</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
           </TouchableOpacity>
@@ -233,16 +207,28 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
-    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.gray800,
+    flex: 1,
+    textAlign: 'center',
+  },
+  backButton: {
+    padding: 8,
+    width: 40,
+  },
+  placeholderButton: {
+    width: 40,
+    padding: 8,
   },
   scrollView: {
     flex: 1,

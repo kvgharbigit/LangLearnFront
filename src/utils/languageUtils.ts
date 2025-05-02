@@ -99,24 +99,24 @@ export function getWelcomeMessage(language: string, learningObjective?: string):
  */
 export function getWelcomeTitle(language: string): string {
   const titles: Record<string, string> = {
-    "en": "Hello! I am your English tutor.",
-    "es": "¡Hola! Soy tu tutor de español.",
-    "fr": "Bonjour! Je suis votre tuteur de français.",
-    "it": "Ciao! Sono il tuo tutor di italiano.",
-    "de": "Hallo! Ich bin dein Deutsch-Tutor.",
-    "pt": "Olá! Sou seu tutor de português.",
-    "zh": "你好！我是你的中文老师。",
-    "ja": "こんにちは！私はあなたの日本語チューターです。",
-    "ko": "안녕하세요! 저는 당신의 한국어 튜터입니다.",
-    "ar": "مرحباً! أنا معلمك للغة العربية.",
-    "hi": "नमस्ते! मैं आपका हिंदी शिक्षक हूँ।",
-    "ru": "Привет! Я твой репетитор русского языка.",
-    "nl": "Hallo! Ik ben je Nederlandse tutor.",
-    "pl": "Cześć! Jestem twoim nauczycielem polskiego.",
-    "hu": "Szia! Én vagyok a magyar tanárod.",
-    "fi": "Hei! Olen suomen kielen opettajasi.",
-    "el": "Γεια σας! Είμαι ο καθηγητής ελληνικών σας.",
-    "tr": "Merhaba! Ben senin Türkçe öğretmeninim."
+    "en": "Welcome to Confluency!",
+    "es": "¡Bienvenido a Confluency!",
+    "fr": "Bienvenue à Confluency!",
+    "it": "Benvenuto a Confluency!",
+    "de": "Willkommen bei Confluency!",
+    "pt": "Bem-vindo à Confluency!",
+    "zh": "欢迎使用 Confluency!",
+    "ja": "Confluencyへようこそ!",
+    "ko": "Confluency에 오신 것을 환영합니다!",
+    "ar": "مرحبًا بك في Confluency!",
+    "hi": "Confluency में आपका स्वागत है!",
+    "ru": "Добро пожаловать в Confluency!",
+    "nl": "Welkom bij Confluency!",
+    "pl": "Witamy w Confluency!",
+    "hu": "Üdvözöljük a Confluency-ben!",
+    "fi": "Tervetuloa Confluency:iin!",
+    "el": "Καλώς ήρθατε στο Confluency!",
+    "tr": "Confluency'e hoş geldiniz!"
   };
 
   return titles[language] || titles["en"];
@@ -129,7 +129,7 @@ export function getWelcomeTitle(language: string): string {
  */
 export function getWelcomeSubtitle(language: string): string {
   const languageInfo = getLanguageInfo(language);
-  return `Start practicing your ${languageInfo.name} conversation skills!`;
+  return `Your AI language tutor for ${languageInfo.name}`;
 }
 
 /**

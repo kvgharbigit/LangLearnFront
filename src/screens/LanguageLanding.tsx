@@ -228,7 +228,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
                   style={styles.logoImage}
                 />
                 <View>
-                  <Text style={styles.title}>LangLearn</Text>
+                  <Text style={styles.title}>Confluency</Text>
                   <Text style={styles.tagline}>AI-powered language learning</Text>
                 </View>
               </View>

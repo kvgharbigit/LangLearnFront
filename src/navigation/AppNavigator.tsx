@@ -15,6 +15,7 @@ import LanguageTutor from '../screens/LanguageTutor';
 import AudioTestScreen from '../screens/AudioTestScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import SubscriptionScreen from '../screens/SubscriptionScreen';
 
 // Contexts
 import { useAuth } from '../contexts/AuthContext';
@@ -63,6 +64,7 @@ const ProfileStackNavigator = () => {
     <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
       <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
+      <ProfileStack.Screen name="Subscription" component={SubscriptionScreen} />
     </ProfileStack.Navigator>
   );
 };

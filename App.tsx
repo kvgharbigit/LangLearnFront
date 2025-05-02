@@ -11,6 +11,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
+import SubscriptionScreen from './src/screens/SubscriptionScreen';
 
 // Import existing screens
 import LanguageLanding from './src/screens/LanguageLanding';
@@ -68,6 +69,10 @@ const MainNavigator = () => {
       <Stack.Screen
         name="EditProfile"
         component={EditProfileScreen}
+      />
+      <Stack.Screen
+        name="Subscription"
+        component={SubscriptionScreen}
       />
     </Stack.Navigator>
   );

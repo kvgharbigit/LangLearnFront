@@ -3,4 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="lang_expo" />
   </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="confluency_front" project-jdk-type="Python SDK" />
 </project>

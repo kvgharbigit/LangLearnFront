@@ -11,6 +11,8 @@ import {
   KeyboardAvoidingView,
   Keyboard,
 } from 'react-native';
+import { hasAvailableQuota } from '../services/usageService';
+import QuotaExceededModal from '../components/QuotaExceededModal';
 import { Audio } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -57,8 +59,11 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const [isListening, setIsListening] = useState<boolean>(false);
   const [keyboardVisible, setKeyboardVisible] = useState<boolean>(false);
   const [canReplayLastMessage, setCanReplayLastMessage] = useState<boolean>(false);
-const [lastAudioConversationId, setLastAudioConversationId] = useState<string | null>(null);
-const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null>(null);
+  const [lastAudioConversationId, setLastAudioConversationId] = useState<string | null>(null);
+  const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null>(null);
+  
+  // Quota state
+  const [showQuotaExceededModal, setShowQuotaExceededModal] = useState<boolean>(false);
 
 
   // New state for customizable audio parameters
@@ -542,6 +547,25 @@ const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null
   const initializeConversation = async () => {
     try {
       setIsLoading(true);
+      
+      // Check if user has available quota
+      const hasQuota = await hasAvailableQuota();
+      if (!hasQuota) {
+        // Show quota exceeded modal
+        setShowQuotaExceededModal(true);
+        
+        // Create a welcome message that explains the quota limit
+        let quotaExceededMessage = {
+          role: 'assistant',
+          content: "You've reached your monthly usage limit. Please upgrade your subscription to continue using the language tutor.",
+          timestamp: new Date().toISOString(),
+          translation: ''
+        };
+        
+        setHistory([quotaExceededMessage]);
+        setIsLoading(false);
+        return;
+      }
 
       // Call the new API endpoint to create a conversation
       const response = await api.createConversation({
@@ -570,20 +594,35 @@ const [lastAudioMessageIndex, setLastAudioMessageIndex] = useState<number | null
       }
     } catch (error) {
       console.error('Error initializing conversation:', error);
+      
+      // Check if the error is due to quota exceeded
+      if (error instanceof Error && error.message.includes('quota exceeded')) {
+        setShowQuotaExceededModal(true);
+        
+        // Create a welcome message that explains the quota limit
+        let quotaExceededMessage = {
+          role: 'assistant',
+          content: "You've reached your monthly usage limit. Please upgrade your subscription to continue using the language tutor.",
+          timestamp: new Date().toISOString(),
+          translation: ''
+        };
+        
+        setHistory([quotaExceededMessage]);
+      } else {
+        // Fallback if the API call fails for other reasons
+        const currentTargetLanguage = getTargetLanguage();
+        const currentLearningObjective = getLearningObjective();
 
-      // Fallback if the API call fails
-      const currentTargetLanguage = getTargetLanguage();
-      const currentLearningObjective = getLearningObjective();
+        // Create a fallback welcome message
+        let welcomeMessage = {
+          role: 'assistant',
+          content: getWelcomeMessage(currentTargetLanguage, currentLearningObjective),
+          timestamp: new Date().toISOString(),
+          translation: ''
+        };
 
-      // Create a fallback welcome message
-      let welcomeMessage = {
-        role: 'assistant',
-        content: getWelcomeMessage(currentTargetLanguage, currentLearningObjective),
-        timestamp: new Date().toISOString(),
-        translation: ''
-      };
-
-      setHistory([welcomeMessage]);
+        setHistory([welcomeMessage]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1385,6 +1424,12 @@ const renderMessages = () => {
       <MuteInfoModal
         visible={showMuteInfoModal}
         onClose={() => setShowMuteInfoModal(false)}
+      />
+      
+      {/* Quota Exceeded Modal */}
+      <QuotaExceededModal
+        visible={showQuotaExceededModal}
+        onClose={() => setShowQuotaExceededModal(false)}
       />
 
       {/* Voice Input Toggle Bar */}

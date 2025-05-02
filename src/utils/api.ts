@@ -1,12 +1,31 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { ConversationMode } from '../components/ConversationModeSelector';
+import usageService from '../services/usageService';
+import { getCurrentUser, getIdToken } from '../services/authService';
 
 // Update this to your actual API URL
-//const API_URL = 'https://language-tutor-984417336702.asia-east1.run.app';
+const API_URL = 'https://language-tutor-984417336702.asia-east1.run.app';
 //const API_URL = 'http://192.168.86.26:8004';
 //const API_URL = 'http://192.168.86.241:8004';
-const API_URL = 'https://a84f-128-250-0-218.ngrok-free.app'; //work
+//const API_URL = 'https://a84f-128-250-0-218.ngrok-free.app'; //work
+
+// Helper to get user auth headers for API requests
+const getUserAuthHeaders = async () => {
+  const user = getCurrentUser();
+  if (!user) return {};
+  
+  try {
+    const token = await getIdToken(user, true);
+    return {
+      'Authorization': `Bearer ${token}`,
+      'X-User-ID': user.uid
+    };
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return { 'X-User-ID': user.uid };
+  }
+};
 
 // Update the ChatParams interface to include isMuted and conversationMode
 interface ChatParams {
@@ -49,6 +68,15 @@ export const sendTextMessage = async (
   conversationMode: ConversationMode = 'language_lesson'
 ) => {
   try {
+    // Check if user has available quota before making the request
+    const hasQuota = await usageService.hasAvailableQuota();
+    if (!hasQuota) {
+      throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+    }
+    
+    // Get user's auth headers
+    const authHeaders = await getUserAuthHeaders();
+    
     const params: ChatParams = {
       message,
       conversation_id: conversationId,
@@ -67,11 +95,21 @@ export const sendTextMessage = async (
 
     const response = await fetch(`${API_URL}/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...authHeaders
+      },
       body: JSON.stringify(params),
     });
 
     if (!response.ok) {
+      // Special handling for quota exceeded (403)
+      if (response.status === 403) {
+        // Force local quota check to sync with server
+        await usageService.forceQuotaExceeded();
+        throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+      }
+      
       throw new Error(`Server responded with status: ${response.status}`);
     }
 
@@ -82,6 +120,21 @@ export const sendTextMessage = async (
       // Find the index of the last assistant message
       const lastAssistantIndex = data.history.length - 1;
       data.message_index = lastAssistantIndex;
+    }
+    
+    // Track Claude API usage locally
+    if (data.history && data.history.length > 0) {
+      // Get the last assistant message for tracking
+      const lastMessage = data.history[data.history.length - 1];
+      if (lastMessage && lastMessage.content) {
+        // Track input (user message) and output (assistant reply)
+        await usageService.trackClaudeUsage(message, lastMessage.content);
+        
+        // Track TTS usage if audio is generated
+        if (data.has_audio && !isMuted) {
+          await usageService.trackTTSUsage(lastMessage.content);
+        }
+      }
     }
 
     return data;
@@ -117,6 +170,15 @@ export const sendVoiceRecording = async ({
   conversationMode = 'language_lesson'
 }: VoiceParams) => {
   try {
+    // Check if user has available quota before making the request
+    const hasQuota = await usageService.hasAvailableQuota();
+    if (!hasQuota) {
+      throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+    }
+    
+    // Get user's auth headers
+    const authHeaders = await getUserAuthHeaders();
+    
     // Get file info
     const fileInfo = await FileSystem.getInfoAsync(audioUri);
     if (!fileInfo.exists) {
@@ -145,19 +207,57 @@ export const sendVoiceRecording = async ({
     formData.append('is_muted', isMuted.toString());
     formData.append('conversation_mode', conversationMode);
 
+    // Add auth headers to formData for user identification
+    const userId = authHeaders['X-User-ID'];
+    if (userId) {
+      formData.append('user_id', userId);
+    }
+
     const response = await fetch(`${API_URL}/voice-input`, {
       method: 'POST',
       body: formData,
       headers: {
         'Content-Type': 'multipart/form-data',
+        ...authHeaders
       },
     });
 
     if (!response.ok) {
+      // Special handling for quota exceeded (403)
+      if (response.status === 403) {
+        // Force local quota check to sync with server
+        await usageService.forceQuotaExceeded();
+        throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+      }
+      
       throw new Error(`Server error: ${response.status}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    
+    // Track Whisper usage locally (estimate audio duration from file size)
+    // Audio files are typically ~16KB per second of audio at standard quality
+    const audioDurationEstimateSeconds = Math.max(1, Math.ceil(fileInfo.size / 16000));
+    await usageService.trackWhisperUsage(audioDurationEstimateSeconds);
+    
+    // Track Claude API usage locally (if there's a response)
+    if (data.history && data.history.length > 0) {
+      // Get the transcribed text and the last assistant message
+      const transcription = data.transcript || "";
+      const lastMessage = data.history[data.history.length - 1];
+      
+      if (lastMessage && lastMessage.content) {
+        // Track input (transcribed text) and output (assistant reply)
+        await usageService.trackClaudeUsage(transcription, lastMessage.content);
+        
+        // Track TTS usage if audio is generated
+        if (data.has_audio && !isMuted) {
+          await usageService.trackTTSUsage(lastMessage.content);
+        }
+      }
+    }
+
+    return data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;
@@ -265,6 +365,15 @@ export const createConversation = async ({
   isMuted?: boolean;
 }) => {
   try {
+    // Check if user has available quota before creating a new conversation
+    const hasQuota = await usageService.hasAvailableQuota();
+    if (!hasQuota) {
+      throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+    }
+    
+    // Get user's auth headers
+    const authHeaders = await getUserAuthHeaders();
+    
     // Create request body
     const requestBody = {
       difficulty,
@@ -284,17 +393,44 @@ export const createConversation = async ({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders
       },
       body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
+      // Special handling for quota exceeded (403)
+      if (response.status === 403) {
+        // Force local quota check to sync with server
+        await usageService.forceQuotaExceeded();
+        throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
+      }
+      
       const errorData = await response.json();
       console.error('Error creating conversation:', errorData);
       throw new Error(errorData.detail || 'Failed to create conversation');
     }
 
-    return await response.json();
+    const data = await response.json();
+    
+    // Track Claude API usage for the welcome message
+    if (data.history && data.history.length > 0) {
+      const welcomeMessage = data.history[0];
+      if (welcomeMessage && welcomeMessage.content) {
+        // The input for the welcome message is effectively the conversation context
+        const contextInput = `${targetLanguage} conversation with ${difficulty} difficulty${learningObjective ? ` about ${learningObjective}` : ''}`;
+        
+        // Track usage locally
+        await usageService.trackClaudeUsage(contextInput, welcomeMessage.content);
+        
+        // Track TTS usage if audio is generated
+        if (data.has_audio && !isMuted) {
+          await usageService.trackTTSUsage(welcomeMessage.content);
+        }
+      }
+    }
+
+    return data;
   } catch (error) {
     console.error('Create conversation error:', error);
     throw error;
