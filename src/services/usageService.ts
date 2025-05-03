@@ -326,8 +326,11 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
     
     // Use AsyncStorage instead of localStorage in React Native
     try {
-      // In Expo Go development mode, skip server verification
-      if (__DEV__) {
+      // Import isExpoGo and isDevelopment from deviceInfo.ts
+      const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+      
+      // Skip server verification only in development environment
+      if (isDevelopment() || isExpoGo()) {
         // For development environment, check subscription tier and set appropriate quota
         const { tier } = await getCurrentSubscription();
         if (tier !== 'free') {

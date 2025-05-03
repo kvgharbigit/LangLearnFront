@@ -6,9 +6,20 @@ import { Platform } from 'react-native';
  * require native modules not available in Expo Go
  */
 export const isExpoGo = (): boolean => {
-  // In Expo Go, application is bundled differently
-  const noBundleIdentifier = !Platform.constants.reactNativeVersion;
-  return noBundleIdentifier || typeof Platform.constants.brand === 'undefined';
+  // More reliable way to detect Expo Go environment
+  if (Platform.OS === 'web') return false;
+  
+  try {
+    // Check for Expo Constants
+    const Constants = require('expo-constants');
+    // executionEnvironment will be 'storeClient' if it's a production build from store
+    return Constants.executionEnvironment !== 'storeClient' && 
+           Constants.executionEnvironment !== 'standalone';
+  } catch (e) {
+    // Fallback method for detection (less reliable)
+    const noBundleIdentifier = !Platform.constants.reactNativeVersion;
+    return noBundleIdentifier || typeof Platform.constants.brand === 'undefined';
+  }
 };
 
 /**

@@ -53,6 +53,10 @@ const isExpoGo = () => {
 
 // Initialize RevenueCat
 export const initializeRevenueCat = (userId?: string) => {
+  // Import isExpoGo and isDevelopment from deviceInfo.ts to ensure we're using the updated detection
+  const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+  
+  // Skip initialization in Expo Go or development environment
   if (isExpoGo()) {
     console.log('RevenueCat initialization skipped in Expo Go');
     return;
@@ -61,8 +65,29 @@ export const initializeRevenueCat = (userId?: string) => {
   try {
     const apiKey = Platform.OS === 'ios' ? API_KEYS.ios : API_KEYS.android;
     
-    // This would normally use the Purchases SDK but we skip it in Expo Go
-    console.log('RevenueCat initialized with', apiKey);
+    // Use Purchases SDK in production builds
+    try {
+      const Purchases = require('react-native-purchases');
+      
+      // Configure with proper API key and user ID
+      Purchases.configure({ 
+        apiKey, 
+        appUserID: userId,
+        observerMode: false  // Ensure observer mode is off in production
+      });
+      
+      // Set debug logs only in development builds
+      if (__DEV__) {
+        Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+      } else {
+        // In production, use minimal logging
+        Purchases.setLogLevel(Purchases.LOG_LEVEL.ERROR);
+      }
+      
+      console.log('RevenueCat initialized with SDK and api key');
+    } catch (err) {
+      console.error('Failed to load RevenueCat SDK:', err);
+    }
   } catch (error) {
     console.error('Error initializing RevenueCat:', error);
   }
@@ -71,9 +96,12 @@ export const initializeRevenueCat = (userId?: string) => {
 // Get available packages
 export const getOfferings = async (): Promise<PurchasesPackage[]> => {
   try {
-    // In Expo Go, return mock packages based on subscription plans
-    if (isExpoGo()) {
-      console.log('Returning mock subscription packages in Expo Go');
+    // Import isExpoGo and isDevelopment from deviceInfo.ts
+    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    
+    // In Expo Go or development mode, return mock packages based on subscription plans
+    if (isExpoGo() || isDevelopment()) {
+      console.log('Returning mock subscription packages in development environment');
       // Create mock packages based on subscription plans
       return SUBSCRIPTION_PLANS
         .filter(plan => plan.tier !== 'free') // Exclude free tier
@@ -94,12 +122,26 @@ export const getOfferings = async (): Promise<PurchasesPackage[]> => {
         })) as PurchasesPackage[];
     }
 
-    // This would normally use the Purchases SDK but we skip it in Expo Go
-    console.log('Would fetch offerings from RevenueCat');
-    return [];
+    // Use actual RevenueCat SDK for production builds
+    try {
+      const Purchases = require('react-native-purchases');
+      const offerings = await Purchases.getOfferings();
+      
+      if (offerings.current && offerings.current.availablePackages) {
+        console.log('Received offerings from RevenueCat:', offerings.current.identifier);
+        return offerings.current.availablePackages;
+      } else {
+        console.warn('No offerings available from RevenueCat');
+        return [];
+      }
+    } catch (err) {
+      console.error('Failed to get offerings from RevenueCat SDK:', err);
+      return [];
+    }
   } catch (error) {
     console.error('Error fetching offerings:', error);
     // Return empty array instead of throwing in Expo Go
+    const { isExpoGo } = require('../utils/deviceInfo');
     if (isExpoGo()) return [];
     throw error;
   }
@@ -110,9 +152,12 @@ export const purchasePackage = async (
   pckg: PurchasesPackage
 ): Promise<CustomerInfo> => {
   try {
-    // In Expo Go, simulate a successful purchase
-    if (isExpoGo()) {
-      console.log('Simulating purchase in Expo Go for package:', pckg.identifier);
+    // Import isExpoGo and isDevelopment from deviceInfo.ts
+    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    
+    // In Expo Go or development environment, simulate a successful purchase
+    if (isExpoGo() || isDevelopment()) {
+      console.log('Simulating purchase in development environment for package:', pckg.identifier);
       
       // Create mock customerInfo response
       const mockTier = pckg.identifier.includes('basic_tier') ? 'basic' : 
@@ -131,24 +176,38 @@ export const purchasePackage = async (
           },
           all: {}
         },
-        originalAppUserId: 'expo_go_mock_user',
+        originalAppUserId: 'dev_mock_user',
         managementURL: null,
         originalPurchaseDate: new Date().toISOString(),
       } as CustomerInfo;
     }
 
-    // This would normally use the Purchases SDK but we skip it in Expo Go
-    console.log('Would purchase package from RevenueCat:', pckg.identifier);
-    throw new Error('Real purchases not available in Expo Go');
+    // Use actual RevenueCat SDK for production builds
+    try {
+      const Purchases = require('react-native-purchases');
+      console.log('Purchasing package from RevenueCat:', pckg.identifier);
+      
+      // Make the purchase with the SDK
+      const purchaseResult = await Purchases.purchasePackage(pckg);
+      console.log('Purchase successful');
+      
+      return purchaseResult.customerInfo;
+    } catch (err) {
+      console.error('Error with RevenueCat purchase:', err);
+      throw err;
+    }
   } catch (error) {
-    if (isExpoGo()) {
-      // In Expo Go, return a mock response instead of throwing
+    // Import isExpoGo and isDevelopment from deviceInfo.ts again to ensure it's available in this scope
+    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    
+    if (isExpoGo() || isDevelopment()) {
+      // In development, return a mock response instead of throwing
       return {
         entitlements: {
           active: {},
           all: {}
         },
-        originalAppUserId: 'expo_go_mock_user',
+        originalAppUserId: 'dev_mock_user',
         managementURL: null,
         originalPurchaseDate: new Date().toISOString(),
       } as CustomerInfo;
@@ -165,12 +224,15 @@ export const getCurrentSubscription = async (): Promise<{
   isActive: boolean;
 }> => {
   try {
-    // In Expo Go, return simulated subscription
-    if (isExpoGo()) {
-      console.log('Returning mock subscription in Expo Go');
+    // Import isExpoGo and isDevelopment from deviceInfo.ts
+    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    
+    // In Expo Go or development environment, return simulated subscription
+    if (isExpoGo() || isDevelopment()) {
+      console.log('Returning mock subscription in development environment');
       // Check local storage for any mock subscription set during testing
-      // In Expo Go, return a premium tier for development testing
-      console.log('Returning mock premium subscription in Expo Go');
+      // In development, return a premium tier for testing
+      console.log('Returning mock premium subscription for development');
       return {
         tier: 'premium',
         expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
@@ -178,26 +240,47 @@ export const getCurrentSubscription = async (): Promise<{
       };
     }
 
-    // This would normally use the Purchases SDK but we skip it in Expo Go
-    console.log('Would get customer info from RevenueCat');
-    
-    // Default to free tier if no active entitlements
-    return {
-      tier: 'free',
-      expirationDate: null,
-      isActive: false
-    };
-  } catch (error) {
-    console.error('Error getting subscription info:', error);
-    // Return default free tier in case of errors, especially in Expo Go
-    if (isExpoGo()) {
+    // In production, use the actual RevenueCat SDK
+    try {
+      const Purchases = require('react-native-purchases');
+      const customerInfo = await Purchases.getCustomerInfo();
+      
+      if (customerInfo && customerInfo.entitlements.active[ENTITLEMENT_ID]) {
+        // User has an active subscription
+        const activeEntitlement = customerInfo.entitlements.active[ENTITLEMENT_ID];
+        const productId = activeEntitlement.productIdentifier;
+        const tier = getTierFromProductIdentifier(productId);
+        
+        return {
+          tier,
+          expirationDate: activeEntitlement.expirationDate ? new Date(activeEntitlement.expirationDate) : null,
+          isActive: true
+        };
+      }
+      
+      // No active subscription - return free tier
+      return {
+        tier: 'free',
+        expirationDate: null,
+        isActive: false
+      };
+    } catch (err) {
+      console.error('Error getting customer info from RevenueCat:', err);
+      // Default to free tier if SDK fails
       return {
         tier: 'free',
         expirationDate: null,
         isActive: false
       };
     }
-    throw error;
+  } catch (error) {
+    console.error('Error getting subscription info:', error);
+    // Return default free tier in case of errors
+    return {
+      tier: 'free',
+      expirationDate: null,
+      isActive: false
+    };
   }
 };
 
@@ -214,32 +297,44 @@ const getTierFromProductIdentifier = (productId: string): SubscriptionTier => {
 // Restore purchases
 export const restorePurchases = async (): Promise<CustomerInfo> => {
   try {
-    // In Expo Go, return a mock response
-    if (isExpoGo()) {
-      console.log('Simulating restore purchases in Expo Go');
+    // Import isExpoGo and isDevelopment from deviceInfo.ts
+    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    
+    // In Expo Go or development environment, return a mock response
+    if (isExpoGo() || isDevelopment()) {
+      console.log('Simulating restore purchases in development environment');
       // Return a mock CustomerInfo object
       return {
         entitlements: {
           active: {},
           all: {}
         },
-        originalAppUserId: 'expo_go_mock_user',
+        originalAppUserId: 'dev_mock_user',
         managementURL: null,
         originalPurchaseDate: new Date().toISOString(),
       } as CustomerInfo;
     }
 
-    // This would normally use the Purchases SDK but we skip it in Expo Go
-    console.log('Would restore purchases from RevenueCat');
-    throw new Error('Restore purchases not available in Expo Go');
+    // In production, use the actual RevenueCat SDK
+    try {
+      const Purchases = require('react-native-purchases');
+      const restoreResult = await Purchases.restorePurchases();
+      
+      console.log('Purchases restored successfully');
+      return restoreResult.customerInfo;
+    } catch (err) {
+      console.error('Error restoring purchases with RevenueCat SDK:', err);
+      throw err;
+    }
   } catch (error) {
     console.error('Error restoring purchases:', error);
     
-    // In Expo Go, return a default mock instead of throwing
-    if (isExpoGo()) {
+    // In development, return a default mock instead of throwing
+    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    if (isExpoGo() || isDevelopment()) {
       return {
         entitlements: { active: {}, all: {} },
-        originalAppUserId: 'expo_go_mock_user',
+        originalAppUserId: 'dev_mock_user',
         managementURL: null,
         originalPurchaseDate: new Date().toISOString(),
       } as CustomerInfo;
