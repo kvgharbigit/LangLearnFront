@@ -44,4 +44,4 @@ yarn-error.*
 node_modules/
 
 # Google service account keys
-language-tutor-app-2025-*.json
+language-tutor-app-2025-*.jsonservice-account.json

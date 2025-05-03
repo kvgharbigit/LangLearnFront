@@ -12,13 +12,14 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "autoSubmit": true
     }
   },
   "submit": {
     "production": {
       "android": {
-        "serviceAccountKey": "GOOGLE_SERVICE_ACCOUNT_KEY",
+        "serviceAccountKeyPath": "service-account.json",
         "track": "internal"
       }
     }
