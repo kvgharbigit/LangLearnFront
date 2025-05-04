@@ -58,8 +58,8 @@ const MicrophoneTest: React.FC<MicrophoneTestProps> = ({
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        interruptionModeIOS: 1, // DoNotMix
-        interruptionModeAndroid: 1, // DoNotMix
+        interruptionModeIOS: 2, // MixWithOthers - allows audio to continue during modals
+        interruptionModeAndroid: 2, // MixWithOthers - allows audio to continue during modals
         shouldDuckAndroid: false,
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: false,
@@ -145,8 +145,8 @@ const MicrophoneTest: React.FC<MicrophoneTestProps> = ({
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
-        interruptionModeIOS: 1,
-        interruptionModeAndroid: 1,
+        interruptionModeIOS: 2, // MixWithOthers - allows audio to continue during modals
+        interruptionModeAndroid: 2, // MixWithOthers - allows audio to continue during modals
         shouldDuckAndroid: true,
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: false,

@@ -1058,8 +1058,8 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
           shouldDuckAndroid: true,
           playThroughEarpieceAndroid: false,
           staysActiveInBackground: false,
-          interruptionModeIOS: 1, // Audio.InterruptionModeIOS.DoNotMix = 1
-          interruptionModeAndroid: 1, // Audio.InterruptionModeAndroid.DoNotMix = 1
+          interruptionModeIOS: 2, // Audio.InterruptionModeIOS.MixWithOthers = 2
+          interruptionModeAndroid: 2, // Audio.InterruptionModeAndroid.MixWithOthers = 2
         });
 
         console.log('Audio session configured successfully');

@@ -67,9 +67,9 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
           await Audio.setAudioModeAsync({
             allowsRecordingIOS: true,
             playsInSilentModeIOS: true,
-            interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+            interruptionModeIOS: InterruptionModeIOS.MixWithOthers, // Allow audio to continue during modals
             shouldDuckAndroid: false,
-            interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+            interruptionModeAndroid: InterruptionModeAndroid.MixWithOthers, // Allow audio to continue during modals
             playThroughEarpieceAndroid: false,
             staysActiveInBackground: false,
           });
@@ -147,9 +147,9 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+        interruptionModeIOS: InterruptionModeIOS.MixWithOthers, // Allow audio to continue during modals
         shouldDuckAndroid: false,
-        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+        interruptionModeAndroid: InterruptionModeAndroid.MixWithOthers, // Allow audio to continue during modals
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: false,
       });

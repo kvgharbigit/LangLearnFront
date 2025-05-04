@@ -160,7 +160,13 @@ const TutorHeader: React.FC<Props> = ({
       saveSettings();
       setSettingsChanged(false);
     }
+    
+    // Set modal visibility without stopping audio
     setSettingsModalVisible(!settingsModalVisible);
+    
+    // IMPORTANT: We specifically avoid calling stopAudio() here
+    // This ensures audio continues playing when settings modal opens/closes
+    // In the parent component, audio should not be stopped on modal focus changes
   };
 
   const toggleHelpModal = () => {
@@ -441,6 +447,8 @@ const TutorHeader: React.FC<Props> = ({
       transparent={true}
       visible={settingsModalVisible}
       onRequestClose={toggleSettingsModal}
+      // Ensure audio continues playing when modal opens
+      // Uses default behavior - no audio pause/stop handlers
     >
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>

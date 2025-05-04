@@ -241,8 +241,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        interruptionModeIOS: 1, // 1 = DoNotMix
-        interruptionModeAndroid: 1, // 1 = DoNotMix
+        interruptionModeIOS: 2, // 2 = MixWithOthers - allows audio to continue during modals
+        interruptionModeAndroid: 2, // 2 = MixWithOthers - allows audio to continue during modals
         shouldDuckAndroid: false,
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: false,
@@ -289,8 +289,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        interruptionModeIOS: 1, // 1 = DoNotMix
-        interruptionModeAndroid: 1, // 1 = DoNotMix
+        interruptionModeIOS: 2, // 2 = MixWithOthers - allows audio to continue during modals
+        interruptionModeAndroid: 2, // 2 = MixWithOthers - allows audio to continue during modals
         shouldDuckAndroid: false,
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: false,
@@ -482,8 +482,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        interruptionModeIOS: 1, // 1 = DoNotMix
-        interruptionModeAndroid: 1, // 1 = DoNotMix
+        interruptionModeIOS: 2, // 2 = MixWithOthers - allows audio to continue during modals
+        interruptionModeAndroid: 2, // 2 = MixWithOthers - allows audio to continue during modals
         shouldDuckAndroid: false,
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: false,
@@ -526,8 +526,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        interruptionModeIOS: 1, // 1 = DoNotMix
-        interruptionModeAndroid: 1, // 1 = DoNotMix
+        interruptionModeIOS: 2, // 2 = MixWithOthers - allows audio to continue during modals
+        interruptionModeAndroid: 2, // 2 = MixWithOthers - allows audio to continue during modals
         shouldDuckAndroid: false,
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: false,
