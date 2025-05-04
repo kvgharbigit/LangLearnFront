@@ -8,8 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import offlineAssets from './offlineAssets';
 
 // Update this to your actual API URL
-const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
-//const API_URL = 'http://192.168.86.241:8004'; // Desktop WiFi IP address
+//const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
+const API_URL = 'http://192.168.86.241:8004'; // Desktop WiFi IP address
 //const API_URL = 'http://172.29.224.1:8004'; // WSL adapter IP
 //const API_URL = 'http://192.168.86.26:8004'; // Previous IP
 //const API_URL = 'https://a84f-128-250-0-218.ngrok-free.app'; //work
@@ -562,6 +562,14 @@ export const sendVoiceRecording = async ({
     // Audio files are typically ~16KB per second of audio at standard quality
     const audioDurationEstimateSeconds = Math.max(1, Math.ceil(fileInfo.size / 16000));
     await usageService.trackWhisperUsage(audioDurationEstimateSeconds);
+    
+    // Check if no speech was detected - this is a special response from our backend
+    if (data.no_speech_detected) {
+      // Pass this information back to the caller for handling
+      // No usage tracking required as no API calls were made
+      console.log("No speech detected in recording");
+      return data;
+    }
     
     // Track Claude API usage locally (if there's a response)
     if (data.history && data.history.length > 0) {

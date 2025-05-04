@@ -1637,6 +1637,33 @@ const handleAudioData = async () => {
     setStatusMessage('Received response from server');
     console.log("📨 Received response from server:", response);
 
+    // Check if no speech was detected in the recording
+    if (response.no_speech_detected) {
+      // Remove the temporary "Processing voice..." message
+      setHistory(prev => prev.filter(msg => !msg.isTemporary));
+      
+      // Show feedback to the user that no speech was detected
+      setStatusMessage("We couldn't hear you. Please try speaking again.");
+      
+      // Show a system message that will disappear after the next message
+      setHistory(prev => [
+        ...prev,
+        {
+          role: 'system',
+          content: "We couldn't hear your voice. Please try speaking louder or check your microphone.",
+          timestamp: new Date().toISOString(),
+          isTemporary: true
+        }
+      ]);
+      
+      // Reset processing state
+      setIsLoading(false);
+      setIsProcessing(false);
+      
+      // Return early - don't continue with normal message processing
+      return;
+    }
+
     // Update conversation, attaching corrections to the user message
     setHistory(prev => {
       const filtered = prev.filter(msg => !msg.isTemporary);
@@ -2483,7 +2510,7 @@ const renderMessages = () => {
                         ]}
                       />
                       <Text style={styles.micIcon}>⏱️</Text>
-                      <Text style={styles.buttonText}>Pre-buffering...</Text>
+                      <Text style={styles.buttonText}>Listening for Speech...</Text>
                     </>
                   ) : isProcessing ? (
                     <>
@@ -2540,7 +2567,7 @@ const renderMessages = () => {
                   ) : isPreBuffering ? (
                     <>
                       <Text style={styles.statusIcon}>⏱️</Text>
-                      <Text style={styles.statusText}>Pre-buffering... start speaking anytime</Text>
+                      <Text style={styles.statusText}>Speak when you're ready!</Text>
                     </>
                   ) : (
                     <>
