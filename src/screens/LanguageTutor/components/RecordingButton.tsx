@@ -86,7 +86,7 @@ const RecordingButton: React.FC<RecordingButtonProps> = ({
               { transform: [{ scale: pulseAnim }] }
             ]}
           />
-          <Text style={styles.micIcon}>⏹️</Text>
+          <Text style={styles.micIcon}>📩</Text>
         </>
       );
     } else if (isPreBuffering) {

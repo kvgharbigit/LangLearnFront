@@ -5,6 +5,9 @@ import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import { AUDIO_SETTINGS } from '../constants/settings'; // Import settings directly
 
+// Hardcoded maximum recording duration in milliseconds (30 seconds)
+const MAX_RECORDING_DURATION = 30000;
+
 // Types
 interface VoiceRecorderOptions {
   silenceThreshold?: number;
@@ -22,6 +25,7 @@ interface VoiceRecorderSettings {
   minRecordingTime: number;
   checkInterval: number;
   preBufferDuration: number; // Duration of pre-buffer in milliseconds
+  maxRecordingDuration: number; // Maximum recording duration in milliseconds
 }
 
 interface VoiceRecorderState {
@@ -34,7 +38,8 @@ interface VoiceRecorderState {
   silenceCountdown: number | null;
   audioSamples: number[];
   isProcessing: boolean;
-  isPreBuffering: boolean; // New state to track pre-buffer mode
+  isPreBuffering: boolean; // State to track pre-buffer mode
+  maxRecordingTimeRemaining: number | null; // Remaining time in seconds until max duration is reached
 }
 
 interface RecordingStatus {
@@ -50,7 +55,7 @@ interface VoiceRecorderResult extends VoiceRecorderState {
   resetRecording: () => void;
   setIsProcessing: (processing: boolean) => void;
   setStatusMessage: (message: string) => void;
-  startPreBuffering: () => Promise<void>; // New function to start pre-buffer mode
+  startPreBuffering: () => Promise<void>; // Function to start pre-buffer mode
   settings: VoiceRecorderSettings;
 }
 
@@ -70,6 +75,7 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
     minRecordingTime: options.minRecordingTime || AUDIO_SETTINGS.MIN_RECORDING_TIME,
     checkInterval: options.checkInterval || AUDIO_SETTINGS.CHECK_INTERVAL,
     preBufferDuration: options.preBufferDuration || 1000,
+    maxRecordingDuration: MAX_RECORDING_DURATION, // Use hardcoded constant instead of user option
   };
 
   // State
@@ -83,6 +89,7 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
   const [audioSamples, setAudioSamples] = useState<number[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isPreBuffering, setIsPreBuffering] = useState<boolean>(false);
+  const [maxRecordingTimeRemaining, setMaxRecordingTimeRemaining] = useState<number | null>(null);
 
   // Refs
   const recordingRef = useRef<Audio.Recording | null>(null);
@@ -95,6 +102,9 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
   const speechDetectedTimeRef = useRef<number | null>(null);
   const cleanupInProgressRef = useRef<boolean>(false);
   const preBufferTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Added ref for pre-buffer timeout
+  const maxRecordingTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Added ref for max recording duration timeout
+  const maxRecordingIntervalRef = useRef<NodeJS.Timeout | null>(null); // Interval to check recording duration
+  const stopRecordingRef = useRef<boolean>(false); // Flag to prevent duplicate stop calls
 
   // Tracking refs
   const hasSpeechRef = useRef<boolean>(false);
@@ -145,6 +155,19 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       if (preBufferTimeoutRef.current) {
         clearTimeout(preBufferTimeoutRef.current);
         preBufferTimeoutRef.current = null;
+      }
+      
+      // Clear max recording duration timeout
+      if (maxRecordingTimeoutRef.current) {
+        clearTimeout(maxRecordingTimeoutRef.current);
+        maxRecordingTimeoutRef.current = null;
+      }
+      
+      // Clear max recording duration interval
+      if (maxRecordingIntervalRef.current) {
+        clearInterval(maxRecordingIntervalRef.current);
+        maxRecordingIntervalRef.current = null;
+        console.log('Cleared max recording interval during cleanup');
       }
 
       // Clear silence detector interval
@@ -206,19 +229,29 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
     }
   }, [audioLevel]);
 
-  // Update UI from refs
+  // Update UI from refs and track max recording time remaining
   useEffect(() => {
     const syncUI = (): void => {
       if (mountedRef.current) {
         setHasSpeech(hasSpeechRef.current);
         setSilenceDetected(silenceDetectedRef.current);
         setIsPreBuffering(isPreBufferingRef.current);
+        
+        // Update max recording time remaining if actively recording
+        if (isRecording && recordingStartTimeRef.current) {
+          const elapsedTime = Date.now() - recordingStartTimeRef.current;
+          const remainingMs = Math.max(0, MAX_RECORDING_DURATION - elapsedTime);
+          const remainingSec = Math.ceil(remainingMs / 1000);
+          setMaxRecordingTimeRemaining(remainingSec);
+        } else if (!isRecording && maxRecordingTimeRemaining !== null) {
+          setMaxRecordingTimeRemaining(null);
+        }
       }
     };
 
-    const interval = setInterval(syncUI, 50);
+    const interval = setInterval(syncUI, 250); // Update slightly less frequently (every 250ms)
     return () => clearInterval(interval);
-  }, []);
+  }, [isRecording, maxRecordingTimeRemaining]);
 
   // Convert dB level to normalized 0-100 scale
   const normalizeAudioLevel = (db: number): number => {
@@ -258,6 +291,7 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       setPeakLevel(0);
       setAudioSamples([]);
       setSilenceCountdown(null);
+      setMaxRecordingTimeRemaining(null);
       setHasSpeech(false);
       setSilenceDetected(false);
       hasSpeechRef.current = false;
@@ -270,6 +304,12 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       if (preBufferTimeoutRef.current) {
         clearTimeout(preBufferTimeoutRef.current);
         preBufferTimeoutRef.current = null;
+      }
+      
+      // Clear any existing max recording duration timeout
+      if (maxRecordingTimeoutRef.current) {
+        clearTimeout(maxRecordingTimeoutRef.current);
+        maxRecordingTimeoutRef.current = null;
       }
 
       // Run cleanup to make sure we don't have any lingering recordings
@@ -369,6 +409,62 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
             // Update UI state to show we're now actively recording
             setIsRecording(true);
             setStatusMessage('Speech detected - recording...');
+            
+            // Set a timeout to automatically stop recording after max duration (30 seconds)
+            console.log(`Setting max recording timeout for exactly ${MAX_RECORDING_DURATION}ms (30 seconds) at ${new Date().toISOString()}`);
+            const startTime = Date.now();
+            
+            // Use both approaches to ensure at least one works: timeout and interval
+            
+            // 1. Traditional timeout approach
+            maxRecordingTimeoutRef.current = setTimeout(() => {
+              const elapsed = Date.now() - startTime;
+              console.log(`MAX RECORDING TIMEOUT TRIGGERED after ${elapsed}ms at ${new Date().toISOString()}`);
+              
+              if (mountedRef.current) {
+                console.log(`Component is mounted: ${mountedRef.current}`);
+                console.log(`Is recording state: ${isRecording}`);
+                
+                setStatusMessage('Maximum recording time (30s) reached - auto-stopping');
+                console.log('Maximum recording duration (30 seconds) reached - auto-stopping');
+                stopRecording();
+              } else {
+                console.log('Timeout triggered but component not mounted');
+              }
+            }, MAX_RECORDING_DURATION);
+            console.log(`Max recording timeout ID: ${maxRecordingTimeoutRef.current}`);
+            
+            // 2. Additional interval-based approach to ensure timing reliability
+            // Check every 500ms if we've exceeded the max recording duration
+            maxRecordingIntervalRef.current = setInterval(() => {
+              if (recordingStartTimeRef.current) {
+                const elapsedTime = Date.now() - recordingStartTimeRef.current;
+                
+                // Log progress every second
+                if (elapsedTime % 1000 < 500) {
+                  console.log(`Recording duration: ${elapsedTime}ms / ${MAX_RECORDING_DURATION}ms`);
+                }
+                
+                // If we've exceeded the max duration, stop recording
+                if (elapsedTime >= MAX_RECORDING_DURATION) {
+                  console.log(`MAX RECORDING INTERVAL CHECK: Duration ${elapsedTime}ms exceeds limit of ${MAX_RECORDING_DURATION}ms`);
+                  
+                  if (mountedRef.current && isRecording) {
+                    setStatusMessage('Maximum recording time (30s) reached - auto-stopping (interval)');
+                    console.log('Maximum recording duration (30 seconds) reached - auto-stopping (interval)');
+                    
+                    // Clear this interval first to prevent multiple calls
+                    if (maxRecordingIntervalRef.current) {
+                      clearInterval(maxRecordingIntervalRef.current);
+                      maxRecordingIntervalRef.current = null;
+                    }
+                    
+                    stopRecording();
+                  }
+                }
+              }
+            }, 500);
+            console.log(`Max recording interval ID: ${maxRecordingIntervalRef.current}`);
 
             // Set recording start time to when pre-buffer began (for silence detection timing)
             if (preBufferStartTimeRef.current) {
@@ -499,6 +595,7 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       setPeakLevel(0);
       setAudioSamples([]);
       setSilenceCountdown(null);
+      setMaxRecordingTimeRemaining(null);
       setHasSpeech(false);
       setSilenceDetected(false);
       hasSpeechRef.current = false;
@@ -512,6 +609,12 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       if (preBufferTimeoutRef.current) {
         clearTimeout(preBufferTimeoutRef.current);
         preBufferTimeoutRef.current = null;
+      }
+      
+      // Clear any existing max recording duration timeout
+      if (maxRecordingTimeoutRef.current) {
+        clearTimeout(maxRecordingTimeoutRef.current);
+        maxRecordingTimeoutRef.current = null;
       }
 
       setStatusMessage('Preparing to record...');
@@ -651,6 +754,62 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
 
       // Start tracking recording time
       recordingStartTimeRef.current = Date.now();
+      
+      // Set a timeout to automatically stop recording after max duration (30 seconds)
+      console.log(`Setting max recording timeout for exactly ${MAX_RECORDING_DURATION}ms (30 seconds) at ${new Date().toISOString()}`);
+      const startTime = Date.now();
+      
+      // Use both approaches to ensure at least one works: timeout and interval
+      
+      // 1. Traditional timeout approach
+      maxRecordingTimeoutRef.current = setTimeout(() => {
+        const elapsed = Date.now() - startTime;
+        console.log(`MAX RECORDING TIMEOUT TRIGGERED after ${elapsed}ms at ${new Date().toISOString()}`);
+        
+        if (mountedRef.current) {
+          console.log(`Component is mounted: ${mountedRef.current}`);
+          console.log(`Is recording state: ${isRecording}`);
+          
+          setStatusMessage('Maximum recording time (30s) reached - auto-stopping');
+          console.log('Maximum recording duration (30 seconds) reached - auto-stopping');
+          stopRecording();
+        } else {
+          console.log('Timeout triggered but component not mounted');
+        }
+      }, MAX_RECORDING_DURATION);
+      console.log(`Max recording timeout ID: ${maxRecordingTimeoutRef.current}`);
+      
+      // 2. Additional interval-based approach to ensure timing reliability
+      // Check every 500ms if we've exceeded the max recording duration
+      maxRecordingIntervalRef.current = setInterval(() => {
+        if (recordingStartTimeRef.current) {
+          const elapsedTime = Date.now() - recordingStartTimeRef.current;
+          
+          // Log progress every second
+          if (elapsedTime % 1000 < 500) {
+            console.log(`Recording duration: ${elapsedTime}ms / ${MAX_RECORDING_DURATION}ms`);
+          }
+          
+          // If we've exceeded the max duration, stop recording
+          if (elapsedTime >= MAX_RECORDING_DURATION) {
+            console.log(`MAX RECORDING INTERVAL CHECK: Duration ${elapsedTime}ms exceeds limit of ${MAX_RECORDING_DURATION}ms`);
+            
+            if (mountedRef.current && isRecording) {
+              setStatusMessage('Maximum recording time (30s) reached - auto-stopping (interval)');
+              console.log('Maximum recording duration (30 seconds) reached - auto-stopping (interval)');
+              
+              // Clear this interval first to prevent multiple calls
+              if (maxRecordingIntervalRef.current) {
+                clearInterval(maxRecordingIntervalRef.current);
+                maxRecordingIntervalRef.current = null;
+              }
+              
+              stopRecording();
+            }
+          }
+        }
+      }, 500);
+      console.log(`Max recording interval ID: ${maxRecordingIntervalRef.current}`);
 
       // Set up silence detection interval (used for UI updates)
       silenceDetectorRef.current = setInterval(() => {
@@ -680,6 +839,17 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
 
   // Stop recording function
   const stopRecording = useCallback(async (): Promise<void> => {
+    // Just in case this is called multiple times in quick succession
+    const isAlreadyStopping = stopRecordingRef.current;
+    if (isAlreadyStopping) {
+      console.log('Already stopping recording, ignoring duplicate stopRecording call');
+      return;
+    }
+    
+    // Set flag to prevent duplicate calls
+    stopRecordingRef.current = true;
+    
+    console.log(`stopRecording called at ${new Date().toISOString()}`);
     setStatusMessage('Stopping recording...');
 
     // Clear any pre-buffer timeout first
@@ -687,6 +857,20 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       clearTimeout(preBufferTimeoutRef.current);
       preBufferTimeoutRef.current = null;
       console.log('Cleared pre-buffer timeout during stopRecording');
+    }
+    
+    // Clear max recording timeout
+    if (maxRecordingTimeoutRef.current) {
+      clearTimeout(maxRecordingTimeoutRef.current);
+      maxRecordingTimeoutRef.current = null;
+      console.log('Cleared max recording timeout during stopRecording');
+    }
+    
+    // Clear max recording interval
+    if (maxRecordingIntervalRef.current) {
+      clearInterval(maxRecordingIntervalRef.current);
+      maxRecordingIntervalRef.current = null;
+      console.log('Cleared max recording interval during stopRecording');
     }
 
     if (!recordingRef.current) {
@@ -750,6 +934,12 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
     setIsPreBuffering(false);
     setSilenceDetected(false);
     silenceDetectedRef.current = false;
+    
+    // Reset stop recording flag
+    setTimeout(() => {
+      stopRecordingRef.current = false;
+      console.log('Reset stopRecordingRef');
+    }, 500);
   }, []);
 
   // Get the recorded audio URI
@@ -763,6 +953,7 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
     setPeakLevel(0);
     setAudioSamples([]);
     setSilenceCountdown(null);
+    setMaxRecordingTimeRemaining(null);
     setHasSpeech(false);
     setSilenceDetected(false);
     hasSpeechRef.current = false;
@@ -779,6 +970,13 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       preBufferTimeoutRef.current = null;
       console.log('Cleared pre-buffer timeout during resetRecording');
     }
+    
+    // Clear any existing max recording timeout
+    if (maxRecordingTimeoutRef.current) {
+      clearTimeout(maxRecordingTimeoutRef.current);
+      maxRecordingTimeoutRef.current = null;
+      console.log('Cleared max recording timeout during resetRecording');
+    }
   }, []);
 
   return {
@@ -793,6 +991,7 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
     audioSamples,
     isProcessing,
     isPreBuffering,
+    maxRecordingTimeRemaining,
 
     // Methods
     startRecording,

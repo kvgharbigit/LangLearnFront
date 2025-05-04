@@ -1150,7 +1150,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     // Function to stop audio playback
     const stopAudioPlayback = async () => {
-      console.log("⏹️ Screen blur/navigation - stopping audio playback");
+      console.log("📩 Screen blur/navigation - stopping audio playback");
       
       if (isPlaying && soundRef.current) {
         try {
@@ -1481,7 +1481,7 @@ const handleSubmit = async (inputMessage: string) => {
       console.error('Error getting saved tempo before sendTextMessage:', error);
     }
     
-    console.log(`📨 Sending text message with tempo: ${currentTempo} (${Math.round(currentTempo * 100)}%)`);
+    console.log(`📩 Sending text message with tempo: ${currentTempo} (${Math.round(currentTempo * 100)}%)`);
     
     const response = await api.sendTextMessage(
       inputMessage,
@@ -1635,7 +1635,7 @@ const handleAudioData = async () => {
     });
 
     setStatusMessage('Received response from server');
-    console.log("📨 Received response from server:", response);
+    console.log("📩 Received response from server:", response);
 
     // Check if no speech was detected in the recording
     if (response.no_speech_detected) {
@@ -2499,7 +2499,7 @@ const renderMessages = () => {
                           { transform: [{ scale: pulseAnim }] }
                         ]}
                       />
-                      <Text style={styles.micIcon}>⏹️</Text>
+                      <Text style={styles.micIcon}>📩</Text>
                     </>
                   ) : isPreBuffering ? (
                     <>

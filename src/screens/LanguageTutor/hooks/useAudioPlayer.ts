@@ -66,7 +66,7 @@ export default function useAudioPlayer({
   const stopAudio = useCallback(async (preserveLastMessage = false) => {
     if (soundRef.current) {
       try {
-        console.log('⏹️ Stopping audio playback');
+        console.log('📩 Stopping audio playback');
         
         // Remove the callback first
         if (playbackCallbackRef.current) {

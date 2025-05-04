@@ -452,7 +452,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     // Function to stop audio playback
     const stopAudioPlayback = async () => {
-      console.log("⏹️ Screen blur/navigation - stopping audio playback");
+      console.log("📩 Screen blur/navigation - stopping audio playback");
       
       if (isPlaying) {
         try {
