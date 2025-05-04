@@ -11,7 +11,7 @@ import RegisterScreen from '../screens/RegisterScreen';
 
 // Main App Screens
 import LanguageLanding from '../screens/LanguageLanding';
-import LanguageTutor from '../screens/LanguageTutor';
+import LanguageTutor from '../screens/LanguageTutorScreen'; // Updated to use the refactored component
 import AudioTestScreen from '../screens/AudioTestScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
