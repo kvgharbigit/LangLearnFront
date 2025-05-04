@@ -218,17 +218,17 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       setHistory(prev => [...prev, userMessage]);
       
       // Send message to API
-      const response = await api.sendChatMessage({
+      const response = await api.sendTextMessage(
         message,
         conversationId,
         tempo,
-        difficulty: getDifficulty(),
-        target_language: getTargetLanguage(),
-        native_language: getNativeLanguage(),
-        learning_objective: getLearningObjective(),
-        is_muted: isMuted,
-        conversation_mode: getConversationMode()
-      });
+        getDifficulty(),
+        getNativeLanguage(),
+        getTargetLanguage(),
+        getLearningObjective(),
+        isMuted,
+        getConversationMode()
+      );
       
       // Add assistant response to history
       if (response) {
