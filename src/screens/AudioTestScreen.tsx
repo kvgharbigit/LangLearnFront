@@ -478,10 +478,10 @@ const AudioTestScreen: React.FC<Props> = ({ navigation }) => {
                   style={[styles.button, styles.recordButton]}
                   onPress={startRecording}
                   disabled={isPlaying}
-                  accessibilityLabel="Start Recording"
+                  accessibilityLabel="Record"
                 >
                   <Ionicons name="mic" size={24} color="white" style={styles.buttonIcon} />
-                  <Text style={styles.buttonText}>Start Recording</Text>
+                  <Text style={styles.buttonText}>Record</Text>
                 </TouchableOpacity>
               )}
 

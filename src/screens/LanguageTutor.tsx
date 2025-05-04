@@ -1650,7 +1650,7 @@ const handleAudioData = async () => {
         ...prev,
         {
           role: 'system',
-          content: "We couldn't hear your voice. Please try speaking louder or check your microphone.",
+          content: "We couldn't hear your voice. Please try speaking louder or check your voice recognition settings.",
           timestamp: new Date().toISOString(),
           isTemporary: true
         }
@@ -2485,7 +2485,8 @@ const renderMessages = () => {
                     (isRecording || isPreBuffering) && styles.recordingButton,
                     isProcessing && styles.processingButton,
                     isListening && styles.listeningButton,
-                    isPlaying && styles.disabledVoiceButton // Add this new style
+                    isPlaying && styles.disabledVoiceButton,
+                    !isRecording && !isProcessing && !isListening && !isPlaying && autoRecordEnabled && styles.autoRecordButton
                   ]}
                   onPress={handleVoiceButtonClick}
                   disabled={isProcessing || isPlaying} // Add isPlaying to disabled condition
@@ -2498,8 +2499,7 @@ const renderMessages = () => {
                           { transform: [{ scale: pulseAnim }] }
                         ]}
                       />
-                      <Text style={styles.micIcon}>🎙️</Text>
-                      <Text style={styles.buttonText}>Stop Recording</Text>
+                      <Text style={styles.micIcon}>⏹️</Text>
                     </>
                   ) : isPreBuffering ? (
                     <>
@@ -2509,32 +2509,17 @@ const renderMessages = () => {
                           { transform: [{ scale: pulseAnim }] }
                         ]}
                       />
-                      <Text style={styles.micIcon}>⏱️</Text>
-                      <Text style={styles.buttonText}>Listening for Speech...</Text>
+                      <Text style={styles.micIcon}>👂</Text>
                     </>
                   ) : isProcessing ? (
-                    <>
-                      <Text style={styles.processingIcon}>⏳</Text>
-                      <Text style={styles.buttonText}>Processing...</Text>
-                    </>
+                    <Text style={styles.processingIcon}>⏳</Text>
                   ) : isPlaying ? (
-                    <>
-                      <Text style={styles.playingIcon}>🔊</Text>
-                      <Text style={styles.buttonText}>Audio playing...</Text>
-                    </>
+                    <Text style={styles.playingIcon}>🔊</Text>
                   ) : isListening ? (
-                    <>
-                      <Text style={styles.listeningIcon}>👂</Text>
-                      <Text style={styles.buttonText}>Listening for speech...</Text>
-                    </>
+                    <Text style={styles.listeningIcon}>👂</Text>
                   ) : (
                     <>
                       <Text style={styles.micIcon}>🎙️</Text>
-                      <Text style={styles.buttonText}>
-                        {autoRecordEnabled
-                          ? 'Start Recording (auto after AI)'
-                          : 'Start Recording'}
-                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -2602,6 +2587,11 @@ const renderMessages = () => {
 };
 
 const styles = StyleSheet.create({
+  buttonContentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: 'white',
@@ -2770,15 +2760,12 @@ const styles = StyleSheet.create({
   voiceButton: {
     position: 'relative',
     backgroundColor: colors.primary,
-    borderRadius: 50,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+    borderRadius: 40, // Make it perfectly round
+    width: 80, // Set width and height to be the same
+    height: 80, // Large enough for the emoji
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    width: 250,
-    height: 54,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -2794,6 +2781,16 @@ const styles = StyleSheet.create({
   listeningButton: {
     backgroundColor: colors.info,
   },
+  autoRecordButton: {
+    backgroundColor: '#8e44ad', // Purple color to indicate auto-record mode
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    shadowColor: '#8e44ad',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 6, // For Android
+  },
   disabledVoiceButton: {
     backgroundColor: colors.gray400,
     opacity: 0.7,
@@ -2801,7 +2798,9 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   playingIcon: {
-    fontSize: 20,
+    fontSize: 36,
+    textAlign: 'center',
+    textAlignVertical: 'center',
   },
   pulse: {
     position: 'absolute',
@@ -2812,18 +2811,26 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   micIcon: {
-    fontSize: 20,
+    fontSize: 36, // Make emoji larger to fit the circular button
+    textAlignVertical: 'center',
+    textAlign: 'center', // Center horizontally
   },
   processingIcon: {
-    fontSize: 20,
+    fontSize: 36, // Same size as the mic icon
+    textAlign: 'center',
+    textAlignVertical: 'center',
   },
   listeningIcon: {
-    fontSize: 20,
+    fontSize: 36,
+    textAlign: 'center',
+    textAlignVertical: 'center',
   },
   buttonText: {
     color: 'white',
     fontWeight: '500',
     fontSize: 16,
+    textAlignVertical: 'center',
+    marginTop: 1, // Slight adjustment to fine-tune vertical alignment
   },
   recordingStatus: {
     flexDirection: 'row',
