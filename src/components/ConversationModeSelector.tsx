@@ -28,32 +28,6 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
   // Categorized options for conversation modes
   const conversationCategories = [
     {
-      title: 'Language Lessons',
-      modes: [
-        {
-          id: 'language_lesson' as ConversationMode,
-          label: 'Grammar Lesson',
-          icon: 'book-outline',
-          description: 'Master specific grammar rules, verb forms, and language structures with focused guidance.',
-          placeholder: '• The Subjunctive Mood\n• Conjugating the Preterite \n• Common Verbs'
-        },
-        {
-          id: 'verb_challenge' as ConversationMode,
-          label: 'Verb Challenge',
-          icon: 'flash-outline',
-          description: 'Practice constructing sentences with essential verbs in different tenses and moods.',
-          placeholder: '• Specific verb tenses to practice\n• Difficulty level preferences\n• Types of verbs'
-        },
-        {
-          id: 'noun_challenge' as ConversationMode,
-          label: 'Noun Challenge',
-          icon: 'cube-outline',
-          description: 'Build vocabulary and sentence skills using important nouns from your areas of interest.',
-          placeholder: '• Categories of nouns\n• Specific topics\n• Difficulty preferences'
-        }
-      ]
-    },
-    {
       title: 'Conversations',
       modes: [
         {
@@ -83,6 +57,32 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
           icon: 'theatre-outline',
           description: 'Practice real-life conversations in common scenarios like restaurants, travel, and shopping.',
           placeholder: '• At a restaurant\n• Job interview\n• Airport check-in\n• Shopping for clothes'
+        }
+      ]
+    },
+    {
+      title: 'Language Lessons',
+      modes: [
+        {
+          id: 'language_lesson' as ConversationMode,
+          label: 'Grammar Lesson',
+          icon: 'book-outline',
+          description: 'Master specific grammar rules, verb forms, and language structures with focused guidance.',
+          placeholder: '• The Subjunctive Mood\n• Conjugating the Preterite \n• Common Verbs'
+        },
+        {
+          id: 'verb_challenge' as ConversationMode,
+          label: 'Verb Challenge',
+          icon: 'flash-outline',
+          description: 'Practice constructing sentences with essential verbs in different tenses and moods.',
+          placeholder: '• Specific verb tenses to practice\n• Difficulty level preferences\n• Types of verbs'
+        },
+        {
+          id: 'noun_challenge' as ConversationMode,
+          label: 'Noun Challenge',
+          icon: 'cube-outline',
+          description: 'Build vocabulary and sentence skills using important nouns from your areas of interest.',
+          placeholder: '• Categories of nouns\n• Specific topics\n• Difficulty preferences'
         }
       ]
     }
