@@ -19,6 +19,7 @@ import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { loginUser, resetPassword, signInWithGoogle } from '../services/supabaseAuthService';
+import { initializeUserData } from '../utils/initializeUserData';
 import { AuthStackParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
@@ -84,7 +85,15 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
 
-      // Success - navigation will be handled by the auth state observer
+      // Success - initialize user data in backend
+      if (user) {
+        console.log('Login successful, initializing user data...');
+        initializeUserData(user.id).catch(err => {
+          console.error('Error initializing user data after login:', err);
+        });
+      }
+
+      // Navigation will be handled by the auth state observer
     } catch (error) {
       setErrorMessage('An unexpected error occurred');
       console.error('Login error:', error);

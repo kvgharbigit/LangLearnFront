@@ -17,10 +17,15 @@ import {
 import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { registerUser } from '../services/supabaseAuthService';
+import { registerUser, logoutUser, clearCachedUser } from '../services/supabaseAuthService';
+import { initializeUserData } from '../utils/initializeUserData';
+import { supabase } from '../supabase/config';
 import { AuthStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { clearAllPreferences } from '../utils/userPreferences';
+import { clearLanguagePreferences } from '../utils/languageStorage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -34,6 +39,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState<boolean>(false);
   
@@ -104,6 +110,15 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     setIsLoading(true);
     
     try {
+      // Clear app preferences first
+      console.log('Clearing app preferences...');
+      await clearAllPreferences();
+      await clearLanguagePreferences();
+      
+      // This function handles the complete registration process
+      // including clearing previous sessions, creating the account,
+      // and establishing a new session
+      console.log('Starting registration process...');
       const { user, error } = await registerUser(email, password, name);
       
       if (error) {
@@ -112,14 +127,35 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           setErrorMessage('This email is already registered');
         } else if (error.message.includes('weak-password')) {
           setErrorMessage('Password is too weak. Use at least 8 characters with a mix of letters, numbers, and symbols');
+        } else if (error.message.includes('Database error saving new user')) {
+          setErrorMessage('Account creation failed. Please try using a different email address.');
+        } else if (error.message.includes('different email')) {
+          setErrorMessage('Account creation failed. Please try using a different email address.');
+        } else if (error.message.includes('security purposes') || error.message.includes('rate limit')) {
+          // Handle rate limiting errors
+          setErrorMessage('Too many registration attempts. Please wait a moment before trying again or use a different email address.');
         } else {
           setErrorMessage(error.message || 'Registration failed');
         }
         return;
       }
       
-      // Success - navigation will be handled by auth state observer
-      // You may want to show a success message here
+      console.log('Registration successful, user ID:', user?.id);
+      
+      // Initialize user data in the backend
+      if (user) {
+        console.log('Initializing user data after registration...');
+        initializeUserData(user.id).catch(err => {
+          console.error('Error initializing user data after registration:', err);
+        });
+      }
+      
+      // Show success message to the user - now that email verification is disabled
+      setIsLoading(false);
+      setErrorMessage(null);
+      setSuccessMessage('Registration successful! You can now sign in to your account.');
+      
+      // If we get here, everything worked - navigation will be handled by auth state observer
       
     } catch (error) {
       setErrorMessage('An unexpected error occurred');
@@ -198,6 +234,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.errorContainer}>
                 <Ionicons name="alert-circle" size={20} color="#B71C1C" />
                 <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            )}
+            
+            {/* Success message display */}
+            {successMessage && (
+              <View style={styles.successContainer}>
+                <Ionicons name="checkmark-circle" size={20} color="#2E7D32" />
+                <Text style={styles.successText}>{successMessage}</Text>
               </View>
             )}
             
@@ -576,6 +620,22 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#B71C1C',
+    fontSize: 14,
+    flex: 1,
+  },
+  successContainer: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  successText: {
+    color: '#2E7D32',
     fontSize: 14,
     flex: 1,
   },

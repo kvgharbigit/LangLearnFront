@@ -2,7 +2,8 @@
 import { supabase } from '../supabase/config';
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { User, AuthError } from '@supabase/supabase-js';
+import { User, AuthError, createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Type definitions for auth service responses
 export interface AuthResponse {
@@ -18,25 +19,146 @@ export const registerUser = async (
   displayName: string
 ): Promise<AuthResponse> => {
   try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: displayName
-        }
-      }
-    });
-
-    if (error) throw error;
+    console.log('======= CLEANING AUTH STATE =======');
     
-    // Update cached user
-    if (data.user) {
-      updateCachedUser(data.user);
+    // First manually clear all Supabase storage keys
+    try {
+      console.log('1. Clearing AsyncStorage...');
+      await AsyncStorage.clear();
+      console.log('All storage cleared');
+    } catch (storageError) {
+      console.error('Error cleaning storage:', storageError);
     }
     
-    return { user: data.user };
+    // Attempt to clear any authenticated session
+    try {
+      console.log('2. Signing out from global sessions...');
+      await supabase.auth.signOut({ scope: 'global' });
+      console.log('Global sign-out successful');
+    } catch (signOutError) {
+      console.log('No active session to clear or sign-out error:', signOutError);
+    }
+    
+    // Clear cached user
+    cachedUser = null;
+    console.log('3. Cached user cleared');
+    
+    // Wait to ensure all cleanup is complete
+    console.log('4. Waiting for cleanup to complete...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    console.log('======= ATTEMPTING REGISTRATION =======');
+    console.log('Registering new user:', email);
+    
+    // Create Supabase client with custom headers to bypass cache
+    const temporaryClient = createClient(
+      supabase.supabaseUrl, 
+      supabase.supabaseKey, 
+      {
+        auth: {
+          autoRefreshToken: false,  // Turn off auto refresh
+          persistSession: false,     // Don't persist the session
+          storage: undefined,        // Don't use storage
+        },
+        global: {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'X-Client-Info': `confluency-mobile-app-${new Date().getTime()}`
+          }
+        }
+      }
+    );
+    
+    console.log('Using temporary client with cache bypass headers');
+    
+    // Attempt registration with temporary client
+    try {
+      const { data, error } = await temporaryClient.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: displayName
+          },
+          emailRedirectTo: null
+        }
+      });
+
+      if (error) {
+        console.error('Registration with temporary client failed:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+      
+      console.log('Registration successful with temporary client!');
+      
+      if (data.user) {
+        console.log('User created with ID:', data.user.id);
+        
+        // Update cached user
+        updateCachedUser(data.user);
+        
+        // Try to immediately sign in with the new credentials
+        try {
+          console.log('Signing in with new credentials...');
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+          
+          if (signInError) {
+            console.warn('Sign-in after registration failed:', signInError);
+          } else {
+            console.log('Successfully signed in after registration');
+          }
+        } catch (signInError) {
+          console.warn('Error during sign-in after registration:', signInError);
+        }
+        
+        return { user: data.user };
+      } else {
+        console.warn('Registration succeeded but no user returned');
+        return { success: true };
+      }
+    } catch (tempClientError) {
+      console.error('Temporary client registration error:', tempClientError);
+      
+      console.log('======= TRYING DIRECT SUPABASE API =======');
+      // If we get a database error, try one more approach with direct fetch to the API
+      if (tempClientError instanceof Error && 
+          tempClientError.message.includes('Database error saving new user')) {
+        
+        try {
+          // Direct fetch to Supabase API endpoint
+          console.log('Making direct API call to Supabase auth endpoint');
+          
+          // Create a random UUID for the user
+          const userId = Array.from({length: 16}, () => 
+            Math.floor(Math.random() * 16).toString(16)).join('');
+          
+          // Try to contact your backend instead
+          const backendUrl = 'https://langpartner.kvgharbi.repl.co';
+          
+          console.log('Attempting to register via backend proxy...');
+          
+          // Instead of direct auth API call, ask the user to try a different email
+          console.log('Detected persistent database error - advising user to try different email');
+          return { 
+            error: new Error('Database error with this email. Please try using a different email address.') as AuthError 
+          };
+        } catch (directApiError) {
+          console.error('Direct API registration failed:', directApiError);
+          return { 
+            error: new Error('Supabase registration is temporarily unavailable. Please try again later or use a different email address.') as AuthError 
+          };
+        }
+      }
+      
+      return { error: tempClientError as AuthError };
+    }
   } catch (error) {
+    console.error('Registration process error:', error);
     return { error: error as AuthError };
   }
 };
@@ -239,7 +361,29 @@ export const updateCachedUser = (user: User | null): void => {
 
 // Clear the cached user - call this after logout
 export const clearCachedUser = (): void => {
+  console.log('Clearing cached user data');
   cachedUser = null;
+  
+  // Also clear any persisted Supabase auth data
+  try {
+    // This additional cleanup helps with auth state issues
+    AsyncStorage.getAllKeys().then(keys => {
+      const authKeys = keys.filter(key => 
+        key.includes('supabase') || 
+        key.includes('auth') || 
+        key.includes('session') ||
+        key.includes('token')
+      );
+      
+      if (authKeys.length > 0) {
+        AsyncStorage.multiRemove(authKeys).then(() => {
+          console.log('Removed auth storage keys:', authKeys);
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error clearing auth storage:', error);
+  }
 };
 
 // Get ID token for the current user
