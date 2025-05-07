@@ -17,7 +17,7 @@ import {
 import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { registerUser } from '../services/authService';
+import { registerUser } from '../services/supabaseAuthService';
 import { AuthStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -57,53 +57,70 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     ]).start();
   }, []);
 
-  const handleRegister = async () => {
-    // Clear previous errors
-    setErrorMessage(null);
-
-    // Basic validation
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      setErrorMessage('Please fill in all fields');
-      return;
+  // Validate form fields
+  const validateForm = (): boolean => {
+    if (!name.trim()) {
+      setErrorMessage('Please enter your name');
+      return false;
     }
-
+    
+    if (!email.trim()) {
+      setErrorMessage('Please enter your email');
+      return false;
+    }
+    
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      setErrorMessage('Please enter a valid email address');
+      return false;
+    }
+    
+    if (!password.trim()) {
+      setErrorMessage('Please enter a password');
+      return false;
+    }
+    
+    if (password.length < 8) {
+      setErrorMessage('Password must be at least 8 characters');
+      return false;
+    }
+    
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match');
+      return false;
+    }
+    
+    return true;
+  };
+
+  // Handle register action
+  const handleRegister = async () => {
+    setErrorMessage(null);
+    
+    if (!validateForm()) {
       return;
     }
-
-    if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters');
-      return;
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setErrorMessage('Please enter a valid email address');
-      return;
-    }
-
+    
     setIsLoading(true);
-
+    
     try {
       const { user, error } = await registerUser(email, password, name);
-
+      
       if (error) {
-        // Handle specific error codes
-        if (error.code === 'auth/email-already-in-use') {
-          setErrorMessage('This email is already in use');
-        } else if (error.code === 'auth/invalid-email') {
-          setErrorMessage('Invalid email address');
-        } else if (error.code === 'auth/weak-password') {
-          setErrorMessage('Password is too weak');
+        // Handle specific error cases
+        if (error.message.includes('email already in use')) {
+          setErrorMessage('This email is already registered');
+        } else if (error.message.includes('weak-password')) {
+          setErrorMessage('Password is too weak. Use at least 8 characters with a mix of letters, numbers, and symbols');
         } else {
-          setErrorMessage(error.message || 'Failed to register');
+          setErrorMessage(error.message || 'Registration failed');
         }
         return;
       }
-
-      // Success - navigation will be handled by the auth state observer
+      
+      // Success - navigation will be handled by auth state observer
+      // You may want to show a success message here
+      
     } catch (error) {
       setErrorMessage('An unexpected error occurred');
       console.error('Registration error:', error);
@@ -116,7 +133,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const togglePasswordVisibility = () => {
     setPasswordVisible(prev => !prev);
   };
-
+  
   // Toggle confirm password visibility
   const toggleConfirmPasswordVisibility = () => {
     setConfirmPasswordVisible(prev => !prev);
@@ -134,15 +151,6 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.bgCircle2} />
       </View>
       
-      {/* Back button */}
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigation.navigate('Login')}
-        accessibilityLabel="Go back to login"
-      >
-        <Ionicons name="arrow-back" size={24} color={colors.primary} />
-      </TouchableOpacity>
-      
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
@@ -157,18 +165,34 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
               { opacity: fadeAnim, transform: [{ translateY }] }
             ]}
           >
+            {/* Back button */}
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              accessibilityLabel="Go back"
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.gray800} />
+            </TouchableOpacity>
+            
             {/* Logo and title section */}
             <View style={styles.logoContainer}>
               <Image
                 source={require('../../assets/transparent_background_icon.png')}
                 style={styles.logoImage}
               />
-              <Text style={styles.title}>Confluency</Text>
+              <View>
+                <Text style={styles.title}>Confluency</Text>
+                <Text style={styles.tagline}>AI-powered language learning</Text>
+              </View>
             </View>
-
-            <Text style={styles.subtitle}>Create Your Account</Text>
-            <Text style={styles.descText}>Sign up to start your language learning journey</Text>
-
+            
+            <View style={styles.welcomeContainer}>
+              <Text style={styles.subtitle}>Create Account</Text>
+              <Text style={styles.welcomeText}>
+                Join our community of language learners
+              </Text>
+            </View>
+            
             {/* Error message display */}
             {errorMessage && (
               <View style={styles.errorContainer}>
@@ -176,28 +200,29 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             )}
-
+            
             {/* Form container */}
             <View style={styles.formContainer}>
               {/* Name input */}
               <View style={styles.inputContainer}>
                 <View style={styles.inputLabelContainer}>
                   <Ionicons name="person-outline" size={18} color={colors.gray600} />
-                  <Text style={styles.inputLabel}>Name</Text>
+                  <Text style={styles.inputLabel}>Full Name</Text>
                 </View>
                 <View style={styles.inputWrapper}>
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter your name"
+                    placeholder="Enter your full name"
                     value={name}
                     onChangeText={setName}
                     autoCapitalize="words"
                     returnKeyType="next"
+                    autoComplete="name"
                     placeholderTextColor={colors.gray500}
                   />
                 </View>
               </View>
-
+              
               {/* Email input */}
               <View style={styles.inputContainer}>
                 <View style={styles.inputLabelContainer}>
@@ -218,7 +243,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                   />
                 </View>
               </View>
-
+              
               {/* Password input */}
               <View style={styles.inputContainer}>
                 <View style={styles.inputLabelContainer}>
@@ -247,8 +272,11 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                     />
                   </TouchableOpacity>
                 </View>
+                <Text style={styles.passwordHint}>
+                  Use at least 8 characters with a mix of letters, numbers, and symbols
+                </Text>
               </View>
-
+              
               {/* Confirm Password input */}
               <View style={styles.inputContainer}>
                 <View style={styles.inputLabelContainer}>
@@ -279,41 +307,44 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                   </TouchableOpacity>
                 </View>
               </View>
-
+              
               {/* Register button */}
               <TouchableOpacity
                 style={[
                   styles.registerButton,
-                  (!name || !email || !password || !confirmPassword || isLoading) &&
-                    styles.disabledButton,
+                  (!name || !email || !password || !confirmPassword || isLoading) && styles.disabledButton
                 ]}
                 onPress={handleRegister}
-                disabled={
-                  !name || !email || !password || !confirmPassword || isLoading
-                }
+                disabled={!name || !email || !password || !confirmPassword || isLoading}
                 accessibilityLabel="Create Account"
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color="#fff" />
                 ) : (
                   <>
                     <Text style={styles.registerButtonText}>Create Account</Text>
-                    <Ionicons name="arrow-forward" size={20} color="white" style={styles.buttonIcon} />
+                    <Ionicons name="person-add" size={20} color="white" style={styles.registerIcon} />
                   </>
                 )}
               </TouchableOpacity>
             </View>
-
-            {/* Login link */}
-            <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>Already have an account?</Text>
-              <TouchableOpacity 
+            
+            {/* Sign in link */}
+            <View style={styles.signinContainer}>
+              <Text style={styles.signinText}>Already have an account?</Text>
+              <TouchableOpacity
                 onPress={() => navigation.navigate('Login')}
-                accessibilityLabel="Log In"
+                style={styles.signinLink}
+                accessibilityLabel="Sign In"
               >
-                <Text style={styles.loginLink}>Log In</Text>
+                <Text style={styles.signinLinkText}>Sign In</Text>
               </TouchableOpacity>
             </View>
+            
+            {/* Terms and conditions */}
+            <Text style={styles.termsText}>
+              By creating an account, you agree to our Terms of Service and Privacy Policy
+            </Text>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -326,6 +357,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  animatedContent: {
+    flex: 1,
+  },
   backgroundContainer: {
     position: 'absolute',
     width: width,
@@ -335,7 +369,7 @@ const styles = StyleSheet.create({
   bgGradient1: {
     position: 'absolute',
     width: width * 1.5,
-    height: height * 0.4,
+    height: height * 0.6,
     backgroundColor: '#F0F4FF',
     top: -height * 0.15,
     borderBottomLeftRadius: 300,
@@ -346,9 +380,9 @@ const styles = StyleSheet.create({
   bgGradient2: {
     position: 'absolute',
     width: width * 1.8,
-    height: height * 0.25,
+    height: height * 0.35,
     backgroundColor: '#EEF1FF',
-    top: -height * 0.12,
+    top: -height * 0.15,
     right: -width * 0.2,
     borderBottomLeftRadius: 300,
     transform: [{ rotate: '-5deg' }],
@@ -356,12 +390,12 @@ const styles = StyleSheet.create({
   },
   bgCircle1: {
     position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
     backgroundColor: colors.primaryLight,
-    bottom: -80,
-    left: -80,
+    bottom: -50,
+    left: -100,
     opacity: 0.5,
   },
   bgCircle2: {
@@ -370,67 +404,67 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 90,
     backgroundColor: colors.primaryLight,
-    top: height * 0.65,
+    top: height * 0.6,
     right: -70,
     opacity: 0.3,
   },
   backButton: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 55 : 20,
-    left: 20,
+    top: 10,
+    left: 10,
     zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 5,
   },
   keyboardAvoidingView: {
     flex: 1,
   },
-  animatedContent: {
-    flex: 1,
-  },
   scrollContent: {
     flexGrow: 1,
-    padding: 24,
-    paddingTop: 90,
+    paddingHorizontal: 24,
+    paddingTop: 50,
+    paddingBottom: 40,
   },
   logoContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
+    marginTop: 20,
   },
   logoImage: {
-    width: 70,
-    height: 70,
-    marginBottom: 16,
+    width: 60,
+    height: 60,
+    marginRight: 12,
     resizeMode: 'contain',
   },
   title: {
-    fontSize: 34,
+    fontSize: 30,
     fontWeight: '800',
     color: colors.primary,
     letterSpacing: -0.5,
+    marginBottom: 2,
+  },
+  tagline: {
+    fontSize: 14,
+    color: colors.gray600,
+    letterSpacing: 0.2,
+  },
+  welcomeContainer: {
+    marginBottom: 24,
+    alignItems: 'center',
   },
   subtitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     color: colors.gray800,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  descText: {
+  welcomeText: {
     fontSize: 16,
     color: colors.gray600,
     textAlign: 'center',
-    marginBottom: 24,
+    maxWidth: '85%',
   },
   formContainer: {
     width: '100%',
@@ -445,7 +479,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   inputLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.gray700,
     marginLeft: 6,
@@ -457,7 +491,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: 'white',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 15,
     borderWidth: 1.5,
     borderColor: colors.gray300,
     borderRadius: 16,
@@ -467,12 +501,18 @@ const styles = StyleSheet.create({
   visibilityToggle: {
     position: 'absolute',
     right: 16,
-    top: 16,
+    top: 15,
     padding: 2,
+  },
+  passwordHint: {
+    marginTop: 6,
+    fontSize: 12,
+    color: colors.gray600,
+    paddingHorizontal: 2,
   },
   registerButton: {
     backgroundColor: colors.primary,
-    paddingVertical: 18,
+    paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -484,7 +524,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     flexDirection: 'row',
   },
-  buttonIcon: {
+  registerIcon: {
     marginLeft: 8,
   },
   disabledButton: {
@@ -498,21 +538,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.3,
   },
-  loginContainer: {
+  signinContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
-    marginTop: 12,
+    marginBottom: 20,
   },
-  loginText: {
+  signinText: {
     color: colors.gray600,
     fontSize: 15,
   },
-  loginLink: {
+  signinLink: {
+    paddingVertical: 4,
+  },
+  signinLinkText: {
     color: colors.primary,
     fontWeight: '600',
     fontSize: 15,
+  },
+  termsText: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: colors.gray500,
+    paddingHorizontal: 20,
   },
   errorContainer: {
     backgroundColor: '#FFEBEE',

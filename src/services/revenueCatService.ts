@@ -93,15 +93,21 @@ export const initializeRevenueCat = (userId?: string) => {
   }
 };
 
+// Import utilities at the top level
+import { shouldUseMockData, logDataSource } from '../utils/dataMode';
+
 // Get available packages
 export const getOfferings = async (): Promise<PurchasesPackage[]> => {
   try {
-    // Import isExpoGo and isDevelopment from deviceInfo.ts
-    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    // Check if we should be using mock data
+    const isExpoEnvironment = isExpoGo();
+    const useMockData = true; // Always use mock RevenueCat in development
     
-    // In Expo Go or development mode, return mock packages based on subscription plans
-    if (isExpoGo() || isDevelopment()) {
-      console.log('Returning mock subscription packages in development environment');
+    // In Expo Go or when configured to use mock data, return mock packages
+    if (useMockData) {
+      logDataSource('SubscriptionService', true);
+      console.warn('⚠️ Using mock subscription packages');
+      
       // Create mock packages based on subscription plans
       return SUBSCRIPTION_PLANS
         .filter(plan => plan.tier !== 'free') // Exclude free tier
@@ -121,6 +127,8 @@ export const getOfferings = async (): Promise<PurchasesPackage[]> => {
           }
         })) as PurchasesPackage[];
     }
+    
+    logDataSource('SubscriptionService', false);
 
     // Use actual RevenueCat SDK for production builds
     try {
@@ -224,21 +232,22 @@ export const getCurrentSubscription = async (): Promise<{
   isActive: boolean;
 }> => {
   try {
-    // Import isExpoGo and isDevelopment from deviceInfo.ts
-    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    // Check if we should be using mock data
+    const isExpoEnvironment = isExpoGo();
+    const useMockData = true; // Always use mock RevenueCat data in development
     
-    // In Expo Go or development environment, return simulated subscription
-    if (isExpoGo() || isDevelopment()) {
-      console.log('Returning mock subscription in development environment');
-      // Check local storage for any mock subscription set during testing
-      // In development, return a premium tier for testing
-      console.log('Returning mock premium subscription for development');
+    // In Expo Go or when configured to use mock data, return simulated subscription
+    if (useMockData) {
+      logDataSource('SubscriptionService', true);
+      console.warn('⚠️ Using mock premium subscription');
       return {
         tier: 'premium',
         expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         isActive: true
       };
     }
+    
+    logDataSource('SubscriptionService', false);
 
     // In production, use the actual RevenueCat SDK
     try {

@@ -7,9 +7,9 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import { useAuth } from './src/contexts/AuthContext';
 import { LanguageProvider } from './src/contexts/LanguageContext';
 import { NetworkProvider } from './src/contexts/NetworkContext';
-import { configureGoogleSignIn } from './src/services/compatGoogleAuthService';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import NetworkStatusBar from './src/components/NetworkStatusBar';
+import 'react-native-url-polyfill/auto'; // Required for Supabase
 
 // Import auth screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -108,11 +108,17 @@ const RootNavigator = () => {
   );
 };
 
+// Import API preconnection
+import { preconnectToAPI } from './src/utils/api';
+
 // Main App component
 export default function App() {
-  // Initialize Google Sign-In on app start
+  // Preconnect to API on app startup
   useEffect(() => {
-    configureGoogleSignIn();
+    // Warm up API connection
+    preconnectToAPI()
+      .then(() => console.log('API connection prewarmed successfully'))
+      .catch(err => console.warn('API prewarm error (non-critical):', err));
   }, []);
 
   return (

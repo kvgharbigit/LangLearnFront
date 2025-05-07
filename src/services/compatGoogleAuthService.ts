@@ -1,7 +1,7 @@
 // src/services/compatGoogleAuthService.ts
+// This file is now a compatibility layer using Supabase auth
 import { Platform } from 'react-native';
-import { auth } from '../firebase/config';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { supabase } from '../supabase/config';
 import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
@@ -74,17 +74,29 @@ export const signInWithGoogle = async () => {
         return { error: new Error("No access token received") };
       }
       
-      console.log("Access token received, creating credential");
+      console.log("Access token received, signing in with Supabase");
       
-      // Create a Google credential with the token
-      const credential = GoogleAuthProvider.credential(null, access_token);
+      // Sign in with Supabase OAuth
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          queryParams: {
+            access_token
+          }
+        }
+      });
       
-      // Sign in with Firebase
-      console.log("Signing in with Firebase...");
-      const userCredential = await signInWithCredential(auth, credential);
-      console.log("Firebase sign-in successful");
+      if (error) {
+        console.error("Supabase sign-in error:", error);
+        throw error;
+      }
       
-      return { user: userCredential.user };
+      console.log("Supabase sign-in successful");
+      
+      // Get the user after successful sign-in
+      const { data: userData } = await supabase.auth.getUser();
+      
+      return { user: userData.user };
     } else if (result.type === 'cancel') {
       console.log("Auth cancelled by user");
       return { cancelled: true };
@@ -101,8 +113,10 @@ export const signInWithGoogle = async () => {
 // Sign out function
 export const signOutFromGoogle = async () => {
   try {
-    // Sign out from Firebase
-    await auth.signOut();
+    // Sign out from Supabase
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    
     return { success: true };
   } catch (error) {
     console.error('Sign out error:', error);

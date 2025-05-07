@@ -193,7 +193,8 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const renderUsageProgress = () => {
     if (!usage || !tokenUsage) return null;
     
-    const { percentageUsed } = tokenUsage;
+    // Ensure percentageUsed is a valid number
+    const percentageUsed = isNaN(tokenUsage.percentageUsed) ? 0 : tokenUsage.percentageUsed;
     const progressWidth = `${Math.min(percentageUsed, 100)}%`;
     
     let progressColor = colors.primary;
@@ -218,7 +219,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               percentageUsed > 70 ? {color: '#FFB300'} : 
               {color: colors.primary}
             ]}>
-              {Math.round(percentageUsed)}%
+              {isNaN(percentageUsed) ? '0' : Math.round(percentageUsed)}%
             </Text>
           </View>
         </View>
@@ -237,7 +238,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         </View>
         
         <Text style={styles.tokenCount}>
-          {Math.round(tokenUsage.usedTokens)} of {tokenUsage.tokenLimit} tokens used
+          {isNaN(tokenUsage.usedTokens) ? '0' : Math.round(tokenUsage.usedTokens)} of {isNaN(tokenUsage.tokenLimit) ? '150000' : tokenUsage.tokenLimit} tokens used
         </Text>
         
         <Text style={styles.usageNote}>

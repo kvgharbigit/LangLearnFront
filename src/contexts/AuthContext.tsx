@@ -1,7 +1,7 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { User } from 'firebase/auth';
-import { subscribeToAuthChanges } from '../services/authService';
+import { User } from '@supabase/supabase-js';
+import { subscribeToAuthChanges, initializeUser } from '../services/supabaseAuthService';
 
 // Define the shape of our context
 interface AuthContextType {
@@ -28,10 +28,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Subscribe to auth state changes
-    const unsubscribe = subscribeToAuthChanges((firebaseUser) => {
-      setUser(firebaseUser);
-      setLoading(false);
+    // First initialize the user (important for initial load)
+    const init = async () => {
+      try {
+        console.log('AuthContext: Initializing user...');
+        const initialUser = await initializeUser();
+        setUser(initialUser);
+      } catch (error) {
+        console.error('AuthContext: Error initializing user:', error);
+      } finally {
+        // Set loading to false even if initialization fails
+        setLoading(false);
+      }
+    };
+    
+    // Start initialization
+    init();
+
+    // Subscribe to auth state changes for future updates
+    const unsubscribe = subscribeToAuthChanges((supabaseUser) => {
+      console.log('AuthContext: Auth state changed', supabaseUser?.id);
+      setUser(supabaseUser);
     });
 
     // Cleanup subscription

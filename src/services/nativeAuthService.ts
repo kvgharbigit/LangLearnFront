@@ -1,14 +1,10 @@
 // src/services/nativeAuthService.ts
+// This file is now a compatibility layer using Supabase auth
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
-import {
-  GoogleAuthProvider,
-  OAuthProvider,
-  signInWithCredential
-} from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { supabase } from '../supabase/config';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -35,12 +31,15 @@ export const useGoogleAuth = () => {
       if (result.type === 'success') {
         const { id_token } = result.params;
 
-        // Create a Google credential with the token
-        const googleCredential = GoogleAuthProvider.credential(id_token);
+        // Sign in with Supabase using the Google token
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: id_token,
+        });
 
-        // Sign in with the credential
-        const userCredential = await signInWithCredential(auth, googleCredential);
-        return { user: userCredential.user };
+        if (error) throw error;
+        
+        return { user: data.user };
       } else {
         return { cancelled: true };
       }
@@ -74,37 +73,37 @@ export const signInWithApple = async () => {
       ],
     });
 
-    // Create an Apple provider credential
+    // Get the identity token from Apple
     const { identityToken } = credential;
     if (!identityToken) {
       throw new Error('No identity token provided');
     }
 
-    const provider = new OAuthProvider('apple.com');
-    const authCredential = provider.credential({
-      idToken: identityToken,
-      rawNonce: '', // If you're using a nonce, provide it here
+    // Sign in with Supabase using the Apple identity token
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'apple',
+      token: identityToken,
     });
 
-    // Sign in with Firebase
-    const userCredential = await signInWithCredential(auth, authCredential);
+    if (error) throw error;
 
     // If this is a new user, update their profile with the name from Apple
     // Apple only provides the name on the first sign-in
-    if (credential.fullName && credential.fullName.givenName) {
+    if (credential.fullName && credential.fullName.givenName && data.user) {
       const displayName = [
         credential.fullName.givenName,
         credential.fullName.familyName
       ].filter(Boolean).join(' ');
 
-      if (displayName && userCredential.user) {
-        await userCredential.user.updateProfile({
-          displayName
+      if (displayName) {
+        // Update user metadata in Supabase
+        await supabase.auth.updateUser({
+          data: { full_name: displayName }
         });
       }
     }
 
-    return { user: userCredential.user };
+    return { user: data.user };
   } catch (error) {
     console.error('Apple sign in error:', error);
 

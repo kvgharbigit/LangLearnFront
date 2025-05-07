@@ -30,6 +30,24 @@ const translations: Record<string, Record<string, string>> = {
   en: {
     // Profile Screen
     'profile.title': 'Confluency',
+    'profile.guest': 'Guest',
+    'profile.editProfile': 'Edit Profile',
+    'profile.settings': 'Settings',
+    'profile.appLanguage': 'App Language',
+    'profile.subscription': 'Subscription',
+    'profile.currentPlan': 'Current Plan',
+    'profile.support': 'Support',
+    'profile.helpCenter': 'Help Center',
+    'profile.contactUs': 'Contact Us',
+    'profile.legal': 'Legal',
+    'profile.privacyPolicy': 'Privacy Policy',
+    'profile.termsOfService': 'Terms of Service',
+    'profile.version': 'Version',
+    'profile.logoutConfirmTitle': 'Confirm Logout',
+    'profile.logoutConfirmMessage': 'Are you sure you want to log out?',
+    'profile.logoutError': 'An error occurred during logout. Please try again.',
+    
+    // Legacy keys (keeping for backward compatibility)
     'profile.section.subscription': 'Subscription',
     'profile.manage.subscription': 'Manage Subscription',
     'profile.section.preferences': 'Preferences',
@@ -77,6 +95,24 @@ const translations: Record<string, Record<string, string>> = {
   // Spanish translations
   es: {
     'profile.title': 'Confluency',
+    'profile.guest': 'Invitado',
+    'profile.editProfile': 'Editar Perfil',
+    'profile.settings': 'Configuración',
+    'profile.appLanguage': 'Idioma de la App',
+    'profile.subscription': 'Suscripción',
+    'profile.currentPlan': 'Plan Actual',
+    'profile.support': 'Soporte',
+    'profile.helpCenter': 'Centro de Ayuda',
+    'profile.contactUs': 'Contáctanos',
+    'profile.legal': 'Legal',
+    'profile.privacyPolicy': 'Política de Privacidad',
+    'profile.termsOfService': 'Términos de Servicio',
+    'profile.version': 'Versión',
+    'profile.logoutConfirmTitle': 'Confirmar Cierre de Sesión',
+    'profile.logoutConfirmMessage': '¿Estás seguro de que deseas cerrar sesión?',
+    'profile.logoutError': 'Ocurrió un error durante el cierre de sesión. Por favor, inténtalo de nuevo.',
+    
+    // Legacy keys
     'profile.section.subscription': 'Suscripción',
     'profile.manage.subscription': 'Administrar Suscripción',
     'profile.section.preferences': 'Preferencias',

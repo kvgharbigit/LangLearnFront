@@ -1,8 +1,8 @@
 // src/services/nativeGoogleAuthService.ts
+// This file is now a compatibility layer using Supabase auth
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { auth } from '../firebase/config';
 import { Platform } from 'react-native';
+import { supabase } from '../supabase/config';
 
 // Configure Google Sign-In
 export const configureGoogleSignIn = () => {
@@ -25,13 +25,15 @@ export const signInWithGoogle = async () => {
     // Sign in with Google
     const { idToken } = await GoogleSignin.signIn();
     
-    // Create a Google credential with the token
-    const googleCredential = GoogleAuthProvider.credential(idToken);
+    // Sign in with Supabase using the Google token
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: idToken,
+    });
     
-    // Sign in with Firebase using the Google credential
-    const userCredential = await signInWithCredential(auth, googleCredential);
+    if (error) throw error;
     
-    return { user: userCredential.user };
+    return { user: data.user };
   } catch (error) {
     console.error('Native Google sign in error:', error);
     

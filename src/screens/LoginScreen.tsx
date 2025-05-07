@@ -18,9 +18,8 @@ import {
 import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { loginUser, resetPassword } from '../services/authService';
+import { loginUser, resetPassword, signInWithGoogle } from '../services/supabaseAuthService';
 import { AuthStackParamList } from '../types/navigation';
-import { signInWithGoogle, configureGoogleSignIn } from '../services/compatGoogleAuthService';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
 
@@ -41,10 +40,8 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(30)).current;
   
-  // Initialize Google Auth and start animations
+  // Start animations
   useEffect(() => {
-    configureGoogleSignIn();
-    
     // Start entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -76,10 +73,10 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       const { user, error } = await loginUser(email, password);
 
       if (error) {
-        // Handle specific error codes
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        // Handle Supabase error messages
+        if (error.message.includes('Invalid login credentials')) {
           setErrorMessage('Invalid email or password');
-        } else if (error.code === 'auth/too-many-requests') {
+        } else if (error.message.includes('rate limit')) {
           setErrorMessage('Too many attempts. Please try again later');
         } else {
           setErrorMessage(error.message || 'Failed to login');
@@ -125,19 +122,14 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     setPasswordVisible(prev => !prev);
   };
   
-  // Handle Google Sign-In using native implementation
+  // Handle Google Sign-In using Supabase
   const handleGoogleSignIn = async () => {
     try {
       setGoogleLoading(true);
       setErrorMessage(null);
       
-      // Use the native Google Sign-In
-      const { user, error, cancelled } = await signInWithGoogle();
-      
-      if (cancelled) {
-        console.log('Google sign in was cancelled');
-        return;
-      }
+      // Use Supabase Google Sign-In
+      const { user, error } = await signInWithGoogle();
       
       if (error) {
         console.error('Google sign in error:', error);
@@ -614,4 +606,3 @@ const styles = StyleSheet.create({
 });
 
 export default LoginScreen;
-

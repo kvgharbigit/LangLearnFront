@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { ConversationMode } from '../components/ConversationModeSelector';
-import usageService from '../services/usageService';
-import { getCurrentUser, getIdToken } from '../services/authService';
+import supabaseUsageService from '../services/supabaseUsageService';
+import { getCurrentUser, getIdToken } from '../services/supabaseAuthService';
 import { fetchWithRetry, classifyApiError, parseErrorResponse } from './apiHelpers';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import offlineAssets from './offlineAssets';
@@ -23,11 +23,11 @@ const getUserAuthHeaders = async () => {
     const token = await getIdToken(user, true);
     return {
       'Authorization': `Bearer ${token}`,
-      'X-User-ID': user.uid
+      'X-User-ID': user.id  // Note: Supabase user ID is in user.id
     };
   } catch (error) {
     console.error('Error getting auth token:', error);
-    return { 'X-User-ID': user.uid };
+    return { 'X-User-ID': user.id };
   }
 };
 
@@ -50,16 +50,24 @@ export const preconnectToAPI = async (): Promise<void> => {
         return;
       }
       
-      // Send a lightweight request to establish connection
-      const response = await fetch(`${API_URL}/ping`, {
-        method: 'HEAD',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        }
-      });
+      // Try to check server connectivity using the ping endpoint
+      try {
+        // Check if the server is up by connecting to the ping endpoint
+        const connectionTest = await fetch(`${API_URL}/ping`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        console.log(`🔌 API connection test ${connectionTest.ok ? 'successful' : 'responded with'} (${connectionTest.status})`);
+      } catch (connError) {
+        // Log but don't fail the app startup if the server is unreachable
+        console.log("⚠️ API server may be unreachable:", connError);
+      }
       
-      console.log(`🔌 API preconnection ${response.ok ? 'successful' : 'failed'} (${response.status})`);
+      // Always resolve even if connection fails - this allows the app to work offline
       resolve();
     } catch (error) {
       console.log("⚠️ API preconnection error:", error);
@@ -237,7 +245,7 @@ export const sendTextMessage = async (
     if (!__DEV__) {
       // Check if user has available quota before making the request  
       try {
-        const hasQuota = await usageService.hasAvailableQuota();
+        const hasQuota = await supabaseUsageService.hasAvailableQuota();
         if (!hasQuota) {
           throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
         }
@@ -282,7 +290,7 @@ export const sendTextMessage = async (
       // Special handling for quota exceeded (403)
       if (response.status === 403) {
         // Force local quota check to sync with server
-        await usageService.forceQuotaExceeded();
+        await supabaseUsageService.forceQuotaExceeded();
         throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
       }
       
@@ -324,11 +332,11 @@ export const sendTextMessage = async (
       const lastMessage = data.history[data.history.length - 1];
       if (lastMessage && lastMessage.content) {
         // Track input (user message) and output (assistant reply)
-        await usageService.trackClaudeUsage(message, lastMessage.content);
+        await supabaseUsageService.trackClaudeUsage(message, lastMessage.content);
         
         // Track TTS usage if audio is generated
         if (data.has_audio && !isMuted) {
-          await usageService.trackTTSUsage(lastMessage.content);
+          await supabaseUsageService.trackTTSUsage(lastMessage.content);
         }
       }
     }
@@ -437,7 +445,7 @@ export const sendVoiceRecording = async ({
     if (!__DEV__) {
       // Check if user has available quota before making the request  
       try {
-        const hasQuota = await usageService.hasAvailableQuota();
+        const hasQuota = await supabaseUsageService.hasAvailableQuota();
         if (!hasQuota) {
           throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
         }
@@ -527,7 +535,7 @@ export const sendVoiceRecording = async ({
       // Special handling for quota exceeded (403)
       if (response && response.status === 403) {
         // Force local quota check to sync with server
-        await usageService.forceQuotaExceeded();
+        await supabaseUsageService.forceQuotaExceeded();
         throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
       }
       
@@ -561,7 +569,7 @@ export const sendVoiceRecording = async ({
     // Track Whisper usage locally (estimate audio duration from file size)
     // Audio files are typically ~16KB per second of audio at standard quality
     const audioDurationEstimateSeconds = Math.max(1, Math.ceil(fileInfo.size / 16000));
-    await usageService.trackWhisperUsage(audioDurationEstimateSeconds);
+    await supabaseUsageService.trackWhisperUsage(audioDurationEstimateSeconds);
     
     // Check if no speech was detected - this is a special response from our backend
     if (data.no_speech_detected) {
@@ -579,11 +587,11 @@ export const sendVoiceRecording = async ({
       
       if (lastMessage && lastMessage.content) {
         // Track input (transcribed text) and output (assistant reply)
-        await usageService.trackClaudeUsage(transcription, lastMessage.content);
+        await supabaseUsageService.trackClaudeUsage(transcription, lastMessage.content);
         
         // Track TTS usage if audio is generated
         if (data.has_audio && !isMuted) {
-          await usageService.trackTTSUsage(lastMessage.content);
+          await supabaseUsageService.trackTTSUsage(lastMessage.content);
         }
       }
     }
@@ -812,7 +820,7 @@ export const createConversation = async ({
     if (!__DEV__) {
       // Check if user has available quota before creating a new conversation
       try {
-        const hasQuota = await usageService.hasAvailableQuota();
+        const hasQuota = await supabaseUsageService.hasAvailableQuota();
         if (!hasQuota) {
           throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
         }
@@ -856,7 +864,7 @@ export const createConversation = async ({
       // Special handling for quota exceeded (403)
       if (response.status === 403) {
         // Force local quota check to sync with server
-        await usageService.forceQuotaExceeded();
+        await supabaseUsageService.forceQuotaExceeded();
         throw new Error('Usage quota exceeded. Please upgrade your subscription to continue.');
       }
       
@@ -893,11 +901,11 @@ export const createConversation = async ({
         const contextInput = `${targetLanguage} conversation with ${difficulty} difficulty${learningObjective ? ` about ${learningObjective}` : ''}`;
         
         // Track usage locally
-        await usageService.trackClaudeUsage(contextInput, welcomeMessage.content);
+        await supabaseUsageService.trackClaudeUsage(contextInput, welcomeMessage.content);
         
         // Track TTS usage if audio is generated
         if (data.has_audio && !isMuted) {
-          await usageService.trackTTSUsage(welcomeMessage.content);
+          await supabaseUsageService.trackTTSUsage(welcomeMessage.content);
         }
       }
     }
@@ -928,5 +936,4 @@ export default {
   createConversation,
   preconnectToAPI,
   getAudioStreamUrl,
-  preconnectToAPI
 };

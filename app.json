@@ -30,7 +30,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.github.kvgharbigit.langlearn",
-      "googleServicesFile": "./ios/GoogleService-Info.plist",
       "config": {
         "googleSignIn": {
           "reservedClientId": "com.googleusercontent.apps.984417336702-dhfmjetmjmn5lrp91erart3ouopipthc"
@@ -42,17 +41,14 @@
         "foregroundImage": "./assets/transparent_background_icon.png",
         "backgroundColor": "#4A6FA5"
       },
-      "package": "io.github.kvgharbigit.langlearn",
-      "googleServicesFile": "google-services.json"
+      "package": "io.github.kvgharbigit.langlearn"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "newArchEnabled": true,
     "plugins": [
-      "@react-native-firebase/app",
-      "expo-web-browser",
-      "@react-native-google-signin/google-signin"
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

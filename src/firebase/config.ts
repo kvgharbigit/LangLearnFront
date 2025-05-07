@@ -1,34 +1,36 @@
 // src/firebase/config.ts
-import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence, Auth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+// This file is now a compatibility layer that re-exports from supabase/config.ts
+// It allows existing code to import from firebase/config without breaking changes
 
-// Your Firebase configuration
-const firebaseConfig = {
-  apiKey: Platform.OS === 'ios'
-    ? "AIzaSyB2pP1Qp7-H2-DIj_5F7vh16XWO0Fc6JKg"  // iOS API key
-    : "AIzaSyCFgF0241aFjzmgGRl70AicSJQ0HlCzSeY", // Android API key
-  authDomain: "languageapp-472c1.firebaseapp.com",
-  projectId: "languageapp-472c1",
-  storageBucket: "languageapp-472c1.firebasestorage.app",
-  messagingSenderId: "205296109732",
-  appId: Platform.OS === 'ios'
-    ? "1:205296109732:ios:6cd2b1ded17fe088f53e31"  // iOS app ID
-    : "1:205296109732:android:ea506239b5d29bc6f53e31"  // Android app ID
+import { supabase } from '../supabase/config';
+
+// Create placeholders for Firebase objects that were used
+const auth = {
+  currentUser: null,
+  onAuthStateChanged: () => {
+    console.warn('Firebase auth is no longer used. Update imports to use supabase.');
+    return () => {}; // Return dummy unsubscribe function
+  }
 };
 
-// Initialize Firebase
-const app: FirebaseApp = initializeApp(firebaseConfig);
+// Create placeholder for Firestore db
+const db = {
+  collection: () => {
+    console.warn('Firebase Firestore is no longer used. Update imports to use supabase.');
+    return {
+      doc: () => ({
+        get: async () => ({ exists: false, data: () => null }),
+        set: async () => {},
+        update: async () => {}
+      })
+    };
+  }
+};
 
-// Initialize Auth with persistence
-const auth: Auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-});
-
-// Initialize Firestore
-const db = getFirestore(app);
+// Create placeholder app
+const app = {
+  name: '[DEFAULT]'
+};
 
 export { auth, db };
 export default app;
