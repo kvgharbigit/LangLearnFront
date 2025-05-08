@@ -8,8 +8,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import offlineAssets from './offlineAssets';
 
 // Update this to your actual API URL
-//const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
-const API_URL = 'http://192.168.86.241:8004'; // Desktop WiFi IP address
+const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
+//const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
+//const API_URL = 'http://192.168.86.241:8004'; // Desktop WiFi IP address
 //const API_URL = 'http://172.29.224.1:8004'; // WSL adapter IP
 //const API_URL = 'http://192.168.86.26:8004'; /// Previous IP
 //const API_URL = 'https://a84f-128-250-0-218.ngrok-free.app'; //work
