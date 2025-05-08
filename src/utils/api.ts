@@ -8,9 +8,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import offlineAssets from './offlineAssets';
 
 // Update this to your actual API URL
-const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
+//const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
 //const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
-//const API_URL = 'http://192.168.86.241:8004'; // Desktop WiFi IP address
+const API_URL = 'http://192.168.86.241:8004'; // Desktop WiFi IP address
 //const API_URL = 'http://172.29.224.1:8004'; // WSL adapter IP
 //const API_URL = 'http://192.168.86.26:8004'; /// Previous IP
 //const API_URL = 'https://a84f-128-250-0-218.ngrok-free.app'; //work
@@ -332,12 +332,17 @@ export const sendTextMessage = async (
       // Get the last assistant message for tracking
       const lastMessage = data.history[data.history.length - 1];
       if (lastMessage && lastMessage.content) {
-        // Track input (user message) and output (assistant reply)
-        await supabaseUsageService.trackClaudeUsage(message, lastMessage.content);
-        
-        // Track TTS usage if audio is generated
-        if (data.has_audio && !isMuted) {
-          await supabaseUsageService.trackTTSUsage(lastMessage.content);
+        try {
+          // Track input (user message) and output (assistant reply)
+          await supabaseUsageService.trackClaudeUsage(message, lastMessage.content);
+          
+          // Track TTS usage if audio is generated
+          if (data.has_audio && !isMuted) {
+            await supabaseUsageService.trackTTSUsage(lastMessage.content);
+          }
+        } catch (trackingError) {
+          // Log but don't fail the whole interaction if tracking fails
+          console.warn('Usage tracking failed but conversation will continue:', trackingError);
         }
       }
     }
@@ -569,8 +574,13 @@ export const sendVoiceRecording = async ({
     
     // Track Whisper usage locally (estimate audio duration from file size)
     // Audio files are typically ~16KB per second of audio at standard quality
-    const audioDurationEstimateSeconds = Math.max(1, Math.ceil(fileInfo.size / 16000));
-    await supabaseUsageService.trackWhisperUsage(audioDurationEstimateSeconds);
+    try {
+      const audioDurationEstimateSeconds = Math.max(1, Math.ceil(fileInfo.size / 16000));
+      await supabaseUsageService.trackWhisperUsage(audioDurationEstimateSeconds);
+    } catch (trackingError) {
+      // Log but don't fail the voice conversation if tracking fails
+      console.warn('Whisper usage tracking failed but will continue:', trackingError);
+    }
     
     // Check if no speech was detected - this is a special response from our backend
     if (data.no_speech_detected) {
@@ -587,12 +597,17 @@ export const sendVoiceRecording = async ({
       const lastMessage = data.history[data.history.length - 1];
       
       if (lastMessage && lastMessage.content) {
-        // Track input (transcribed text) and output (assistant reply)
-        await supabaseUsageService.trackClaudeUsage(transcription, lastMessage.content);
-        
-        // Track TTS usage if audio is generated
-        if (data.has_audio && !isMuted) {
-          await supabaseUsageService.trackTTSUsage(lastMessage.content);
+        try {
+          // Track input (transcribed text) and output (assistant reply)
+          await supabaseUsageService.trackClaudeUsage(transcription, lastMessage.content);
+          
+          // Track TTS usage if audio is generated
+          if (data.has_audio && !isMuted) {
+            await supabaseUsageService.trackTTSUsage(lastMessage.content);
+          }
+        } catch (trackingError) {
+          // Log but don't fail the voice conversation if tracking fails
+          console.warn('Claude/TTS usage tracking failed but will continue:', trackingError);
         }
       }
     }
@@ -902,11 +917,16 @@ export const createConversation = async ({
         const contextInput = `${targetLanguage} conversation with ${difficulty} difficulty${learningObjective ? ` about ${learningObjective}` : ''}`;
         
         // Track usage locally
-        await supabaseUsageService.trackClaudeUsage(contextInput, welcomeMessage.content);
-        
-        // Track TTS usage if audio is generated
-        if (data.has_audio && !isMuted) {
-          await supabaseUsageService.trackTTSUsage(welcomeMessage.content);
+        try {
+          await supabaseUsageService.trackClaudeUsage(contextInput, welcomeMessage.content);
+          
+          // Track TTS usage if audio is generated
+          if (data.has_audio && !isMuted) {
+            await supabaseUsageService.trackTTSUsage(welcomeMessage.content);
+          }
+        } catch (trackingError) {
+          // Log but don't fail the conversation creation if tracking fails
+          console.warn('Usage tracking error in conversation creation:', trackingError);
         }
       }
     }

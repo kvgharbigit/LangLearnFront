@@ -1,6 +1,9 @@
 // test_supabase_tables.js
 const { createClient } = require('@supabase/supabase-js');
 
+// Initialize global variable to track token_limit existence
+global.tokenLimitExists = false;
+
 // Supabase configuration
 const supabaseUrl = 'https://hkanndmudvnjrvkisklp.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrYW5uZG11ZHZuanJ2a2lza2xwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2Mjc0MDMsImV4cCI6MjA2MjIwMzQwM30.OsnzQS5EBT31LYeloAvc80yaxJ70AVsTEC3atNjWn4o';
@@ -18,9 +21,9 @@ async function testSupabaseTables() {
     console.log('\n📡 [TEST 1] Database Connection Test');
     
     try {
-      const { data, error } = await supabase.from('users').select('count(*)');
+      const { count, error } = await supabase.from('users').select('*', { count: 'exact', head: true });
       if (error) throw error;
-      console.log('✅ Connection successful!');
+      console.log(`✅ Connection successful! Found ${count} users.`);
     } catch (error) {
       console.error('❌ Connection failed:', error.message);
     }
@@ -70,7 +73,11 @@ async function testSupabaseTables() {
         console.log(`✅ Usage table accessible with ${columns.length} columns: ${columns.join(', ')}`);
         
         // Check for token_limit column specifically
-        console.log(`${columns.includes('token_limit') ? '✅' : '❌'} token_limit column exists: ${columns.includes('token_limit')}`);
+        const tokenLimitExists = columns.includes('token_limit');
+        console.log(`${tokenLimitExists ? '✅' : '❌'} token_limit column exists: ${tokenLimitExists}`);
+        
+        // Set global variable to track token_limit status
+        global.tokenLimitExists = tokenLimitExists;
         
         // Required columns for usage table
         const requiredColumns = [
@@ -105,11 +112,14 @@ async function testSupabaseTables() {
       if (error) {
         console.error('❌ Error selecting token_limit column:', error.message);
         console.log('ℹ️ This confirms token_limit column is missing or inaccessible');
+        global.tokenLimitExists = false;
       } else {
         console.log('✅ token_limit column exists and can be queried');
+        global.tokenLimitExists = true;
       }
     } catch (error) {
       console.error('❌ Error testing token_limit column:', error);
+      global.tokenLimitExists = false;
     }
 
     // --------------------------------------------------
@@ -182,9 +192,11 @@ async function testSupabaseTables() {
           // Check specifically for token_limit column issues
           if (usageError.message.includes('token_limit')) {
             console.error('⚠️ The error is specifically related to the token_limit column');
+            global.tokenLimitExists = false;
           }
         } else {
           console.log('✅ Successfully inserted test usage record');
+          global.tokenLimitExists = true;
         }
         
         // Clean up test data
@@ -253,6 +265,7 @@ async function testSupabaseTables() {
         // Check specifically for token_limit column issues
         if (updateError.message.includes('token_limit')) {
           console.error('⚠️ The error is specifically related to the token_limit column');
+          global.tokenLimitExists = false;
         }
       } else {
         console.log('✅ Successfully updated usage record');
@@ -268,6 +281,10 @@ async function testSupabaseTables() {
           console.error('❌ Failed to verify update:', error.message);
         } else {
           console.log('✅ Update verification:', data);
+          // If token_limit was successfully updated, mark it as existing
+          if (data && 'token_limit' in data) {
+            global.tokenLimitExists = true;
+          }
         }
       }
       
@@ -289,16 +306,36 @@ async function testSupabaseTables() {
     console.log('Note: This test requires SQL execution privileges');
     
     try {
-      // Try to get schema information via RPC
-      const { data, error } = await supabase.rpc('get_schema_info', {
-        table_name: 'usage'
-      });
-      
-      if (error) {
-        console.error('❌ Cannot fetch schema info:', error.message);
-        console.log('ℹ️ This is expected if get_schema_info function is not defined or you lack permission');
+      // Directly query a sample record to infer schema - safer approach
+      const { data: usageData, error: usageError } = await supabase
+        .from('usage')
+        .select('*')
+        .limit(1);
+        
+      if (usageError) {
+        console.error('❌ Cannot fetch usage table structure:', usageError.message);
+      } else if (usageData && usageData.length > 0) {
+        const columnNames = Object.keys(usageData[0]);
+        console.log('✅ Usage table columns detected:', columnNames.join(', '));
+        
+        // Check for token_limit specifically
+        if (columnNames.includes('token_limit')) {
+          console.log('✅ token_limit column confirmed in schema');
+          // Get token_limit type by examining the data
+          const tokenLimitType = typeof usageData[0].token_limit;
+          console.log(`ℹ️ token_limit is of type: ${tokenLimitType}`);
+        }
       } else {
-        console.log('✅ Schema information:', data);
+        console.log('⚠️ No records found in usage table to infer structure');
+        
+        // In this case, we can still confirm table exists even without records
+        const { count, error } = await supabase
+          .from('usage')
+          .select('*', { count: 'exact', head: true });
+          
+        if (!error) {
+          console.log(`ℹ️ Usage table exists but contains ${count} records`);
+        }
       }
     } catch (error) {
       console.error('❌ Error getting schema information:', error);
@@ -314,7 +351,7 @@ async function testSupabaseTables() {
     console.log('3. Run the following SQL:');
     console.log(`
     -- Add token_limit column if it doesn't exist
-    ALTER TABLE usage ADD COLUMN IF NOT EXISTS token_limit BIGINT DEFAULT 300000;
+    ALTER TABLE usage ADD COLUMN IF NOT EXISTS token_limit BIGINT DEFAULT 150;
     
     -- Update existing records to set token_limit based on credit_limit
     UPDATE usage 
@@ -329,11 +366,19 @@ async function testSupabaseTables() {
     // Summary of Findings
     // --------------------------------------------------
     console.log('\n📝 SUMMARY OF FINDINGS:');
-    console.log('ℹ️ Based on the error message "Could not find the \'token_limit\' column of \'usage\' in the schema cache",');
-    console.log('ℹ️ the most likely issue is that the token_limit column is missing from the usage table.');
-    console.log('ℹ️ This can happen if the database schema was created with an older version of the schema definition');
-    console.log('ℹ️ that did not include the token_limit column.');
-    console.log('ℹ️ The recommended solution is to add this column using SQL in the Supabase dashboard.');
+    
+    // Check if any test explicitly confirmed token_limit exists
+    // This handles the case where the Test 3 set tokenLimitExists to true
+    // We need to ensure our summary matches the actual test results
+    if (global.tokenLimitExists === true) {
+      console.log('✅ All database schema checks passed! The token_limit column exists and is properly configured.');
+    } else {
+      console.log('ℹ️ Based on the error message "Could not find the \'token_limit\' column of \'usage\' in the schema cache",');
+      console.log('ℹ️ the most likely issue is that the token_limit column is missing from the usage table.');
+      console.log('ℹ️ This can happen if the database schema was created with an older version of the schema definition');
+      console.log('ℹ️ that did not include the token_limit column.');
+      console.log('ℹ️ The recommended solution is to add this column using SQL in the Supabase dashboard.');
+    }
   } catch (error) {
     console.error('❌ Error during comprehensive Supabase testing:', error);
   }

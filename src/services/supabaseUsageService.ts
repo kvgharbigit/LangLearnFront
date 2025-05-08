@@ -5,13 +5,16 @@ import { getCurrentSubscription } from './revenueCatService';
 import { 
   UsageDetails, 
   UsageCosts, 
-  MonthlyUsage, 
+  MonthlyUsage,
+  SupabaseDailyUsageEntry,
   calculateCosts, 
   estimateTokens,
   getTodayDateString,
   getMonthlyPeriod,
   creditsToTokens,
-  tokensToCredits
+  tokensToCredits,
+  convertToDailyUsageEntry,
+  convertToUsageDetails
 } from '../types/usage';
 import { SUBSCRIPTION_PLANS } from '../types/subscription';
 
@@ -43,6 +46,9 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
     
     const costs = calculateCosts(emptyUsage);
     
+    // Initial daily usage (empty object - consistent with Supabase format)
+    const emptyDailyUsage = {};
+    
     // Initial monthly usage object
     const monthlyUsage: MonthlyUsage = {
       currentPeriodStart: start,
@@ -50,13 +56,14 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
       usageDetails: emptyUsage,
       calculatedCosts: costs,
       creditLimit,
-      tokenLimit: creditsToTokens(creditLimit), // Convert credits to tokens
+      tokenLimit: plan?.monthlyTokens || 0, // Use monthlyTokens from the subscription plan
       percentageUsed: 0,
-      dailyUsage: {},
+      dailyUsage: emptyDailyUsage,
       subscriptionTier: tier
     };
     
-    // Create a record in Supabase
+    // Create a record in Supabase using snake_case field names
+    const tokenLimit = plan?.monthlyTokens || 0; // Use the correct token value from subscription plan
     const { error } = await supabase
       .from('usage')
       .insert([{
@@ -67,10 +74,15 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
         claude_input_tokens: 0,
         claude_output_tokens: 0,
         tts_characters: 0,
+        whisper_cost: 0,
+        claude_input_cost: 0,
+        claude_output_cost: 0,
+        tts_cost: 0,
+        total_cost: 0,
         credit_limit: creditLimit,
-        token_limit: creditsToTokens(creditLimit),
+        token_limit: tokenLimit, // This is now plan?.monthlyTokens
         percentage_used: 0,
-        daily_usage: JSON.stringify({}),
+        daily_usage: JSON.stringify(emptyDailyUsage),
         subscription_tier: tier
       }]);
     
@@ -113,11 +125,11 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
           ttsCost: 0.06,
           totalCost: 0.133625
         },
-        creditLimit: 3.0,
-        tokenLimit: 300000,
+        creditLimit: 1.5, // Free tier credit limit
+        tokenLimit: 150, // Free tier: 1.5 credits * 100
         percentageUsed: 4.45,
         dailyUsage: {},
-        subscriptionTier: 'basic'
+        subscriptionTier: 'free' // Mock data should use free tier
       };
     }
     
@@ -143,28 +155,36 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
     }
     
     // Parse the usage data from Supabase format to our MonthlyUsage format
+    // First safely parse the daily_usage JSON string
+    let parsedDailyUsage = {};
+    try {
+      if (typeof data.daily_usage === 'string' && data.daily_usage) {
+        parsedDailyUsage = JSON.parse(data.daily_usage);
+      } else if (typeof data.daily_usage === 'object') {
+        parsedDailyUsage = data.daily_usage || {};
+      }
+    } catch (parseError) {
+      console.warn('Error parsing daily_usage JSON:', parseError);
+    }
+    
+    // Convert snake_case database fields to camelCase application fields
+    const usageDetails: UsageDetails = {
+      whisperMinutes: data.whisper_minutes || 0,
+      claudeInputTokens: data.claude_input_tokens || 0,
+      claudeOutputTokens: data.claude_output_tokens || 0,
+      ttsCharacters: data.tts_characters || 0
+    };
+    
     const usage: MonthlyUsage = {
       currentPeriodStart: data.current_period_start,
       currentPeriodEnd: data.current_period_end,
-      usageDetails: {
-        whisperMinutes: data.whisper_minutes,
-        claudeInputTokens: data.claude_input_tokens,
-        claudeOutputTokens: data.claude_output_tokens,
-        ttsCharacters: data.tts_characters
-      },
-      calculatedCosts: calculateCosts({
-        whisperMinutes: data.whisper_minutes,
-        claudeInputTokens: data.claude_input_tokens,
-        claudeOutputTokens: data.claude_output_tokens,
-        ttsCharacters: data.tts_characters
-      }),
-      creditLimit: data.credit_limit,
-      tokenLimit: data.token_limit,
-      percentageUsed: data.percentage_used,
-      dailyUsage: typeof data.daily_usage === 'string' 
-        ? JSON.parse(data.daily_usage) 
-        : (data.daily_usage || {}),
-      subscriptionTier: data.subscription_tier
+      usageDetails: usageDetails,
+      calculatedCosts: calculateCosts(usageDetails),
+      creditLimit: data.credit_limit || 0,
+      tokenLimit: data.token_limit || 0,
+      percentageUsed: data.percentage_used || 0,
+      dailyUsage: parsedDailyUsage,
+      subscriptionTier: data.subscription_tier || 'free'
     };
     
     // Check if billing period has expired and needs to be reset
@@ -213,24 +233,37 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
       usageDetails: emptyUsage,
       calculatedCosts: costs,
       creditLimit,
-      tokenLimit: creditsToTokens(creditLimit), // Convert credits to tokens
+      tokenLimit: plan?.monthlyTokens || 0, // Use monthlyTokens from the subscription plan
       percentageUsed: 0,
       dailyUsage: {}, // Reset daily usage for new period
       subscriptionTier: tier
     };
     
-    // Update user record in Supabase
+    // Update user record in Supabase with all fields in snake_case format
+    const tokenLimit = plan?.monthlyTokens || 0; // Use the correct token value from subscription plan
     const { error } = await supabase
       .from('usage')
       .update({
+        // Period fields
         current_period_start: start,
         current_period_end: end,
+        
+        // Reset usage metrics
         whisper_minutes: 0,
         claude_input_tokens: 0,
         claude_output_tokens: 0,
         tts_characters: 0,
+        
+        // Reset cost fields
+        whisper_cost: 0,
+        claude_input_cost: 0,
+        claude_output_cost: 0,
+        tts_cost: 0,
+        total_cost: 0,
+        
+        // Other fields
         credit_limit: creditLimit,
-        token_limit: creditsToTokens(creditLimit),
+        token_limit: tokenLimit, // This is now plan?.monthlyTokens
         percentage_used: 0,
         daily_usage: '{}',
         subscription_tier: tier
@@ -268,37 +301,43 @@ export const trackApiUsage = async (
     // Get today's date string
     const today = getTodayDateString();
     
-    // Initialize today's usage if not exists
+    // Initialize today's usage if not exists using Supabase structure
     if (!currentUsage.dailyUsage[today]) {
       currentUsage.dailyUsage[today] = {
         date: today,
-        usageDetails: {
-          whisperMinutes: 0,
-          claudeInputTokens: 0,
-          claudeOutputTokens: 0,
-          ttsCharacters: 0
-        },
-        calculatedCosts: {
-          whisperCost: 0,
-          claudeInputCost: 0,
-          claudeOutputCost: 0,
-          ttsCost: 0,
-          totalCost: 0
-        }
+        whisper_minutes: 0,
+        claude_input_tokens: 0,
+        claude_output_tokens: 0,
+        tts_characters: 0,
+        whisper_cost: 0,
+        claude_input_cost: 0,
+        claude_output_cost: 0,
+        tts_cost: 0,
+        total_cost: 0
       };
     }
-    
-    // Update daily usage
+
+    // Get daily usage entry
     const dailyUsage = currentUsage.dailyUsage[today];
-    dailyUsage.usageDetails.whisperMinutes += usageToAdd.whisperMinutes || 0;
-    dailyUsage.usageDetails.claudeInputTokens += usageToAdd.claudeInputTokens || 0;
-    dailyUsage.usageDetails.claudeOutputTokens += usageToAdd.claudeOutputTokens || 0;
-    dailyUsage.usageDetails.ttsCharacters += usageToAdd.ttsCharacters || 0;
+    
+    // Update daily usage with flat structure matching Supabase
+    dailyUsage.whisper_minutes += usageToAdd.whisperMinutes || 0;
+    dailyUsage.claude_input_tokens += usageToAdd.claudeInputTokens || 0;
+    dailyUsage.claude_output_tokens += usageToAdd.claudeOutputTokens || 0;
+    dailyUsage.tts_characters += usageToAdd.ttsCharacters || 0;
     
     // Calculate costs for daily usage
-    dailyUsage.calculatedCosts = calculateCosts(dailyUsage.usageDetails);
+    const dailyUsageDetails = convertToUsageDetails(dailyUsage);
+    const costs = calculateCosts(dailyUsageDetails);
     
-    // Update monthly totals
+    // Update cost fields in the flat structure
+    dailyUsage.whisper_cost = costs.whisperCost;
+    dailyUsage.claude_input_cost = costs.claudeInputCost;
+    dailyUsage.claude_output_cost = costs.claudeOutputCost;
+    dailyUsage.tts_cost = costs.ttsCost;
+    dailyUsage.total_cost = costs.totalCost;
+    
+    // Update the monthly totals in the usageDetails object
     const monthlyUsage = currentUsage.usageDetails;
     monthlyUsage.whisperMinutes += usageToAdd.whisperMinutes || 0;
     monthlyUsage.claudeInputTokens += usageToAdd.claudeInputTokens || 0;
@@ -318,14 +357,24 @@ export const trackApiUsage = async (
       currentUsage.percentageUsed = 100; // If no credit limit, mark as 100% used
     }
     
-    // Update user record in Supabase
+    // Update user record in Supabase - use snake_case field names
     const { error } = await supabase
       .from('usage')
       .update({
+        // Usage fields (snake_case for database)
         whisper_minutes: monthlyUsage.whisperMinutes,
         claude_input_tokens: monthlyUsage.claudeInputTokens,
         claude_output_tokens: monthlyUsage.claudeOutputTokens,
         tts_characters: monthlyUsage.ttsCharacters,
+        
+        // Cost fields (calculated based on current usage)
+        whisper_cost: currentUsage.calculatedCosts.whisperCost,
+        claude_input_cost: currentUsage.calculatedCosts.claudeInputCost,
+        claude_output_cost: currentUsage.calculatedCosts.claudeOutputCost,
+        tts_cost: currentUsage.calculatedCosts.ttsCost,
+        total_cost: currentUsage.calculatedCosts.totalCost,
+        
+        // Other fields
         percentage_used: currentUsage.percentageUsed,
         daily_usage: JSON.stringify(currentUsage.dailyUsage)
       })
@@ -392,7 +441,7 @@ export const getUserUsageInTokens = async (): Promise<{
     
     return {
       usedTokens: Math.round(usedTokens),
-      tokenLimit: usage.tokenLimit || creditsToTokens(usage.creditLimit),
+      tokenLimit: usage.tokenLimit || usage.creditLimit * 100, // Convert credits to tokens properly
       percentageUsed: usage.percentageUsed
     };
   } catch (error) {
@@ -490,7 +539,11 @@ export const forceQuotaExceeded = async (): Promise<void> => {
     // Update percentage used to 100% in Supabase
     const { error } = await supabase
       .from('usage')
-      .update({ percentage_used: 100 })
+      .update({ 
+        percentage_used: 100,
+        // Also update total_cost to match credit_limit for consistency
+        total_cost: 999 // A high value that will ensure quota exceeded
+      })
       .eq('user_id', user.id);
     
     if (error) throw error;

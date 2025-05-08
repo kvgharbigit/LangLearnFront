@@ -1,6 +1,7 @@
 // src/types/usage.ts
 import { PRICING } from './subscription';
 
+// Original application interfaces
 export interface UsageDetails {
   whisperMinutes: number;
   claudeInputTokens: number;
@@ -16,21 +17,30 @@ export interface UsageCosts {
   totalCost: number;
 }
 
-export interface DailyUsage {
+// New interface matching Supabase structure for daily usage entries
+export interface SupabaseDailyUsageEntry {
   date: string; // ISO date string (YYYY-MM-DD)
-  usageDetails: UsageDetails;
-  calculatedCosts: UsageCosts;
+  whisper_minutes: number;
+  claude_input_tokens: number;
+  claude_output_tokens: number;
+  tts_characters: number;
+  whisper_cost: number;
+  claude_input_cost: number;
+  claude_output_cost: number;
+  tts_cost: number;
+  total_cost: number;
 }
 
+// Updated monthly usage interface
 export interface MonthlyUsage {
   currentPeriodStart: number; // timestamp
   currentPeriodEnd: number; // timestamp
   usageDetails: UsageDetails;
   calculatedCosts: UsageCosts;
   creditLimit: number;
-  tokenLimit: number; // New field for token limit (creditLimit * 100)
+  tokenLimit: number;
   percentageUsed: number;
-  dailyUsage: Record<string, DailyUsage>; // Keyed by date string
+  dailyUsage: Record<string, SupabaseDailyUsageEntry>; // Updated to use Supabase structure
   subscriptionTier: string;
 }
 
@@ -52,6 +62,37 @@ export const calculateCosts = (usage: UsageDetails): UsageCosts => {
   };
 };
 
+// Helper function to convert from UsageDetails to daily usage DB format
+export const convertToDailyUsageEntry = (
+  date: string, 
+  usageDetails: UsageDetails
+): SupabaseDailyUsageEntry => {
+  const costs = calculateCosts(usageDetails);
+  
+  return {
+    date,
+    whisper_minutes: usageDetails.whisperMinutes,
+    claude_input_tokens: usageDetails.claudeInputTokens,
+    claude_output_tokens: usageDetails.claudeOutputTokens,
+    tts_characters: usageDetails.ttsCharacters,
+    whisper_cost: costs.whisperCost,
+    claude_input_cost: costs.claudeInputCost,
+    claude_output_cost: costs.claudeOutputCost,
+    tts_cost: costs.ttsCost,
+    total_cost: costs.totalCost
+  };
+};
+
+// Helper function to convert from DB format to UsageDetails
+export const convertToUsageDetails = (entry: SupabaseDailyUsageEntry): UsageDetails => {
+  return {
+    whisperMinutes: entry.whisper_minutes || 0,
+    claudeInputTokens: entry.claude_input_tokens || 0,
+    claudeOutputTokens: entry.claude_output_tokens || 0,
+    ttsCharacters: entry.tts_characters || 0
+  };
+};
+
 // Helper to convert text to tokens
 export const estimateTokens = (text: string): number => {
   if (!text) return 0;
@@ -66,7 +107,7 @@ export const getTodayDateString = (): string => {
 
 // Convert credits to tokens (100x multiplier)
 export const creditsToTokens = (credits: number): number => {
-  return Math.round(credits * 100);
+  return Math.round(credits * 100); // 1 credit = 100 tokens
 };
 
 // Convert tokens to credits (divide by 100)
