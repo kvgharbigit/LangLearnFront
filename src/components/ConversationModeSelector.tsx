@@ -54,7 +54,7 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
         {
           id: 'situation_simulation' as ConversationMode,
           label: 'Situation Simulation',
-          icon: 'theatre-outline',
+          icon: 'game-controller-outline',
           description: 'Practice real-life conversations in common scenarios like restaurants, travel, and shopping.',
           placeholder: '• At a restaurant\n• Job interview\n• Airport check-in\n• Shopping for clothes'
         }
@@ -162,15 +162,8 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
       </TouchableOpacity>
 
       {/* Mode description */}
-      {/* Completely rebuilt description box */}
+      {/* Description box without icon */}
       <View style={styles.descriptionBox}>
-        <View style={styles.descriptionBoxIcon}>
-          <Ionicons
-            name={currentMode.icon as any}
-            size={24}
-            color={colors.primary}
-          />
-        </View>
         <View style={styles.descriptionBoxTextContainer}>
           <Text style={styles.descriptionBoxText}>
             {currentMode.description}
@@ -209,9 +202,8 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
           />
         </View>
         <View style={styles.promptInfoContainer}>
-          <Ionicons name="information-circle" size={16} color={colors.info} />
           <Text style={styles.promptInfoText}>
-            Choose a topic you want to chat/learn about! Leave empty and the AI will suggest a topic :)
+            Choose ANY topic - from verbs to vermouth, from dating to dancing - Confluency can talk about anything!
           </Text>
         </View>
       </View>
@@ -348,10 +340,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   promptInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: 8,
-    gap: 8,
   },
   promptInfoText: {
     fontSize: 13,

@@ -127,7 +127,7 @@ export const getAudioSettings = async (): Promise<AudioSettings> => {
       speechThreshold: isIOS ? 78 : 45,
       silenceThreshold: isIOS ? 75 : 43,
       silenceDuration: 1500,
-      tempo: 0.9,
+      tempo: 0.75, // Changed from 0.9 to match PLAYER_SETTINGS.DEFAULT_TEMPO
       isMuted: false,
     };
 
@@ -169,7 +169,7 @@ export const getAudioSettings = async (): Promise<AudioSettings> => {
       speechThreshold: Platform.OS === 'ios' ? 78 : 45,
       silenceThreshold: Platform.OS === 'ios' ? 75 : 43,
       silenceDuration: 1500,
-      tempo: 0.9,  // Updated to match the default tempo of 0.9 (90%)
+      tempo: 0.75,  // Changed from 0.9 to match PLAYER_SETTINGS.DEFAULT_TEMPO
       isMuted: false,
     };
   }

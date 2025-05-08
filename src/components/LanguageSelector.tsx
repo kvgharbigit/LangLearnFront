@@ -15,6 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LANGUAGES, Language } from '../constants/languages';
 import colors from '../styles/colors';
 
+// Define available languages
+const AVAILABLE_LANGUAGES = ['en', 'fr', 'it', 'es'];
+
 interface LanguageSelectorProps {
   selectedLanguage: string;
   onSelectLanguage: (languageCode: string) => void;
@@ -53,11 +56,21 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
   // Filter languages based on search query and excluded language
   const getFilteredLanguages = () => {
-    return LANGUAGES.filter(lang => {
+    const filtered = LANGUAGES.filter(lang => {
       const matchesSearch = lang.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            lang.code.toLowerCase().includes(searchQuery.toLowerCase());
       const notExcluded = excludeLanguage ? lang.code !== excludeLanguage : true;
       return matchesSearch && notExcluded;
+    });
+    
+    // Sort available languages to top
+    return filtered.sort((a, b) => {
+      const aAvailable = AVAILABLE_LANGUAGES.includes(a.code);
+      const bAvailable = AVAILABLE_LANGUAGES.includes(b.code);
+      
+      if (aAvailable && !bAvailable) return -1;
+      if (!aAvailable && bAvailable) return 1;
+      return 0;
     });
   };
 
@@ -140,22 +153,24 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                     style={[
                       styles.languageOption,
                       isSelected && styles.selectedOption,
-                      isExcluded && styles.excludedOption
+                      isExcluded && styles.excludedOption,
+                      !AVAILABLE_LANGUAGES.includes(item.code) && styles.comingSoonOption
                     ]}
                     onPress={() => {
-                      if (!isExcluded) {
+                      if (!isExcluded && AVAILABLE_LANGUAGES.includes(item.code)) {
                         onSelectLanguage(item.code);
                         setModalVisible(false);
                         setSearchQuery('');
                       }
                     }}
-                    disabled={isExcluded}
+                    disabled={isExcluded || !AVAILABLE_LANGUAGES.includes(item.code)}
                   >
                     <Text style={styles.optionFlag}>{item.flag}</Text>
                     <Text style={[
                       styles.optionName,
                       isSelected && styles.selectedText,
-                      isExcluded && styles.excludedText
+                      isExcluded && styles.excludedText,
+                      !AVAILABLE_LANGUAGES.includes(item.code) && styles.comingSoonText
                     ]}>
                       {item.name}
                     </Text>
@@ -169,6 +184,12 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                     {isExcluded && (
                       <View style={styles.excludedBadge}>
                         <Text style={styles.excludedBadgeText}>Native</Text>
+                      </View>
+                    )}
+                    
+                    {!AVAILABLE_LANGUAGES.includes(item.code) && (
+                      <View style={styles.comingSoonBadge}>
+                        <Text style={styles.comingSoonBadgeText}>Coming Soon</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -335,6 +356,10 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     backgroundColor: colors.gray200,
   },
+  comingSoonOption: {
+    opacity: 0.5,
+    backgroundColor: colors.gray200,
+  },
   optionFlag: {
     fontSize: 28,
     marginBottom: 8,
@@ -350,6 +375,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   excludedText: {
+    color: colors.gray600,
+  },
+  comingSoonText: {
     color: colors.gray600,
   },
   checkmark: {
@@ -373,6 +401,21 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   excludedBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  comingSoonBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.gray500,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    alignItems: 'center',
+  },
+  comingSoonBadgeText: {
     color: 'white',
     fontSize: 10,
     fontWeight: '600',
