@@ -426,10 +426,14 @@ export const subscribeToAuthChanges = (callback: (user: User | null) => void) =>
 };
 
 // Google Auth configuration
-// These are example values - you're using the same ones from Firebase
-const ANDROID_CLIENT_ID = '205296109732-9j0a2h3b3qjvmf6gddd1t41rjt8a62p3.apps.googleusercontent.com';
-const IOS_CLIENT_ID = '205296109732-p98kdu02d8jva57j5oef4m3hgv09ufv7.apps.googleusercontent.com';
-const EXPO_CLIENT_ID = '205296109732-tiqvf6lkojlc2bj6gtp38h6p9v0a84rr.apps.googleusercontent.com';
+// Get from Constants.expoConfig.extra
+import Constants from 'expo-constants';
+const extraConfig = Constants.expoConfig?.extra || {};
+
+// These are example values originally from Firebase, now from app.json
+const ANDROID_CLIENT_ID = extraConfig.googleAndroidClientId || '205296109732-9j0a2h3b3qjvmf6gddd1t41rjt8a62p3.apps.googleusercontent.com';
+const IOS_CLIENT_ID = extraConfig.googleIosClientId || '205296109732-p98kdu02d8jva57j5oef4m3hgv09ufv7.apps.googleusercontent.com';
+const EXPO_CLIENT_ID = extraConfig.googleExpoClientId || '205296109732-tiqvf6lkojlc2bj6gtp38h6p9v0a84rr.apps.googleusercontent.com';
 
 // Initialize WebBrowser for authentication
 WebBrowser.maybeCompleteAuthSession();

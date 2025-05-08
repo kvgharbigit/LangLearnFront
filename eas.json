@@ -18,7 +18,7 @@
   "submit": {
     "production": {
       "android": {
-        "serviceAccountKeyPath": "service-account.json",
+        "serviceAccountKeyPath": "language-tutor-app-2025-5fcb9d8a55c2.json",
         "track": "internal"
       }
     }

@@ -8,12 +8,16 @@ import { supabase } from '../supabase/config';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// Firebase Google credentials
-// Your iOS Client ID from the provided GoogleService-Info.plist
-const GOOGLE_IOS_CLIENT_ID = '205296109732-3ctpj05dak8imp6mllko8r213avmsecr.apps.googleusercontent.com';
-// You'll need to get these from your Google Cloud Console
-const GOOGLE_WEB_CLIENT_ID = 'YOUR_WEB_CLIENT_ID'; // Get this from Google Cloud Console
-const GOOGLE_ANDROID_CLIENT_ID = 'YOUR_ANDROID_CLIENT_ID'; // Get this from Google Cloud Console
+// Google OAuth credentials
+// Get from Constants.expoConfig.extra
+import Constants from 'expo-constants';
+const extraConfig = Constants.expoConfig?.extra || {};
+
+// Your iOS Client ID 
+const GOOGLE_IOS_CLIENT_ID = extraConfig.googleIosClientId || '205296109732-3ctpj05dak8imp6mllko8r213avmsecr.apps.googleusercontent.com';
+// Web and Android client IDs from app.json
+const GOOGLE_WEB_CLIENT_ID = extraConfig.googleExpoClientId || 'YOUR_WEB_CLIENT_ID'; 
+const GOOGLE_ANDROID_CLIENT_ID = extraConfig.googleAndroidClientId || 'YOUR_ANDROID_CLIENT_ID';
 
 // Google Sign In
 export const useGoogleAuth = () => {
