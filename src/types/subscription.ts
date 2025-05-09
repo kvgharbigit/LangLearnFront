@@ -1,5 +1,5 @@
 // src/types/subscription.ts
-export type SubscriptionTier = 'free' | 'basic' | 'premium' | 'pro';
+export type SubscriptionTier = 'free' | 'basic' | 'premium' | 'gold';
 
 export interface SubscriptionPlan {
   id: string;
@@ -27,10 +27,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Free',
     tier: 'free',
     price: 0,
-    monthlyCredits: 1.5, // $1.50 worth of usage
-    monthlyTokens: 150, // 1.5 credits * 100
+    monthlyCredits: 1, // $1.00 worth of usage
+    monthlyTokens: 100, // 1 credit * 100
     features: [
-      '150 Conversation Tokens per month',
+      '100 Conversation Tokens per month',
       'Basic language learning tools',
       'Text-to-speech capabilities',
       'Access to 5 languages'
@@ -40,7 +40,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'basic_tier',
     name: 'Basic',
     tier: 'basic',
-    price: 4.50,
+    price: 4.00,
     monthlyCredits: 3, // $3 worth of usage
     monthlyTokens: 300, // 3 credits * 100
     features: [
@@ -69,9 +69,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     ]
   },
   {
-    id: 'pro_tier',
-    name: 'Pro',
-    tier: 'pro',
+    id: 'gold_tier',
+    name: 'Gold',
+    tier: 'gold',
     price: 20.00,
     monthlyCredits: 16, // $16 worth of usage
     monthlyTokens: 1600, // 16 credits * 100

@@ -39,22 +39,21 @@ const API_KEYS = {
 const ENTITLEMENTS = {
   BASIC: 'basic_entitlement',
   PREMIUM: 'premium_entitlement',
-  PRO: 'pro_entitlement'
+  GOLD: 'gold_entitlement'
 };
 
 // Map product IDs to our subscription tiers
 const PRODUCT_IDS = {
   BASIC: 'basic_tier:monthly',
   PREMIUM: 'premium_tier:monthly',
-  PRO: 'pro_tier:monthly',
-  GOLD: 'gold_tier:monthly' // Additional tier from Play Store
+  GOLD: 'gold_tier:monthly'
 };
 
 // Map entitlement IDs to subscription tiers
 const TIER_MAPPING = {
   [ENTITLEMENTS.BASIC]: 'basic',
   [ENTITLEMENTS.PREMIUM]: 'premium',
-  [ENTITLEMENTS.PRO]: 'pro'
+  [ENTITLEMENTS.GOLD]: 'gold'
 };
 
 // Helper to detect if running in Expo Go
@@ -183,13 +182,12 @@ export const purchasePackage = async (
       // Create mock customerInfo response
       const mockTier = pckg.identifier === PRODUCT_IDS.BASIC ? 'basic' : 
                        pckg.identifier === PRODUCT_IDS.PREMIUM ? 'premium' : 
-                       pckg.identifier === PRODUCT_IDS.PRO ? 'pro' :
-                       pckg.identifier === PRODUCT_IDS.GOLD ? 'premium' : 'free';
+                       pckg.identifier === PRODUCT_IDS.GOLD ? 'gold' : 'free';
                        
       // Determine which entitlement to use based on the tier
       const entitlementToUse = mockTier === 'basic' ? ENTITLEMENTS.BASIC :
                                mockTier === 'premium' ? ENTITLEMENTS.PREMIUM :
-                               mockTier === 'pro' ? ENTITLEMENTS.PRO : null;
+                               mockTier === 'gold' ? ENTITLEMENTS.GOLD : null;
       
       // Return a mock CustomerInfo object
       return {
@@ -258,9 +256,9 @@ export const getCurrentSubscription = async (): Promise<{
     // In Expo Go or when configured to use mock data, return simulated subscription
     if (useMockData) {
       logDataSource('SubscriptionService', true);
-      console.warn('⚠️ Using mock premium subscription');
+      console.warn('⚠️ Using mock gold subscription');
       return {
-        tier: 'premium',
+        tier: 'gold',
         expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         isActive: true
       };
@@ -274,10 +272,10 @@ export const getCurrentSubscription = async (): Promise<{
       const customerInfo = await Purchases.getCustomerInfo();
       
       // Check for active entitlements starting with the highest tier
-      if (customerInfo && customerInfo.entitlements.active[ENTITLEMENTS.PRO]) {
-        const activeEntitlement = customerInfo.entitlements.active[ENTITLEMENTS.PRO];
+      if (customerInfo && customerInfo.entitlements.active[ENTITLEMENTS.GOLD]) {
+        const activeEntitlement = customerInfo.entitlements.active[ENTITLEMENTS.GOLD];
         return {
-          tier: 'pro',
+          tier: 'gold',
           expirationDate: activeEntitlement.expirationDate ? new Date(activeEntitlement.expirationDate) : null,
           isActive: true
         };
