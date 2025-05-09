@@ -16,7 +16,10 @@
             "scheme": "confluency"
           }
         ],
-        "category": ["BROWSABLE", "DEFAULT"]
+        "category": [
+          "BROWSABLE",
+          "DEFAULT"
+        ]
       }
     ],
     "splash": {
@@ -34,6 +37,9 @@
         "googleSignIn": {
           "reservedClientId": "com.googleusercontent.apps.984417336702-dhfmjetmjmn5lrp91erart3ouopipthc"
         }
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

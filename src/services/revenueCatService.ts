@@ -29,19 +29,32 @@ export type CustomerInfo = {
   originalPurchaseDate: string;
 };
 
-// RevenueCat API keys (replace with your actual keys)
+// RevenueCat API keys
 const API_KEYS = {
-  ios: 'YOUR_IOS_API_KEY',
+  ios: 'appl_UkqSKmpgpYcEwGsRLwROiWopqQj',
   android: 'goog_CqytRKXWMJjpxZrlAjZLycGdFHy'
 };
 
 // Map RevenueCat entitlement IDs to our subscription tiers
-const ENTITLEMENT_ID = 'language_tutor_premium';
+const ENTITLEMENTS = {
+  BASIC: 'basic_entitlement',
+  PREMIUM: 'premium_entitlement',
+  PRO: 'pro_entitlement'
+};
+
+// Map product IDs to our subscription tiers
+const PRODUCT_IDS = {
+  BASIC: 'basic_tier:monthly',
+  PREMIUM: 'premium_tier:monthly',
+  PRO: 'pro_tier:monthly',
+  GOLD: 'gold_tier:monthly' // Additional tier from Play Store
+};
+
+// Map entitlement IDs to subscription tiers
 const TIER_MAPPING = {
-  'free_tier': 'free',
-  'basic_tier': 'basic',
-  'premium_tier': 'premium',
-  'pro_tier': 'pro'
+  [ENTITLEMENTS.BASIC]: 'basic',
+  [ENTITLEMENTS.PREMIUM]: 'premium',
+  [ENTITLEMENTS.PRO]: 'pro'
 };
 
 // Helper to detect if running in Expo Go
@@ -168,20 +181,26 @@ export const purchasePackage = async (
       console.log('Simulating purchase in development environment for package:', pckg.identifier);
       
       // Create mock customerInfo response
-      const mockTier = pckg.identifier.includes('basic_tier') ? 'basic' : 
-                       pckg.identifier.includes('premium_tier') ? 'premium' : 
-                       pckg.identifier.includes('pro_tier') ? 'pro' : 'free';
+      const mockTier = pckg.identifier === PRODUCT_IDS.BASIC ? 'basic' : 
+                       pckg.identifier === PRODUCT_IDS.PREMIUM ? 'premium' : 
+                       pckg.identifier === PRODUCT_IDS.PRO ? 'pro' :
+                       pckg.identifier === PRODUCT_IDS.GOLD ? 'premium' : 'free';
                        
+      // Determine which entitlement to use based on the tier
+      const entitlementToUse = mockTier === 'basic' ? ENTITLEMENTS.BASIC :
+                               mockTier === 'premium' ? ENTITLEMENTS.PREMIUM :
+                               mockTier === 'pro' ? ENTITLEMENTS.PRO : null;
+      
       // Return a mock CustomerInfo object
       return {
         entitlements: {
-          active: {
-            [ENTITLEMENT_ID]: {
+          active: entitlementToUse ? {
+            [entitlementToUse]: {
               productIdentifier: pckg.identifier,
               isSandbox: true,
               expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
             }
-          },
+          } : {},
           all: {}
         },
         originalAppUserId: 'dev_mock_user',
@@ -254,14 +273,25 @@ export const getCurrentSubscription = async (): Promise<{
       const Purchases = require('react-native-purchases');
       const customerInfo = await Purchases.getCustomerInfo();
       
-      if (customerInfo && customerInfo.entitlements.active[ENTITLEMENT_ID]) {
-        // User has an active subscription
-        const activeEntitlement = customerInfo.entitlements.active[ENTITLEMENT_ID];
-        const productId = activeEntitlement.productIdentifier;
-        const tier = getTierFromProductIdentifier(productId);
-        
+      // Check for active entitlements starting with the highest tier
+      if (customerInfo && customerInfo.entitlements.active[ENTITLEMENTS.PRO]) {
+        const activeEntitlement = customerInfo.entitlements.active[ENTITLEMENTS.PRO];
         return {
-          tier,
+          tier: 'pro',
+          expirationDate: activeEntitlement.expirationDate ? new Date(activeEntitlement.expirationDate) : null,
+          isActive: true
+        };
+      } else if (customerInfo && customerInfo.entitlements.active[ENTITLEMENTS.PREMIUM]) {
+        const activeEntitlement = customerInfo.entitlements.active[ENTITLEMENTS.PREMIUM];
+        return {
+          tier: 'premium',
+          expirationDate: activeEntitlement.expirationDate ? new Date(activeEntitlement.expirationDate) : null,
+          isActive: true
+        };
+      } else if (customerInfo && customerInfo.entitlements.active[ENTITLEMENTS.BASIC]) {
+        const activeEntitlement = customerInfo.entitlements.active[ENTITLEMENTS.BASIC];
+        return {
+          tier: 'basic',
           expirationDate: activeEntitlement.expirationDate ? new Date(activeEntitlement.expirationDate) : null,
           isActive: true
         };
