@@ -1,10 +1,30 @@
 // Updated Message.tsx with replay button for assistant messages and proper export structure
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import HTML from 'react-native-render-html';
+import HTML, { HTMLElementModel, HTMLContentModel } from 'react-native-render-html';
 import { Ionicons } from '@expo/vector-icons';
 import { normalizeText, areMessagesEquivalent, highlightDifferences } from '../utils/text';
+
+// Define custom element models for colored text
+const customHTMLElementModels = {
+  greentext: HTMLElementModel.fromCustomModel({
+    tagName: 'greentext',
+    contentModel: HTMLContentModel.textual
+  }),
+  orangetext: HTMLElementModel.fromCustomModel({
+    tagName: 'orangetext', 
+    contentModel: HTMLContentModel.textual
+  }),
+  strong: HTMLElementModel.fromCustomModel({
+    tagName: 'strong',
+    contentModel: HTMLContentModel.textual
+  }),
+  positionerror: HTMLElementModel.fromCustomModel({
+    tagName: 'positionerror',
+    contentModel: HTMLContentModel.textual
+  })
+};
 
 // Get screen width for dynamic sizing
 const screenWidth = Dimensions.get('window').width;
@@ -53,103 +73,136 @@ const Message: React.FC<MessageProps> = ({
   // Helper for checking if suggestions match the original message
   const isEquivalentToOriginal = (suggestion: string) => {
     if (!suggestion) return false;
+    
+    // Debug: Log natural and corrected fields for debugging visibility issues
+    if (message.natural) {
+      console.log("Natural field content:", message.natural);
+      console.log("Natural field highlighting:", highlightDifferences(message.content, message.natural, 'natural'));
+    }
+    
     return areMessagesEquivalent(message.content, suggestion);
   };
 
   // Check if suggestions match the original message
   const isEquivalentToNative = message.natural && isEquivalentToOriginal(message.natural);
   const isEquivalentToCorrected = message.corrected && isEquivalentToOriginal(message.corrected);
+  
+  // Log message fields for debugging
+  useEffect(() => {
+    if (message.natural) {
+      console.log("Message with natural field:", {
+        content: message.content,
+        natural: message.natural
+      });
+    }
+  }, [message.content, message.natural]);
 
   // Check if BOTH corrections match - this is our new case to handle
   const bothCorrectionsMatch = isEquivalentToNative && isEquivalentToCorrected && message.natural && message.corrected;
+  
+  // Check if natural and corrected fields are identical to each other
+  const naturalAndCorrectedIdentical = message.natural && message.corrected && 
+                                     normalizeText(message.natural) === normalizeText(message.corrected);
 
   // NEW CASE: Check if grammatically correct but not natively correct
   const onlyGrammarCorrect = isEquivalentToCorrected && !isEquivalentToNative && message.corrected && message.natural;
 
   // Highlight differences in suggestions only if they're not equivalent
   const highlightedNative = isEquivalentToNative
-    ? message.natural
+    ? message.natural // Perfect matches are handled by JSX
     : message.natural
-      ? highlightDifferences(message.content, message.natural)
+      ? highlightDifferences(message.content, message.natural, 'natural')
       : '';
 
   const highlightedCorrected = isEquivalentToCorrected
-    ? message.corrected
+    ? message.corrected // Perfect matches are handled by JSX
     : message.corrected
-      ? highlightDifferences(message.content, message.corrected)
+      ? highlightDifferences(message.content, message.corrected, 'corrected')
       : '';
 
-  // Function to highlight incorrect words in red in the original message
+  // For highlighting the user's original message against the corrected version
   const highlightIncorrectWords = useMemo(() => {
     if (!isUser || !message.corrected || isEquivalentToCorrected) {
       // If there's no correction or the correction is the same, return unchanged
       return message.content;
     }
-
-    // Split the texts into words
-    const originalWords = message.content.split(/\s+/);
-    const correctedWords = message.corrected.split(/\s+/);
-
-    // Create a normalized set of corrected words for faster lookup
-    const normalizedCorrectedWords = new Set(
-      correctedWords.map(word => normalizeText(word))
-    );
-
-    // Mark words that don't appear in the corrected text as incorrect
-    const result = originalWords.map(word => {
-      const normalizedWord = normalizeText(word);
-
-      // If the normalized word is not in the corrected text, highlight it
-      if (!normalizedCorrectedWords.has(normalizedWord)) {
-        return `<span style="color: #FF0000">${word}</span>`;
-      }
-
-      return word;
-    });
-
-    return result.join(' ');
+    
+    return highlightDifferences(message.corrected, message.content, 'user');
   }, [isUser, message.content, message.corrected, isEquivalentToCorrected]);
+  
+  // Ensure we parse natural field correctly to fix display issue
+  useEffect(() => {
+    if (message.natural) {
+      console.log("Natural field found:", message.natural);
+    }
+  }, [message.natural]);
 
-  // Styles for HTML rendering
+  // Styles for HTML rendering - using the original approach that works
   const correctedTagsStyles = useMemo(() => ({
     strong: {
       fontWeight: 'bold',
-      color: '#FF0000', // Red for new/changed words
+      color: '#FF0000', // Red for non-matching words
     },
-    span: {
-      color: '#FF0000', // Red for incorrect words
+    greentext: {
+      color: '#4CAF50', // Green for matching words
+    },
+    orangetext: {
+      fontWeight: 'bold',
+      color: '#FF9800', // Orange for words in natural not in user
+    },
+    positionerror: {
+      color: '#FF5722', // Deep orange for position errors
+      textDecorationLine: 'underline', // Underline position errors as requested
+      textDecorationStyle: 'solid',
+      textDecorationColor: '#FF5722',
     }
   }), []);
 
   const nativeTagsStyles = useMemo(() => ({
     strong: {
       fontWeight: 'bold',
-      color: '#FF0000', // Red for new/changed words
+      color: '#FF0000', // Red for non-matching words
+    },
+    greentext: {
+      color: '#4CAF50', // Green for matching words
+    },
+    orangetext: {
+      fontWeight: 'bold', // Bold text
+      color: '#FF8C00', // Orange color for better visibility (DarkOrange)
+      // No background color
+    },
+    positionerror: {
+      color: '#FF5722', // Deep orange for position errors
+      textDecorationLine: 'underline', // Underline position errors as requested
+      textDecorationStyle: 'solid',
+      textDecorationColor: '#FF5722',
     }
   }), []);
 
-  // Updated base styles for rendering HTML content - fixed to avoid using flexWrap which is causing issues
+  // Revert to original approach for rendering HTML content with colors
   const correctedBaseStyle = useMemo(() => {
     const baseStyle = {
       ...styles.annotationText,
-      color: isEquivalentToCorrected ? '#4CAF50' : '#212529'
+      // Perfect match case is handled separately in the JSX
+      color: '#212529' // Default color for text
     };
     if (isUser) {
       return { ...baseStyle, ...styles.userAnnotationText };
     }
     return baseStyle;
-  }, [isUser, isEquivalentToCorrected]);
+  }, [isUser]);
 
   const nativeBaseStyle = useMemo(() => {
     const baseStyle = {
       ...styles.annotationText,
-      color: isEquivalentToNative ? '#4CAF50' : '#212529'
+      // Perfect match case is handled separately in the JSX
+      color: '#212529' // Default color for text
     };
     if (isUser) {
       return { ...baseStyle, ...styles.userAnnotationText };
     }
     return baseStyle;
-  }, [isUser, isEquivalentToNative]);
+  }, [isUser]);
 
   // Toggle translation function
   const toggleTranslation = () => {
@@ -209,11 +262,13 @@ const Message: React.FC<MessageProps> = ({
                     🌍
                   </Text>
                   <View style={styles.annotationTextContainer}>
+                    {/* Apply the highlighted native text with our new styling */}
                     <HTML
                       source={{ html: highlightedNative }}
                       contentWidth={screenWidth * 0.75} // Increased available width
                       tagsStyles={nativeTagsStyles}
                       baseFontStyle={nativeBaseStyle}
+                      customHTMLElementModels={customHTMLElementModels}
                     />
                   </View>
                 </View>
@@ -228,6 +283,7 @@ const Message: React.FC<MessageProps> = ({
               contentWidth={screenWidth * 0.75} // Increased available width
               tagsStyles={correctedTagsStyles}
               baseFontStyle={isUser ? { ...styles.mainText, ...styles.userMainText } : styles.mainText}
+              customHTMLElementModels={customHTMLElementModels}
             />
           </View>
         ) : isAssistant && message.translation ? (
@@ -261,67 +317,128 @@ const Message: React.FC<MessageProps> = ({
 
         {showCorrections && !bothCorrectionsMatch && !onlyGrammarCorrect && (
           <View style={styles.annotationsContainer}>
-            {message.corrected && (
+            {/* Check if natural and corrected are identical */}
+            {message.corrected && (naturalAndCorrectedIdentical ? (
+              // When natural and corrected are identical, show only one line with both emojis
               <View style={[
                 styles.messageAnnotation,
                 styles.grammarHint,
                 isEquivalentToCorrected && styles.identical
               ]}>
                 <View style={styles.annotationRow}>
-                  <Text style={[
-                    styles.annotationLabel,
-                    isUser ? styles.userAnnotationLabel : null,
-                    isEquivalentToCorrected && styles.identicalLabel
-                  ]}>
-                    📝
-                  </Text>
+                  <View style={styles.combinedEmojiContainer}>
+                    <Text style={[
+                      styles.annotationLabel,
+                      isUser ? styles.userAnnotationLabel : null,
+                      isEquivalentToCorrected && styles.identicalLabel
+                    ]}>
+                      📝
+                    </Text>
+                    <Text style={[
+                      styles.annotationLabel,
+                      isUser ? styles.userAnnotationLabel : {},
+                      isEquivalentToNative && styles.identicalLabel
+                    ]}>
+                      🌍
+                    </Text>
+                  </View>
 
                   <View style={styles.annotationTextContainer}>
-                    <HTML
-                      source={{ html: highlightedCorrected }}
-                      contentWidth={screenWidth * 0.75} // Increased available width
-                      tagsStyles={correctedTagsStyles}
-                      baseFontStyle={correctedBaseStyle}
-                    />
-
-                    {isEquivalentToCorrected && (
-                      <Text style={styles.matchIcon}>✓</Text>
+                    {isEquivalentToCorrected ? (
+                      // When perfectly correct, display in bold green
+                      <Text style={styles.perfectMatchText}>
+                        {message.corrected}
+                        <Text style={styles.matchIcon}>✓</Text>
+                      </Text>
+                    ) : (
+                      // When not perfectly correct, use the highlighting approach
+                      <HTML
+                        source={{ html: highlightedCorrected }}
+                        contentWidth={screenWidth * 0.75} // Increased available width
+                        tagsStyles={correctedTagsStyles}
+                        baseFontStyle={correctedBaseStyle}
+                        customHTMLElementModels={customHTMLElementModels}
+                      />
                     )}
                   </View>
                 </View>
               </View>
-            )}
+            ) : (
+              // Original rendering when natural and corrected are different
+              <>
+                <View style={[
+                  styles.messageAnnotation,
+                  styles.grammarHint,
+                  isEquivalentToCorrected && styles.identical
+                ]}>
+                  <View style={styles.annotationRow}>
+                    <Text style={[
+                      styles.annotationLabel,
+                      isUser ? styles.userAnnotationLabel : null,
+                      isEquivalentToCorrected && styles.identicalLabel
+                    ]}>
+                      📝
+                    </Text>
 
-            {message.natural && (
-              <View style={[
-                styles.messageAnnotation,
-                styles.nativeHint,
-                isEquivalentToNative && styles.identical
-              ]}>
-                <View style={styles.annotationRow}>
-                  <Text style={[
-                    styles.annotationLabel,
-                    isUser ? styles.userAnnotationLabel : {},
-                    isEquivalentToNative && styles.identicalLabel
-                  ]}>
-                    🌍
-                  </Text>
-
-                  <View style={styles.annotationTextContainer}>
-                    <HTML
-                      source={{ html: highlightedNative }}
-                      contentWidth={screenWidth * 0.75} // Increased available width
-                      tagsStyles={nativeTagsStyles}
-                      baseStyle={nativeBaseStyle}
-                    />
-
-                    {isEquivalentToNative && (
-                      <Text style={styles.matchIcon}>✓</Text>
-                    )}
+                    <View style={styles.annotationTextContainer}>
+                      {isEquivalentToCorrected ? (
+                        // When perfectly correct, display in bold green
+                        <Text style={styles.perfectMatchText}>
+                          {message.corrected}
+                          <Text style={styles.matchIcon}>✓</Text>
+                        </Text>
+                      ) : (
+                        // When not perfectly correct, use the highlighting approach
+                        <HTML
+                          source={{ html: highlightedCorrected }}
+                          contentWidth={screenWidth * 0.75} // Increased available width
+                          tagsStyles={correctedTagsStyles}
+                          baseFontStyle={correctedBaseStyle}
+                          customHTMLElementModels={customHTMLElementModels}
+                        />
+                      )}
+                    </View>
                   </View>
                 </View>
-              </View>
-            )}
+
+                {message.natural && (
+                  <View style={[
+                    styles.messageAnnotation,
+                    styles.nativeHint,
+                    isEquivalentToNative && styles.identical
+                  ]}>
+                    <View style={styles.annotationRow}>
+                      <Text style={[
+                        styles.annotationLabel,
+                        isUser ? styles.userAnnotationLabel : {},
+                        isEquivalentToNative && styles.identicalLabel
+                      ]}>
+                        🌍
+                      </Text>
+
+                      <View style={styles.annotationTextContainer}>
+                        {isEquivalentToNative ? (
+                          // When perfectly correct, display in bold green
+                          <Text style={styles.perfectMatchText}>
+                            {message.natural}
+                            <Text style={styles.matchIcon}>✓</Text>
+                          </Text>
+                        ) : (
+                          // When not perfectly correct, use the highlighting approach
+                          <HTML
+                            source={{ html: highlightedNative }}
+                            contentWidth={screenWidth * 0.75} // Increased available width
+                            tagsStyles={nativeTagsStyles}
+                            baseFontStyle={nativeBaseStyle}
+                            customHTMLElementModels={customHTMLElementModels}
+                          />
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </>
+            ))}
           </View>
         )}
 
@@ -461,7 +578,7 @@ const styles = StyleSheet.create({
     color: '#2196F3', // Blue for grammar in user message (now on white background)
   },
   userAnnotationText: {
-    color: '#212529', // Dark text on white background
+    // Removed color property to allow our base style color to work
   },
   identicalLabel: {
     color: '#4CAF50', // success
@@ -488,15 +605,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     color: '#4CAF50', // Green text to indicate correctness
-    fontWeight: 'bold',
+    fontWeight: 'bold', // Bold for emphasis
     marginRight: 8, // Add some space between text and emojis
     flexWrap: 'wrap', // Allow text to wrap
+    textShadowColor: 'rgba(0, 128, 0, 0.2)', // Green shadow
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 4, // Creates a glow effect to enhance visibility
   },
   emojiContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 4,
     marginLeft: 'auto', // Push to the right
+  },
+  combinedEmojiContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginRight: 4,
   },
   emojiIcon: {
     fontSize: 16,

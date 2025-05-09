@@ -232,6 +232,9 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       
       // Add assistant response to history
       if (response) {
+        // Log the response to verify fields
+        console.log("API response:", JSON.stringify(response, null, 2));
+        
         const assistantMessage: MessageType = {
           role: 'assistant',
           content: response.reply,
@@ -241,6 +244,9 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
           natural: response.natural,
           conversationId: response.conversation_id
         };
+        
+        // Debug log to verify the 'natural' field
+        console.log("Natural field extracted:", assistantMessage.natural);
         
         setHistory(prev => [...prev, assistantMessage]);
         
