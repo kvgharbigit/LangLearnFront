@@ -120,7 +120,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                 </Text>
               </View>
               <View style={styles.userInfo}>
-                <Text style={styles.userName}>{user?.displayName || translate('profile.guest')}</Text>
+                <Text style={styles.userName}>{user?.user_metadata?.full_name || translate('profile.guest')}</Text>
                 <Text style={styles.userEmail}>{user?.email || ''}</Text>
               </View>
             </View>
