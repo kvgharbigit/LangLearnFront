@@ -113,8 +113,8 @@ import { shouldUseMockData, logDataSource } from '../utils/dataMode';
 export const getOfferings = async (): Promise<PurchasesPackage[]> => {
   try {
     // Check if we should be using mock data
-    const isExpoEnvironment = isExpoGo();
-    const useMockData = true; // Always use mock RevenueCat in development
+    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    const useMockData = isExpoGo() || isDevelopment(); // Only use mock data in development environments
     
     // In Expo Go or when configured to use mock data, return mock packages
     if (useMockData) {
@@ -252,8 +252,8 @@ export const getCurrentSubscription = async (): Promise<{
 }> => {
   try {
     // Check if we should be using mock data
-    const isExpoEnvironment = isExpoGo();
-    const useMockData = true; // Always use mock RevenueCat data in development
+    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    const useMockData = isExpoGo() || isDevelopment(); // Only use mock data in development environments
     
     // In Expo Go or when configured to use mock data, return simulated subscription
     if (useMockData) {

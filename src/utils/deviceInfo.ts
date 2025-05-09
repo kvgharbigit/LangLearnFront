@@ -26,7 +26,9 @@ export const isExpoGo = (): boolean => {
  * Returns if the app is running in a development environment
  */
 export const isDevelopment = (): boolean => {
-  return process.env.NODE_ENV === 'development';
+  // More reliable way to detect development mode in React Native
+  // __DEV__ is a global variable set by React Native during development builds
+  return __DEV__ === true;
 };
 
 /**
