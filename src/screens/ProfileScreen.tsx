@@ -67,8 +67,31 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           onPress: async () => {
             setIsLoading(true);
             try {
-              await logoutUser();
-              // The auth state observer will handle navigation on logout
+              // Perform a global logout that clears all sessions
+              console.log('Signing out user completely...');
+              const { supabase } = await import('../supabase/config');
+              await supabase.auth.signOut({ scope: 'global' });
+              
+              // Also clear any cached user data
+              const { clearCachedUser } = await import('../services/supabaseAuthService');
+              clearCachedUser();
+              
+              // Use reset navigation with a delay to ensure auth state updates first
+              console.log('Logout successful');
+              
+              // Also clear AsyncStorage to ensure clean state
+              try {
+                const AsyncStorage = await import('@react-native-async-storage/async-storage');
+                await AsyncStorage.default.clear();
+                console.log('AsyncStorage cleared');
+              } catch (storageError) {
+                console.error('Error clearing storage:', storageError);
+              }
+              
+              // Simply reload the app after logout - no need to navigate manually
+              // The AuthContext will handle redirecting to the login screen
+              console.log('App will restart to login screen automatically');
+              
             } catch (error) {
               console.error('Logout error:', error);
               Alert.alert(
@@ -79,7 +102,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
               setIsLoading(false);
             }
           },
-        },
+        }
       ]
     );
   };

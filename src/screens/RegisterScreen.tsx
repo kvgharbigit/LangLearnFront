@@ -1,4 +1,4 @@
-// src/screens/RegisterScreen.tsx
+// src/screens/RegisterScreen.tsx with enhanced initialization handling
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -18,7 +18,6 @@ import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { registerUser, logoutUser, clearCachedUser } from '../services/supabaseAuthService';
-import { initializeUserData } from '../utils/initializeUserData';
 import { supabase } from '../supabase/config';
 import { AuthStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
@@ -26,6 +25,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { clearAllPreferences } from '../utils/userPreferences';
 import { clearLanguagePreferences } from '../utils/languageStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUserInitialization } from '../contexts/UserInitializationContext';
+import NetInfo from '@react-native-community/netinfo';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -42,10 +43,23 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState<boolean>(false);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(30)).current;
+  
+  // Access user initialization context
+  const { verifyAndInitUser } = useUserInitialization();
+  
+  // Monitor network connectivity
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOffline(!state.isConnected || state.isInternetReachable === false);
+    });
+    
+    return () => unsubscribe();
+  }, []);
   
   // Run entrance animations when component mounts
   useEffect(() => {
@@ -107,6 +121,12 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
     
+    // Check network connectivity
+    if (isOffline) {
+      setErrorMessage('No internet connection. Please check your network settings and try again.');
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -137,30 +157,58 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         } else {
           setErrorMessage(error.message || 'Registration failed');
         }
+        setIsLoading(false);
         return;
       }
       
       console.log('Registration successful, user ID:', user?.id);
       
-      // Initialize user data in the backend
+      // Initialize user data in the backend - keep loading state active during this process
       if (user) {
-        console.log('Initializing user data after registration...');
+        console.log('Verifying user data tables after registration...');
         try {
-          // Wait for initialization to complete before proceeding
-          await initializeUserData(user.id);
-          console.log('User data initialization completed after registration');
-        } catch (err) {
-          console.error('Error initializing user data after registration:', err);
+          // Show specific message that we're initializing account data
+          setSuccessMessage('Account created! Setting up your profile...');
           
-          // Block registration completion if initialization fails
-          setErrorMessage('Unable to initialize user data. Please try again or contact support.');
+          // Verify user exists in tables and re-initialize if needed
+          // Keep loading state active during this entire process
+          const verified = await verifyAndInitUser(user.id);
+          console.log('User data verification result:', verified);
+          
+          if (!verified) {
+            // Handle verification failure
+            console.error('Failed to verify or initialize user data after registration');
+            setErrorMessage('Unable to initialize your account. Please try again or contact support.');
+            
+            // Sign out the user to prevent them from proceeding with incomplete data
+            try {
+              await supabase.auth.signOut();
+              console.log('Signed out user due to verification failure');
+            } catch (signOutError) {
+              console.error('Error signing out after verification failure:', signOutError);
+            }
+            
+            setIsLoading(false);
+            setSuccessMessage(null);
+            return; // Stop the registration flow
+          }
+          
+          // Successful verification - all tables exist or were re-initialized
+          console.log('User data verification/initialization completed successfully after registration');
+          
+          // Only hide loading indicator and show success after verification is complete
+          setSuccessMessage('Registration successful! Setting up your account...');
+        } catch (err) {
+          console.error('Error verifying user data after registration:', err);
+          
+          // Block registration completion if verification fails
+          setErrorMessage('Unable to verify your account. Please try again or contact support.');
           // Sign out the user to prevent them from proceeding with incomplete data
           try {
-            const { supabase } = await import('../supabase/config');
             await supabase.auth.signOut();
-            console.log('Signed out user due to initialization failure');
+            console.log('Signed out user due to verification failure');
           } catch (signOutError) {
-            console.error('Error signing out after initialization failure:', signOutError);
+            console.error('Error signing out after verification failure:', signOutError);
           }
           
           setIsLoading(false);
@@ -169,17 +217,15 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         }
       }
       
-      // Show success message to the user - now that email verification is disabled
+      // Show success message to the user - only after verification completes
       setIsLoading(false);
       setErrorMessage(null);
-      setSuccessMessage('Registration successful! You can now sign in to your account.');
       
       // If we get here, everything worked - navigation will be handled by auth state observer
       
     } catch (error) {
       setErrorMessage('An unexpected error occurred');
       console.error('Registration error:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -247,6 +293,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                 Join our community of language learners
               </Text>
             </View>
+            
+            {/* Offline warning */}
+            {isOffline && (
+              <View style={styles.warningContainer}>
+                <Ionicons name="cloud-offline" size={20} color="#F57C00" />
+                <Text style={styles.warningText}>You are offline. Please connect to the internet to create an account.</Text>
+              </View>
+            )}
             
             {/* Error message display */}
             {errorMessage && (
@@ -375,10 +429,10 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
               <TouchableOpacity
                 style={[
                   styles.registerButton,
-                  (!name || !email || !password || !confirmPassword || isLoading) && styles.disabledButton
+                  (isOffline || !name || !email || !password || !confirmPassword || isLoading) && styles.disabledButton
                 ]}
                 onPress={handleRegister}
-                disabled={!name || !email || !password || !confirmPassword || isLoading}
+                disabled={isOffline || !name || !email || !password || !confirmPassword || isLoading}
                 accessibilityLabel="Create Account"
               >
                 {isLoading ? (
@@ -528,6 +582,22 @@ const styles = StyleSheet.create({
     color: colors.gray600,
     textAlign: 'center',
     maxWidth: '85%',
+  },
+  warningContainer: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  warningText: {
+    color: '#E65100',
+    fontSize: 14,
+    flex: 1,
   },
   formContainer: {
     width: '100%',

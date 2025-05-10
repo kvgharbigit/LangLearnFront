@@ -1,0 +1,137 @@
+// src/types/usage.normalized.ts
+import { PRICING } from './subscription';
+
+// Original application interfaces
+export interface UsageDetails {
+  whisperMinutes: number;
+  claudeInputTokens: number;
+  claudeOutputTokens: number;
+  ttsCharacters: number;
+}
+
+export interface UsageCosts {
+  whisperCost: number;
+  claudeInputCost: number;
+  claudeOutputCost: number;
+  ttsCost: number;
+  totalCost: number;
+}
+
+// Simplified interface for normalized daily usage entries (no cost fields)
+export interface NormalizedDailyUsageEntry {
+  date: string; // ISO date string (YYYY-MM-DD)
+  whisper_minutes: number;
+  claude_input_tokens: number;
+  claude_output_tokens: number;
+  tts_characters: number;
+}
+
+// Updated monthly usage interface for normalized schema
+export interface MonthlyUsage {
+  currentPeriodStart: number; // timestamp
+  currentPeriodEnd: number; // timestamp
+  usageDetails: UsageDetails;
+  calculatedCosts: UsageCosts; // Calculated on-the-fly, not stored
+  creditLimit: number; // From users table
+  tokenLimit?: number; // Calculated from creditLimit
+  percentageUsed: number; // Calculated on-the-fly
+  dailyUsage: Record<string, NormalizedDailyUsageEntry>; 
+  subscriptionTier: string; // From users table
+}
+
+// Helper functions to calculate costs
+export const calculateCosts = (usage: UsageDetails): UsageCosts => {
+  const whisperCost = usage.whisperMinutes * PRICING.WHISPER_PER_MINUTE;
+  const claudeInputCost = (usage.claudeInputTokens / 1000000) * PRICING.CLAUDE_INPUT_PER_MILLION;
+  const claudeOutputCost = (usage.claudeOutputTokens / 1000000) * PRICING.CLAUDE_OUTPUT_PER_MILLION;
+  const ttsCost = (usage.ttsCharacters / 1000000) * PRICING.TTS_PER_MILLION;
+  
+  const totalCost = whisperCost + claudeInputCost + claudeOutputCost + ttsCost;
+  
+  return {
+    whisperCost,
+    claudeInputCost,
+    claudeOutputCost,
+    ttsCost,
+    totalCost
+  };
+};
+
+// Calculate percentage used based on total cost and credit limit
+export const calculatePercentageUsed = (totalCost: number, creditLimit: number): number => {
+  if (creditLimit <= 0) return 100;
+  return Math.min((totalCost / creditLimit) * 100, 100);
+};
+
+// Helper function to convert from UsageDetails to daily usage DB format (normalized)
+export const convertToDailyUsageEntry = (
+  date: string, 
+  usageDetails: UsageDetails
+): NormalizedDailyUsageEntry => {
+  return {
+    date,
+    whisper_minutes: usageDetails.whisperMinutes,
+    claude_input_tokens: usageDetails.claudeInputTokens,
+    claude_output_tokens: usageDetails.claudeOutputTokens,
+    tts_characters: usageDetails.ttsCharacters
+  };
+};
+
+// Helper function to convert from DB format to UsageDetails
+export const convertToUsageDetails = (entry: NormalizedDailyUsageEntry): UsageDetails => {
+  return {
+    whisperMinutes: entry.whisper_minutes || 0,
+    claudeInputTokens: entry.claude_input_tokens || 0,
+    claudeOutputTokens: entry.claude_output_tokens || 0,
+    ttsCharacters: entry.tts_characters || 0
+  };
+};
+
+// Helper to convert text to tokens
+export const estimateTokens = (text: string): number => {
+  if (!text) return 0;
+  return Math.ceil(text.length * PRICING.TOKENS_PER_CHAR);
+};
+
+// Helper to get today's date string
+export const getTodayDateString = (): string => {
+  const today = new Date();
+  return today.toISOString().split('T')[0]; // YYYY-MM-DD
+};
+
+// Convert credits to tokens (100x multiplier)
+export const creditsToTokens = (credits: number): number => {
+  return Math.round(credits * 100); // 1 credit = 100 tokens
+};
+
+// Convert tokens to credits (divide by 100)
+export const tokensToCredits = (tokens: number): number => {
+  return tokens / 100;
+};
+
+// Get current monthly period based on user's subscription date
+export const getMonthlyPeriod = (subscriptionStartDate: Date = new Date()): { start: number, end: number } => {
+  const today = new Date();
+  const currentDay = today.getDate();
+  const subscriptionDay = subscriptionStartDate.getDate();
+  
+  // Create start date (either this month or previous month on subscription day)
+  const start = new Date();
+  start.setDate(subscriptionDay);
+  if (currentDay < subscriptionDay) {
+    // If today is before subscription day, go back to previous month
+    start.setMonth(start.getMonth() - 1);
+  }
+  start.setHours(0, 0, 0, 0);
+  
+  // Create end date (next subscription day minus 1 day)
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + 1);
+  end.setDate(end.getDate() - 1);
+  end.setHours(23, 59, 59, 999);
+  
+  return {
+    start: start.getTime(),
+    end: end.getTime()
+  };
+};

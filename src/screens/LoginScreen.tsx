@@ -1,4 +1,4 @@
-// Enhanced LoginScreen.tsx
+// Enhanced LoginScreen.tsx with improved initialization handling
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -19,10 +19,11 @@ import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { loginUser, resetPassword, signInWithGoogle } from '../services/supabaseAuthService';
-import { initializeUserData } from '../utils/initializeUserData';
 import { AuthStackParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
+import { useUserInitialization } from '../contexts/UserInitializationContext';
+import NetInfo from '@react-native-community/netinfo';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -36,10 +37,23 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [googleLoading, setGoogleLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(30)).current;
+  
+  // Access user initialization context
+  const { verifyAndInitUser } = useUserInitialization();
+  
+  // Monitor network connectivity
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOffline(!state.isConnected || state.isInternetReachable === false);
+    });
+    
+    return () => unsubscribe();
+  }, []);
   
   // Start animations
   useEffect(() => {
@@ -67,6 +81,12 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       setErrorMessage('Please enter both email and password');
       return;
     }
+    
+    // Check network connectivity
+    if (isOffline) {
+      setErrorMessage('No internet connection. Please check your network settings and try again.');
+      return;
+    }
 
     setIsLoading(true);
 
@@ -82,38 +102,62 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         } else {
           setErrorMessage(error.message || 'Failed to login');
         }
+        setIsLoading(false);
         return;
       }
 
-      // Success - initialize user data in backend
+      // Success - verify user data exists in tables
       if (user) {
-        console.log('Login successful, initializing user data...');
+        console.log('Login successful, verifying user data existence...');
         try {
-          // Wait for initialization to complete before proceeding
-          await initializeUserData(user.id);
-          console.log('User data initialization completed after login');
-        } catch (err) {
-          console.error('Error initializing user data after login:', err);
+          // Verify user exists in tables and re-initialize if needed
+          const verified = await verifyAndInitUser(user.id);
+          console.log('User data verification result:', verified);
           
-          // Block login if initialization fails
-          setErrorMessage('Unable to initialize user data. Please try again or contact support.');
+          if (!verified) {
+            // Handle verification failure
+            console.error('Failed to verify or initialize user data after login');
+            setErrorMessage('Unable to access your account data. Please contact support.');
+            
+            // Sign out the user to prevent them from proceeding with incomplete data
+            try {
+              const { supabase } = await import('../supabase/config');
+              await supabase.auth.signOut();
+              console.log('Signed out user due to verification failure');
+            } catch (signOutError) {
+              console.error('Error signing out after verification failure:', signOutError);
+            }
+            
+            setIsLoading(false);
+            return; // Stop the login flow
+          }
+          
+          // Successful verification - all tables exist or were re-initialized
+          console.log('User data verification/initialization completed successfully after login');
+        } catch (err) {
+          console.error('Error verifying user data after login:', err);
+          
+          // Block login if verification fails
+          setErrorMessage('Unable to verify your account. Please try again or contact support.');
           // Sign out the user to prevent them from proceeding with incomplete data
           try {
             const { supabase } = await import('../supabase/config');
             await supabase.auth.signOut();
-            console.log('Signed out user due to initialization failure');
+            console.log('Signed out user due to verification failure');
           } catch (signOutError) {
-            console.error('Error signing out after initialization failure:', signOutError);
+            console.error('Error signing out after verification failure:', signOutError);
           }
+          
+          setIsLoading(false);
           return; // Stop the login flow
         }
       }
 
       // Navigation will be handled by the auth state observer
+      // AuthContext + InitializationGate will block access until ready
     } catch (error) {
       setErrorMessage('An unexpected error occurred');
       console.error('Login error:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -121,6 +165,12 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const handleForgotPassword = async () => {
     if (!email.trim()) {
       Alert.alert('Email Required', 'Please enter your email address to reset your password');
+      return;
+    }
+    
+    // Check network connectivity
+    if (isOffline) {
+      Alert.alert('Offline', 'Password reset requires an internet connection. Please check your network settings and try again.');
       return;
     }
 
@@ -149,6 +199,12 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   
   // Handle Google Sign-In using Supabase
   const handleGoogleSignIn = async () => {
+    // Check network connectivity first
+    if (isOffline) {
+      setErrorMessage('No internet connection. Please check your network settings and try again.');
+      return;
+    }
+    
     try {
       setGoogleLoading(true);
       setErrorMessage(null);
@@ -159,13 +215,14 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       if (error) {
         console.error('Google sign in error:', error);
         setErrorMessage('Failed to sign in with Google. Please try again.');
+        setGoogleLoading(false);
       }
       
-      // Auth state observer in AuthContext will handle navigation on successful sign-in
+      // For Google Sign-In, user verification will be handled by the AuthContext
+      // This is because the sign-in flow returns before the auth state is fully updated
     } catch (error) {
       console.error('Google sign in error:', error);
       setErrorMessage('An unexpected error occurred during Google sign in');
-    } finally {
       setGoogleLoading(false);
     }
   };
@@ -214,6 +271,14 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 Sign in to continue your language learning journey
               </Text>
             </View>
+            
+            {/* Offline warning */}
+            {isOffline && (
+              <View style={styles.warningContainer}>
+                <Ionicons name="cloud-offline" size={20} color="#F57C00" />
+                <Text style={styles.warningText}>You are offline. Some features may not work.</Text>
+              </View>
+            )}
 
             {/* Error message display */}
             {errorMessage && (
@@ -290,10 +355,10 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
               <TouchableOpacity
                 style={[
                   styles.loginButton,
-                  (!email || !password || isLoading) && styles.disabledButton
+                  (isOffline || !email || !password || isLoading) && styles.disabledButton
                 ]}
                 onPress={handleLogin}
-                disabled={!email || !password || isLoading}
+                disabled={isOffline || !email || !password || isLoading}
                 accessibilityLabel="Log In"
               >
                 {isLoading ? (
@@ -317,9 +382,13 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
             {/* Social login buttons */}
             <View style={styles.socialLoginContainer}>
               <TouchableOpacity 
-                style={[styles.socialButton, googleLoading && styles.socialButtonLoading]}
+                style={[
+                  styles.socialButton, 
+                  googleLoading && styles.socialButtonLoading,
+                  isOffline && styles.disabledSocialButton
+                ]}
                 onPress={handleGoogleSignIn}
-                disabled={googleLoading}
+                disabled={googleLoading || isOffline}
                 accessibilityLabel="Continue with Google"
               >
                 {googleLoading ? (
@@ -336,7 +405,11 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={styles.socialButton}
+                style={[
+                  styles.socialButton,
+                  isOffline && styles.disabledSocialButton
+                ]}
+                disabled={isOffline}
                 accessibilityLabel="Continue with Apple"
               >
                 <Ionicons name="logo-apple" size={20} color={colors.gray800} />
@@ -452,7 +525,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   welcomeContainer: {
-    marginBottom: 30,
+    marginBottom: 24,
     alignItems: 'center',
   },
   subtitle: {
@@ -467,6 +540,22 @@ const styles = StyleSheet.create({
     color: colors.gray600,
     textAlign: 'center',
     maxWidth: '85%',
+  },
+  warningContainer: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  warningText: {
+    color: '#E65100',
+    fontSize: 14,
+    flex: 1,
   },
   formContainer: {
     width: '100%',
@@ -584,6 +673,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
+  },
+  disabledSocialButton: {
+    backgroundColor: colors.gray100,
+    borderColor: colors.gray300,
+    opacity: 0.7,
   },
   socialButtonText: {
     color: colors.gray800,

@@ -56,9 +56,41 @@ export const getStoreText = (): string => {
   return Platform.OS === 'ios' ? 'App Store' : 'Google Play Store';
 };
 
+/**
+ * Gets the app version (returns '1.0.0' as fallback)
+ */
+export const getVersion = (): string => {
+  try {
+    const Constants = require('expo-constants');
+    return Constants.manifest?.version || Constants.manifest2?.version || '1.0.0';
+  } catch (e) {
+    return '1.0.0';
+  }
+};
+
+/**
+ * Gets detailed device info for logging purposes
+ */
+export const getDetailedDeviceInfo = () => {
+  const platformInfo = getPlatformInfo();
+  
+  return {
+    platform: platformInfo.platform,
+    version: platformInfo.version,
+    isIOS: platformInfo.isIOS,
+    isAndroid: platformInfo.isAndroid,
+    appVersion: getVersion(),
+    isDevelopment: isDevelopment(),
+    isExpoGo: isExpoGo(),
+    timestamp: new Date().toISOString()
+  };
+};
+
 export default {
   isExpoGo,
   isDevelopment,
   getPlatformInfo,
   getStoreText,
+  getVersion,
+  getDetailedDeviceInfo
 };

@@ -287,9 +287,9 @@ export const getCurrentSubscription = async (): Promise<{
     // In Expo Go or when configured to use mock data, return simulated subscription
     if (useMockData) {
       logDataSource('SubscriptionService', true);
-      console.warn('⚠️ Using mock gold subscription');
+      console.warn('⚠️ Using mock free subscription');
       return {
-        tier: 'gold',
+        tier: 'free',
         expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         isActive: true
       };

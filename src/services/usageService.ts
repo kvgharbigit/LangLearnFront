@@ -16,7 +16,7 @@ import {
 import { SUBSCRIPTION_PLANS } from '../types/subscription';
 
 // Import API URL from the api.ts file
-const API_URL = 'https://language-tutor-984417336702.asia-east1.run.app';
+import { API_URL } from '../utils/api';
 
 // Import all functionality from supabaseUsageService
 import supabaseUsageService from './supabaseUsageService';

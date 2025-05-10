@@ -11,24 +11,10 @@ export const initializeApp = async (): Promise<void> => {
   console.log('🚀 Initializing application...');
   
   try {
-    // Set up Supabase auth listener
+    // Set up Supabase auth listener - only for logging purposes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log(`Auth state changed: ${event}`);
-      
-      // Auto-initialize user when auth state changes
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        initializeUser()
-          .then(user => {
-            if (user) {
-              console.log('✅ User initialized:', user.id);
-            } else {
-              console.warn('⚠️ Failed to initialize user after auth event');
-            }
-          })
-          .catch(err => {
-            console.error('❌ Error initializing user after auth event:', err);
-          });
-      }
+      // User initialization is now handled by AuthContext
     });
     
     // Initialize user on app start

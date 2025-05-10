@@ -7,8 +7,10 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import { useAuth } from './src/contexts/AuthContext';
 import { LanguageProvider } from './src/contexts/LanguageContext';
 import { NetworkProvider } from './src/contexts/NetworkContext';
+import { UserInitializationProvider } from './src/contexts/UserInitializationContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import NetworkStatusBar from './src/components/NetworkStatusBar';
+import InitializationGate from './src/components/InitializationGate';
 import 'react-native-url-polyfill/auto'; // Required for Supabase
 
 // Import auth screens
@@ -46,45 +48,47 @@ const AuthNavigator = () => {
   );
 };
 
-// Main Navigator - Authenticated screens
+// Main Navigator - Authenticated screens with Initialization Gate
 const MainNavigator = () => {
   return (
-    <Stack.Navigator
-      initialRouteName="LanguageLanding"
-      screenOptions={{
-        headerShown: false,
-        animation: 'slide_from_right',
-      }}
-    >
-      <Stack.Screen
-        name="LanguageLanding"
-        component={LanguageLanding}
-      />
-      <Stack.Screen
-        name="LanguageTutor"
-        component={LanguageTutor}
-      />
-      <Stack.Screen
-        name="AudioTest"
-        component={AudioTestScreen}
-      />
-      <Stack.Screen
-        name="Profile"
-        component={ProfileScreen}
-      />
-      <Stack.Screen
-        name="EditProfile"
-        component={EditProfileScreen}
-      />
-      <Stack.Screen
-        name="Subscription"
-        component={SubscriptionScreen}
-      />
-      <Stack.Screen
-        name="AppLanguage"
-        component={AppLanguageScreen}
-      />
-    </Stack.Navigator>
+    <InitializationGate>
+      <Stack.Navigator
+        initialRouteName="LanguageLanding"
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+        }}
+      >
+        <Stack.Screen
+          name="LanguageLanding"
+          component={LanguageLanding}
+        />
+        <Stack.Screen
+          name="LanguageTutor"
+          component={LanguageTutor}
+        />
+        <Stack.Screen
+          name="AudioTest"
+          component={AudioTestScreen}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+        />
+        <Stack.Screen
+          name="EditProfile"
+          component={EditProfileScreen}
+        />
+        <Stack.Screen
+          name="Subscription"
+          component={SubscriptionScreen}
+        />
+        <Stack.Screen
+          name="AppLanguage"
+          component={AppLanguageScreen}
+        />
+      </Stack.Navigator>
+    </InitializationGate>
   );
 };
 
@@ -110,15 +114,21 @@ const RootNavigator = () => {
 
 // Import API preconnection
 import { preconnectToAPI } from './src/utils/api';
+import { initializeApp } from './src/utils/appInitializer';
 
 // Main App component
 export default function App() {
-  // Preconnect to API on app startup
+  // Preconnect to API on app startup and initialize app
   useEffect(() => {
+    // Initialize application
+    initializeApp()
+      .then(() => console.log('✅ App initialized successfully'))
+      .catch(err => console.warn('❌ App initialization error:', err));
+      
     // Warm up API connection
     preconnectToAPI()
-      .then(() => console.log('API connection prewarmed successfully'))
-      .catch(err => console.warn('API prewarm error (non-critical):', err));
+      .then(() => console.log('🔌 API connection prewarmed successfully'))
+      .catch(err => console.warn('⚠️ API prewarm error (non-critical):', err));
   }, []);
 
   return (
@@ -126,11 +136,13 @@ export default function App() {
       <NetworkProvider>
         <SafeAreaProvider>
           <StatusBar style="dark" />
-          <AuthProvider>
-            <LanguageProvider>
-              <RootNavigator />
-            </LanguageProvider>
-          </AuthProvider>
+          <UserInitializationProvider>
+            <AuthProvider>
+              <LanguageProvider>
+                <RootNavigator />
+              </LanguageProvider>
+            </AuthProvider>
+          </UserInitializationProvider>
         </SafeAreaProvider>
       </NetworkProvider>
     </ErrorBoundary>
