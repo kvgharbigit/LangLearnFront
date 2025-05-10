@@ -5,8 +5,8 @@ import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import { AUDIO_SETTINGS } from '../constants/settings'; // Import settings directly
 
-// Hardcoded maximum recording duration in milliseconds (30 seconds)
-const MAX_RECORDING_DURATION = 30000;
+// Hardcoded maximum recording duration in milliseconds (25 seconds)
+const MAX_RECORDING_DURATION = 25000;
 
 // Types
 interface VoiceRecorderOptions {
@@ -410,8 +410,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
             setIsRecording(true);
             setStatusMessage('Speech detected - recording...');
             
-            // Set a timeout to automatically stop recording after max duration (30 seconds)
-            console.log(`Setting max recording timeout for exactly ${MAX_RECORDING_DURATION}ms (30 seconds) at ${new Date().toISOString()}`);
+            // Set a timeout to automatically stop recording after max duration (25 seconds)
+            console.log(`Setting max recording timeout for exactly ${MAX_RECORDING_DURATION}ms (25 seconds) at ${new Date().toISOString()}`);
             const startTime = Date.now();
             
             // Use both approaches to ensure at least one works: timeout and interval
@@ -425,8 +425,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
                 console.log(`Component is mounted: ${mountedRef.current}`);
                 console.log(`Is recording state: ${isRecording}`);
                 
-                setStatusMessage('Maximum recording time (30s) reached - auto-stopping');
-                console.log('Maximum recording duration (30 seconds) reached - auto-stopping');
+                setStatusMessage('Maximum recording time (25s) reached - auto-stopping');
+                console.log('Maximum recording duration (25 seconds) reached - auto-stopping');
                 stopRecording();
               } else {
                 console.log('Timeout triggered but component not mounted');
@@ -450,8 +450,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
                   console.log(`MAX RECORDING INTERVAL CHECK: Duration ${elapsedTime}ms exceeds limit of ${MAX_RECORDING_DURATION}ms`);
                   
                   if (mountedRef.current && isRecording) {
-                    setStatusMessage('Maximum recording time (30s) reached - auto-stopping (interval)');
-                    console.log('Maximum recording duration (30 seconds) reached - auto-stopping (interval)');
+                    setStatusMessage('Maximum recording time (25s) reached - auto-stopping (interval)');
+                    console.log('Maximum recording duration (25 seconds) reached - auto-stopping (interval)');
                     
                     // Clear this interval first to prevent multiple calls
                     if (maxRecordingIntervalRef.current) {
@@ -550,7 +550,7 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
             });
           }
         }
-      }, 30000); // 30-second timeout for pre-buffer mode
+      }, 25000); // 25-second timeout for pre-buffer mode
 
       // Store the timeout ID in our ref
       preBufferTimeoutRef.current = preBufferTimeoutId;
@@ -755,8 +755,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       // Start tracking recording time
       recordingStartTimeRef.current = Date.now();
       
-      // Set a timeout to automatically stop recording after max duration (30 seconds)
-      console.log(`Setting max recording timeout for exactly ${MAX_RECORDING_DURATION}ms (30 seconds) at ${new Date().toISOString()}`);
+      // Set a timeout to automatically stop recording after max duration (25 seconds)
+      console.log(`Setting max recording timeout for exactly ${MAX_RECORDING_DURATION}ms (25 seconds) at ${new Date().toISOString()}`);
       const startTime = Date.now();
       
       // Use both approaches to ensure at least one works: timeout and interval
@@ -770,8 +770,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
           console.log(`Component is mounted: ${mountedRef.current}`);
           console.log(`Is recording state: ${isRecording}`);
           
-          setStatusMessage('Maximum recording time (30s) reached - auto-stopping');
-          console.log('Maximum recording duration (30 seconds) reached - auto-stopping');
+          setStatusMessage('Maximum recording time (25s) reached - auto-stopping');
+          console.log('Maximum recording duration (25 seconds) reached - auto-stopping');
           stopRecording();
         } else {
           console.log('Timeout triggered but component not mounted');
@@ -795,8 +795,8 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
             console.log(`MAX RECORDING INTERVAL CHECK: Duration ${elapsedTime}ms exceeds limit of ${MAX_RECORDING_DURATION}ms`);
             
             if (mountedRef.current && isRecording) {
-              setStatusMessage('Maximum recording time (30s) reached - auto-stopping (interval)');
-              console.log('Maximum recording duration (30 seconds) reached - auto-stopping (interval)');
+              setStatusMessage('Maximum recording time (25s) reached - auto-stopping (interval)');
+              console.log('Maximum recording duration (25 seconds) reached - auto-stopping (interval)');
               
               // Clear this interval first to prevent multiple calls
               if (maxRecordingIntervalRef.current) {
