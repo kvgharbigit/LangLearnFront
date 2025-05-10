@@ -54,7 +54,8 @@
     },
     "newArchEnabled": true,
     "plugins": [
-      "expo-web-browser"
+      "expo-web-browser",
+      "react-native-polyfill-globals"
     ],
     "extra": {
       "eas": {
