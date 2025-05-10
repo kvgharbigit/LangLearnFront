@@ -88,9 +88,25 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       // Success - initialize user data in backend
       if (user) {
         console.log('Login successful, initializing user data...');
-        initializeUserData(user.id).catch(err => {
+        try {
+          // Wait for initialization to complete before proceeding
+          await initializeUserData(user.id);
+          console.log('User data initialization completed after login');
+        } catch (err) {
           console.error('Error initializing user data after login:', err);
-        });
+          
+          // Block login if initialization fails
+          setErrorMessage('Unable to initialize user data. Please try again or contact support.');
+          // Sign out the user to prevent them from proceeding with incomplete data
+          try {
+            const { supabase } = await import('../supabase/config');
+            await supabase.auth.signOut();
+            console.log('Signed out user due to initialization failure');
+          } catch (signOutError) {
+            console.error('Error signing out after initialization failure:', signOutError);
+          }
+          return; // Stop the login flow
+        }
       }
 
       // Navigation will be handled by the auth state observer

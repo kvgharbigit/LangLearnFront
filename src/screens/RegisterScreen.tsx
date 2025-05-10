@@ -145,9 +145,28 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       // Initialize user data in the backend
       if (user) {
         console.log('Initializing user data after registration...');
-        initializeUserData(user.id).catch(err => {
+        try {
+          // Wait for initialization to complete before proceeding
+          await initializeUserData(user.id);
+          console.log('User data initialization completed after registration');
+        } catch (err) {
           console.error('Error initializing user data after registration:', err);
-        });
+          
+          // Block registration completion if initialization fails
+          setErrorMessage('Unable to initialize user data. Please try again or contact support.');
+          // Sign out the user to prevent them from proceeding with incomplete data
+          try {
+            const { supabase } = await import('../supabase/config');
+            await supabase.auth.signOut();
+            console.log('Signed out user due to initialization failure');
+          } catch (signOutError) {
+            console.error('Error signing out after initialization failure:', signOutError);
+          }
+          
+          setIsLoading(false);
+          setSuccessMessage(null);
+          return; // Stop the registration flow
+        }
       }
       
       // Show success message to the user - now that email verification is disabled
