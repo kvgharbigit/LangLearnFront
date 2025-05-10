@@ -31,13 +31,13 @@ config.resolver = {
     'timers': require.resolve('timers-browserify'),
     'domain': require.resolve('domain-browser'),
     
-    // Custom shims for complex modules
-    'ws': path.resolve(__dirname, './ws-shim.js'),
-    'net': path.resolve(__dirname, './net-shim.js'),
-    'tls': path.resolve(__dirname, './tls-shim.js'),
-    'dns': path.resolve(__dirname, './dns-shim.js'),
-    'dgram': path.resolve(__dirname, './dgram-shim.js'),
-    'fs': path.resolve(__dirname, './fs-shim.js'),
+    // Shims from our custom directory
+    'net': path.resolve(__dirname, 'shims/index.js'),
+    'tls': path.resolve(__dirname, 'shims/index.js'),
+    'dgram': path.resolve(__dirname, 'shims/index.js'),
+    'dns': path.resolve(__dirname, 'shims/index.js'),
+    'fs': path.resolve(__dirname, 'shims/index.js'),
+    'ws': path.resolve(__dirname, 'shims/index.js'),
   }
 };
 

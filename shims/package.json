@@ -1,0 +1,7 @@
+{
+  "name": "node-shims",
+  "version": "1.0.0",
+  "description": "Shims for Node.js modules in React Native",
+  "main": "index.js",
+  "private": true
+}
