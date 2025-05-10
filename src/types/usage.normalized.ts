@@ -1,7 +1,11 @@
 // src/types/usage.normalized.ts
-import { PRICING } from './subscription';
+// Normalized types for usage tracking without redundant fields
+// The key difference is that cost fields and percentage used is calculated on-the-fly
+// rather than being stored in the database
 
-// Original application interfaces
+/**
+ * Raw usage metrics
+ */
 export interface UsageDetails {
   whisperMinutes: number;
   claudeInputTokens: number;
@@ -9,6 +13,9 @@ export interface UsageDetails {
   ttsCharacters: number;
 }
 
+/**
+ * Calculated costs based on usage metrics
+ */
 export interface UsageCosts {
   whisperCost: number;
   claudeInputCost: number;
@@ -17,35 +24,48 @@ export interface UsageCosts {
   totalCost: number;
 }
 
-// Simplified interface for normalized daily usage entries (no cost fields)
-export interface NormalizedDailyUsageEntry {
-  date: string; // ISO date string (YYYY-MM-DD)
+/**
+ * Interface for daily usage entries in Supabase (raw metrics only)
+ */
+export interface SupabaseDailyUsageEntry {
+  date: string;
   whisper_minutes: number;
   claude_input_tokens: number;
   claude_output_tokens: number;
   tts_characters: number;
 }
 
-// Updated monthly usage interface for normalized schema
+/**
+ * The complete monthly usage object (derived from database tables)
+ */
 export interface MonthlyUsage {
-  currentPeriodStart: number; // timestamp
-  currentPeriodEnd: number; // timestamp
+  currentPeriodStart: number;
+  currentPeriodEnd: number;
   usageDetails: UsageDetails;
-  calculatedCosts: UsageCosts; // Calculated on-the-fly, not stored
-  creditLimit: number; // From users table
-  tokenLimit?: number; // Calculated from creditLimit
-  percentageUsed: number; // Calculated on-the-fly
-  dailyUsage: Record<string, NormalizedDailyUsageEntry>; 
-  subscriptionTier: string; // From users table
+  calculatedCosts: UsageCosts;
+  creditLimit: number;
+  percentageUsed: number;
+  dailyUsage: Record<string, SupabaseDailyUsageEntry>;
+  subscriptionTier: string;
 }
 
-// Helper functions to calculate costs
-export const calculateCosts = (usage: UsageDetails): UsageCosts => {
+// Pricing constants for cost calculations (same as backend)
+const PRICING = {
+  WHISPER_PER_MINUTE: 0.006,     // $0.006 per minute of audio
+  CLAUDE_INPUT_PER_MILLION: 0.25, // $0.25 per million tokens
+  CLAUDE_OUTPUT_PER_MILLION: 1.25,// $1.25 per million tokens
+  TTS_PER_MILLION: 4.0,          // $4.00 per million characters
+  TOKENS_PER_CHAR: 1/3,           // Estimate: 1 token ~ 3 characters
+};
+
+/**
+ * Calculate costs based on usage metrics
+ */
+export function calculateCosts(usage: UsageDetails): UsageCosts {
   const whisperCost = usage.whisperMinutes * PRICING.WHISPER_PER_MINUTE;
   const claudeInputCost = (usage.claudeInputTokens / 1000000) * PRICING.CLAUDE_INPUT_PER_MILLION;
   const claudeOutputCost = (usage.claudeOutputTokens / 1000000) * PRICING.CLAUDE_OUTPUT_PER_MILLION;
   const ttsCost = (usage.ttsCharacters / 1000000) * PRICING.TTS_PER_MILLION;
-  
   const totalCost = whisperCost + claudeInputCost + claudeOutputCost + ttsCost;
   
   return {
@@ -55,19 +75,78 @@ export const calculateCosts = (usage: UsageDetails): UsageCosts => {
     ttsCost,
     totalCost
   };
-};
+}
 
-// Calculate percentage used based on total cost and credit limit
-export const calculatePercentageUsed = (totalCost: number, creditLimit: number): number => {
+/**
+ * Calculates percentage used based on total cost and credit limit
+ */
+export function calculatePercentageUsed(totalCost: number, creditLimit: number): number {
   if (creditLimit <= 0) return 100;
   return Math.min((totalCost / creditLimit) * 100, 100);
-};
+}
 
-// Helper function to convert from UsageDetails to daily usage DB format (normalized)
-export const convertToDailyUsageEntry = (
-  date: string, 
-  usageDetails: UsageDetails
-): NormalizedDailyUsageEntry => {
+/**
+ * Helper to get today's date in YYYY-MM-DD format
+ */
+export function getTodayDateString(): string {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+}
+
+/**
+ * Helper to get monthly period (start and end timestamps)
+ */
+export function getMonthlyPeriod(): { start: number, end: number } {
+  const now = Date.now();
+  // 30 days in milliseconds
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  return {
+    start: now,
+    end: now + thirtyDaysMs
+  };
+}
+
+/**
+ * Convert credits to tokens (1 credit = 100 tokens)
+ */
+export function creditsToTokens(credits: number): number {
+  return credits * 100;
+}
+
+/**
+ * Convert tokens to credits (100 tokens = 1 credit)
+ */
+export function tokensToCredits(tokens: number): number {
+  return tokens / 100;
+}
+
+/**
+ * Estimate tokens based on text length
+ */
+export function estimateTokens(text: string): number {
+  if (!text) return 0;
+  return Math.ceil(text.length * PRICING.TOKENS_PER_CHAR);
+}
+
+/**
+ * Convert from SupabaseDailyUsageEntry to UsageDetails
+ */
+export function convertToUsageDetails(entry: SupabaseDailyUsageEntry): UsageDetails {
+  return {
+    whisperMinutes: entry.whisper_minutes || 0,
+    claudeInputTokens: entry.claude_input_tokens || 0,
+    claudeOutputTokens: entry.claude_output_tokens || 0,
+    ttsCharacters: entry.tts_characters || 0
+  };
+}
+
+/**
+ * Convert from UsageDetails to SupabaseDailyUsageEntry
+ */
+export function convertToDailyUsageEntry(
+  usageDetails: UsageDetails, 
+  date: string
+): SupabaseDailyUsageEntry {
   return {
     date,
     whisper_minutes: usageDetails.whisperMinutes,
@@ -75,63 +154,4 @@ export const convertToDailyUsageEntry = (
     claude_output_tokens: usageDetails.claudeOutputTokens,
     tts_characters: usageDetails.ttsCharacters
   };
-};
-
-// Helper function to convert from DB format to UsageDetails
-export const convertToUsageDetails = (entry: NormalizedDailyUsageEntry): UsageDetails => {
-  return {
-    whisperMinutes: entry.whisper_minutes || 0,
-    claudeInputTokens: entry.claude_input_tokens || 0,
-    claudeOutputTokens: entry.claude_output_tokens || 0,
-    ttsCharacters: entry.tts_characters || 0
-  };
-};
-
-// Helper to convert text to tokens
-export const estimateTokens = (text: string): number => {
-  if (!text) return 0;
-  return Math.ceil(text.length * PRICING.TOKENS_PER_CHAR);
-};
-
-// Helper to get today's date string
-export const getTodayDateString = (): string => {
-  const today = new Date();
-  return today.toISOString().split('T')[0]; // YYYY-MM-DD
-};
-
-// Convert credits to tokens (100x multiplier)
-export const creditsToTokens = (credits: number): number => {
-  return Math.round(credits * 100); // 1 credit = 100 tokens
-};
-
-// Convert tokens to credits (divide by 100)
-export const tokensToCredits = (tokens: number): number => {
-  return tokens / 100;
-};
-
-// Get current monthly period based on user's subscription date
-export const getMonthlyPeriod = (subscriptionStartDate: Date = new Date()): { start: number, end: number } => {
-  const today = new Date();
-  const currentDay = today.getDate();
-  const subscriptionDay = subscriptionStartDate.getDate();
-  
-  // Create start date (either this month or previous month on subscription day)
-  const start = new Date();
-  start.setDate(subscriptionDay);
-  if (currentDay < subscriptionDay) {
-    // If today is before subscription day, go back to previous month
-    start.setMonth(start.getMonth() - 1);
-  }
-  start.setHours(0, 0, 0, 0);
-  
-  // Create end date (next subscription day minus 1 day)
-  const end = new Date(start);
-  end.setMonth(end.getMonth() + 1);
-  end.setDate(end.getDate() - 1);
-  end.setHours(23, 59, 59, 999);
-  
-  return {
-    start: start.getTime(),
-    end: end.getTime()
-  };
-};
+}

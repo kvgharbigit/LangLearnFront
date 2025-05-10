@@ -1,11 +1,13 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { ConversationMode } from '../components/ConversationModeSelector';
-import supabaseUsageService from '../services/supabaseUsageService';
+import supabaseUsageService from '../services/usageService'; // Changed to use normalized service
 import { getCurrentUser, getIdToken } from '../services/supabaseAuthService';
 import { fetchWithRetry, classifyApiError, parseErrorResponse } from './apiHelpers';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import offlineAssets from './offlineAssets';
+import { supabase } from '../supabase/config';
+import { estimateTokens } from '../types/usage.normalized';
 
 // Update this to your actual API URL
 //const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
@@ -333,8 +335,66 @@ export const sendTextMessage = async (
       const lastMessage = data.history[data.history.length - 1];
       if (lastMessage && lastMessage.content) {
         try {
-          // Track input (user message) and output (assistant reply)
-          await supabaseUsageService.trackClaudeUsage(message, lastMessage.content);
+          // Get the current user
+          const user = getCurrentUser();
+          if (user) {
+            const inputTokens = estimateTokens(message);
+            const outputTokens = estimateTokens(lastMessage.content);
+            
+            // Get today's date
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Get current usage record
+            const { data: usageData, error: usageError } = await supabase
+              .from('usage')
+              .select('*')
+              .eq('user_id', user.id)
+              .single();
+            
+            if (!usageError && usageData) {
+              // Parse daily usage
+              let dailyUsage = {};
+              try {
+                dailyUsage = typeof usageData.daily_usage === 'string'
+                  ? JSON.parse(usageData.daily_usage || '{}')
+                  : usageData.daily_usage || {};
+              } catch (e) {
+                console.warn('Error parsing daily usage:', e);
+                dailyUsage = {};
+              }
+              
+              // Initialize today's usage if needed
+              if (!dailyUsage[today]) {
+                dailyUsage[today] = {
+                  date: today,
+                  whisper_minutes: 0,
+                  claude_input_tokens: 0,
+                  claude_output_tokens: 0,
+                  tts_characters: 0
+                };
+              }
+              
+              // Update daily usage
+              dailyUsage[today].claude_input_tokens += inputTokens;
+              dailyUsage[today].claude_output_tokens += outputTokens;
+              
+              // Update total tokens
+              const newInputTokens = (usageData.claude_input_tokens || 0) + inputTokens;
+              const newOutputTokens = (usageData.claude_output_tokens || 0) + outputTokens;
+              
+              // Update only the raw metrics
+              await supabase
+                .from('usage')
+                .update({
+                  claude_input_tokens: newInputTokens,
+                  claude_output_tokens: newOutputTokens,
+                  daily_usage: JSON.stringify(dailyUsage)
+                })
+                .eq('user_id', user.id);
+              
+              console.log(`Tracked Claude usage: ${inputTokens} input tokens, ${outputTokens} output tokens`);
+            }
+          }
           
           // Track TTS usage if audio is generated
           if (data.has_audio && !isMuted) {
@@ -598,8 +658,66 @@ export const sendVoiceRecording = async ({
       
       if (lastMessage && lastMessage.content) {
         try {
-          // Track input (transcribed text) and output (assistant reply)
-          await supabaseUsageService.trackClaudeUsage(transcription, lastMessage.content);
+          // Get the current user
+          const user = getCurrentUser();
+          if (user) {
+            const inputTokens = estimateTokens(transcription);
+            const outputTokens = estimateTokens(lastMessage.content);
+            
+            // Get today's date
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Get current usage record
+            const { data: usageData, error: usageError } = await supabase
+              .from('usage')
+              .select('*')
+              .eq('user_id', user.id)
+              .single();
+            
+            if (!usageError && usageData) {
+              // Parse daily usage
+              let dailyUsage = {};
+              try {
+                dailyUsage = typeof usageData.daily_usage === 'string'
+                  ? JSON.parse(usageData.daily_usage || '{}')
+                  : usageData.daily_usage || {};
+              } catch (e) {
+                console.warn('Error parsing daily usage:', e);
+                dailyUsage = {};
+              }
+              
+              // Initialize today's usage if needed
+              if (!dailyUsage[today]) {
+                dailyUsage[today] = {
+                  date: today,
+                  whisper_minutes: 0,
+                  claude_input_tokens: 0,
+                  claude_output_tokens: 0,
+                  tts_characters: 0
+                };
+              }
+              
+              // Update daily usage
+              dailyUsage[today].claude_input_tokens += inputTokens;
+              dailyUsage[today].claude_output_tokens += outputTokens;
+              
+              // Update total tokens
+              const newInputTokens = (usageData.claude_input_tokens || 0) + inputTokens;
+              const newOutputTokens = (usageData.claude_output_tokens || 0) + outputTokens;
+              
+              // Update only the raw metrics
+              await supabase
+                .from('usage')
+                .update({
+                  claude_input_tokens: newInputTokens,
+                  claude_output_tokens: newOutputTokens,
+                  daily_usage: JSON.stringify(dailyUsage)
+                })
+                .eq('user_id', user.id);
+              
+              console.log(`Tracked Claude usage: ${inputTokens} input tokens, ${outputTokens} output tokens`);
+            }
+          }
           
           // Track TTS usage if audio is generated
           if (data.has_audio && !isMuted) {
@@ -916,9 +1034,68 @@ export const createConversation = async ({
         // The input for the welcome message is effectively the conversation context
         const contextInput = `${targetLanguage} conversation with ${difficulty} difficulty${learningObjective ? ` about ${learningObjective}` : ''}`;
         
-        // Track usage locally
+        // Track usage locally with direct database update
         try {
-          await supabaseUsageService.trackClaudeUsage(contextInput, welcomeMessage.content);
+          // Get the current user
+          const user = getCurrentUser();
+          if (user) {
+            const inputTokens = estimateTokens(contextInput);
+            const outputTokens = estimateTokens(welcomeMessage.content);
+            
+            // Get today's date
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Get current usage record
+            const { data: usageData, error: usageError } = await supabase
+              .from('usage')
+              .select('*')
+              .eq('user_id', user.id)
+              .single();
+            
+            if (!usageError && usageData) {
+              // Parse daily usage
+              let dailyUsage = {};
+              try {
+                dailyUsage = typeof usageData.daily_usage === 'string'
+                  ? JSON.parse(usageData.daily_usage || '{}')
+                  : usageData.daily_usage || {};
+              } catch (e) {
+                console.warn('Error parsing daily usage:', e);
+                dailyUsage = {};
+              }
+              
+              // Initialize today's usage if needed
+              if (!dailyUsage[today]) {
+                dailyUsage[today] = {
+                  date: today,
+                  whisper_minutes: 0,
+                  claude_input_tokens: 0,
+                  claude_output_tokens: 0,
+                  tts_characters: 0
+                };
+              }
+              
+              // Update daily usage
+              dailyUsage[today].claude_input_tokens += inputTokens;
+              dailyUsage[today].claude_output_tokens += outputTokens;
+              
+              // Update total tokens
+              const newInputTokens = (usageData.claude_input_tokens || 0) + inputTokens;
+              const newOutputTokens = (usageData.claude_output_tokens || 0) + outputTokens;
+              
+              // Update only the raw metrics
+              await supabase
+                .from('usage')
+                .update({
+                  claude_input_tokens: newInputTokens,
+                  claude_output_tokens: newOutputTokens,
+                  daily_usage: JSON.stringify(dailyUsage)
+                })
+                .eq('user_id', user.id);
+              
+              console.log(`Tracked Claude usage: ${inputTokens} input tokens, ${outputTokens} output tokens`);
+            }
+          }
           
           // Track TTS usage if audio is generated
           if (data.has_audio && !isMuted) {

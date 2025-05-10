@@ -6,9 +6,8 @@ import {
   UsageDetails, 
   UsageCosts, 
   MonthlyUsage,
-  NormalizedDailyUsageEntry,
+  SupabaseDailyUsageEntry,
   calculateCosts, 
-  calculatePercentageUsed,
   estimateTokens,
   getTodayDateString,
   getMonthlyPeriod,
@@ -22,8 +21,11 @@ import { SUBSCRIPTION_PLANS } from '../types/subscription';
 // Import API URL from the api.ts file
 const API_URL = 'http://192.168.86.241:8004'; // Update to match your API_URL in api.ts
 
+// Import data mode helpers
+import { shouldUseMockData, logDataSource } from '../utils/dataMode';
+
 /**
- * Initialize monthly usage tracking for a user
+ * Initialize monthly usage tracking for a user - normalized schema
  */
 export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsage> => {
   try {
@@ -46,9 +48,8 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
     };
     
     const costs = calculateCosts(emptyUsage);
-    const percentageUsed = calculatePercentageUsed(costs.totalCost, creditLimit);
     
-    // Initial daily usage (empty object - normalized schema)
+    // Initial daily usage (empty object)
     const emptyDailyUsage = {};
     
     // Initial monthly usage object
@@ -58,27 +59,26 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
       usageDetails: emptyUsage,
       calculatedCosts: costs,
       creditLimit,
-      tokenLimit: creditsToTokens(creditLimit),
-      percentageUsed,
+      percentageUsed: 0,
       dailyUsage: emptyDailyUsage,
       subscriptionTier: tier
     };
     
-    // First create or update the user record with subscription info
+    // Create a user record in users table
     const { error: userError } = await supabase
       .from('users')
-      .upsert({
+      .insert([{
         user_id: userId,
         subscription_tier: tier,
-        subscription_start: Date.now(),
+        subscription_start: start,
         billing_cycle_start: start,
         billing_cycle_end: end,
         credit_limit: creditLimit
-      });
+      }]);
     
     if (userError) throw userError;
     
-    // Then create a usage record in Supabase with normalized schema
+    // Create a record in usage table with normalized schema (no cost fields)
     const { error } = await supabase
       .from('usage')
       .insert([{
@@ -101,11 +101,8 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
   }
 };
 
-// Import at the top level
-import { shouldUseMockData, logDataSource } from '../utils/dataMode';
-
 /**
- * Get the current usage for a user
+ * Get the current usage for a user - normalized schema
  */
 export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null> => {
   try {
@@ -132,7 +129,6 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
           totalCost: 0.133625
         },
         creditLimit: 1.5, // Free tier credit limit
-        tokenLimit: 150, // Free tier: 1.5 credits * 100
         percentageUsed: 4.45,
         dailyUsage: {},
         subscriptionTier: 'free' // Mock data should use free tier
@@ -148,19 +144,19 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
       userId = user.id;
     }
     
-    // Get user info from users table
+    // First get subscription info from users table
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('user_id', userId)
       .single();
-    
+      
     if (userError || !userData) {
-      console.warn('User not found, will initialize new user data');
+      // Initialize user if not exists
       return await initializeMonthlyUsage(userId);
     }
     
-    // Get usage data from usage table
+    // Then get usage data from usage table
     const { data, error } = await supabase
       .from('usage')
       .select('*')
@@ -172,8 +168,8 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
       return await initializeMonthlyUsage(userId);
     }
     
-    // Parse the usage data from normalized schema
-    // Safely parse the daily_usage JSON string
+    // Parse the usage data from Supabase format to our MonthlyUsage format
+    // First safely parse the daily_usage JSON string
     let parsedDailyUsage = {};
     try {
       if (typeof data.daily_usage === 'string' && data.daily_usage) {
@@ -185,7 +181,7 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
       console.warn('Error parsing daily_usage JSON:', parseError);
     }
     
-    // Convert snake_case database fields to camelCase application fields
+    // Extract raw usage metrics
     const usageDetails: UsageDetails = {
       whisperMinutes: data.whisper_minutes || 0,
       claudeInputTokens: data.claude_input_tokens || 0,
@@ -193,26 +189,24 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
       ttsCharacters: data.tts_characters || 0
     };
     
-    // Calculate costs from raw usage metrics (not stored in DB)
+    // Calculate costs on-the-fly
     const calculatedCosts = calculateCosts(usageDetails);
     
-    // Calculate percentage used (not stored in DB)
-    const percentageUsed = calculatePercentageUsed(
-      calculatedCosts.totalCost, 
-      userData.credit_limit
-    );
+    // Calculate percentage used
+    const creditLimit = userData.credit_limit || 1.5;
+    const percentageUsed = creditLimit > 0 
+      ? Math.min((calculatedCosts.totalCost / creditLimit) * 100, 100)
+      : 100;
     
-    // Construct the full usage object with derived values
     const usage: MonthlyUsage = {
       currentPeriodStart: data.current_period_start,
       currentPeriodEnd: data.current_period_end,
       usageDetails: usageDetails,
-      calculatedCosts: calculatedCosts, // Calculated, not stored
-      creditLimit: userData.credit_limit || 0, // From users table
-      tokenLimit: creditsToTokens(userData.credit_limit || 0), // Calculated from credit limit
-      percentageUsed: percentageUsed, // Calculated, not stored
+      calculatedCosts: calculatedCosts,
+      creditLimit: creditLimit,
+      percentageUsed: percentageUsed,
       dailyUsage: parsedDailyUsage,
-      subscriptionTier: userData.subscription_tier || 'free' // From users table
+      subscriptionTier: userData.subscription_tier || 'free'
     };
     
     // Check if billing period has expired and needs to be reset
@@ -230,7 +224,7 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
 };
 
 /**
- * Reset monthly usage for a new billing period
+ * Reset monthly usage for a new billing period - normalized schema
  */
 export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> => {
   try {
@@ -253,7 +247,6 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
     };
     
     const costs = calculateCosts(emptyUsage);
-    const percentageUsed = calculatePercentageUsed(costs.totalCost, creditLimit);
     
     // Updated monthly usage
     const updatedUsage: MonthlyUsage = {
@@ -262,26 +255,25 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
       usageDetails: emptyUsage,
       calculatedCosts: costs,
       creditLimit,
-      tokenLimit: creditsToTokens(creditLimit),
-      percentageUsed,
+      percentageUsed: 0,
       dailyUsage: {}, // Reset daily usage for new period
       subscriptionTier: tier
     };
     
-    // Update user record in users table
+    // Update user table with new billing cycle
     const { error: userError } = await supabase
       .from('users')
       .update({
-        subscription_tier: tier,
         billing_cycle_start: start,
         billing_cycle_end: end,
+        subscription_tier: tier,
         credit_limit: creditLimit
       })
       .eq('user_id', userId);
-    
+      
     if (userError) throw userError;
     
-    // Update usage record in usage table
+    // Update usage table with reset metrics
     const { error } = await supabase
       .from('usage')
       .update({
@@ -310,7 +302,7 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
 };
 
 /**
- * Track API usage and update user's usage metrics
+ * Track API usage and update user's usage metrics - normalized schema
  */
 export const trackApiUsage = async (
   usageToAdd: Partial<UsageDetails>, 
@@ -331,7 +323,7 @@ export const trackApiUsage = async (
     // Get today's date string
     const today = getTodayDateString();
     
-    // Initialize today's usage if not exists using normalized schema
+    // Initialize today's usage if not exists
     if (!currentUsage.dailyUsage[today]) {
       currentUsage.dailyUsage[today] = {
         date: today,
@@ -343,9 +335,9 @@ export const trackApiUsage = async (
     }
     
     // Get daily usage entry
-    const dailyUsage = currentUsage.dailyUsage[today] as NormalizedDailyUsageEntry;
+    const dailyUsage = currentUsage.dailyUsage[today];
     
-    // Update daily usage with normalized structure
+    // Update daily usage with raw metrics only
     dailyUsage.whisper_minutes += usageToAdd.whisperMinutes || 0;
     dailyUsage.claude_input_tokens += usageToAdd.claudeInputTokens || 0;
     dailyUsage.claude_output_tokens += usageToAdd.claudeOutputTokens || 0;
@@ -358,26 +350,30 @@ export const trackApiUsage = async (
     monthlyUsage.claudeOutputTokens += usageToAdd.claudeOutputTokens || 0;
     monthlyUsage.ttsCharacters += usageToAdd.ttsCharacters || 0;
     
-    // Calculate costs from scratch using the raw metrics
+    // Calculate costs for monthly usage (on-the-fly, not stored in DB)
     currentUsage.calculatedCosts = calculateCosts(monthlyUsage);
     
     // Calculate percentage used
-    currentUsage.percentageUsed = calculatePercentageUsed(
-      currentUsage.calculatedCosts.totalCost,
-      currentUsage.creditLimit
-    );
+    if (currentUsage.creditLimit > 0) {
+      currentUsage.percentageUsed = Math.min(
+        (currentUsage.calculatedCosts.totalCost / currentUsage.creditLimit) * 100, 
+        100
+      );
+    } else {
+      currentUsage.percentageUsed = 100; // If no credit limit, mark as 100% used
+    }
     
-    // Update usage record in Supabase with normalized fields
+    // Update usage record in Supabase with normalized schema (only raw metrics)
     const { error } = await supabase
       .from('usage')
       .update({
-        // Only update raw usage metrics
+        // Usage fields (only raw metrics)
         whisper_minutes: monthlyUsage.whisperMinutes,
         claude_input_tokens: monthlyUsage.claudeInputTokens,
         claude_output_tokens: monthlyUsage.claudeOutputTokens,
         tts_characters: monthlyUsage.ttsCharacters,
         
-        // Update daily usage JSON
+        // Daily usage (as JSON string)
         daily_usage: JSON.stringify(currentUsage.dailyUsage)
       })
       .eq('user_id', userId);
@@ -397,22 +393,98 @@ export const trackApiUsage = async (
 export const trackWhisperUsage = async (audioDurationSeconds: number): Promise<void> => {
   const minutes = audioDurationSeconds / 60;
   await trackApiUsage({ whisperMinutes: minutes });
+  console.log(`Tracked Whisper usage: ${minutes.toFixed(2)} minutes (${audioDurationSeconds}s)`);
 };
 
 /**
  * Track Claude API usage
+ * Uses direct DB update to avoid issues with missing cost columns
  */
 export const trackClaudeUsage = async (
   inputText: string, 
   outputText: string
 ): Promise<void> => {
-  const inputTokens = estimateTokens(inputText);
-  const outputTokens = estimateTokens(outputText);
-  
-  await trackApiUsage({ 
-    claudeInputTokens: inputTokens,
-    claudeOutputTokens: outputTokens
-  });
+  try {
+    const inputTokens = estimateTokens(inputText);
+    const outputTokens = estimateTokens(outputText);
+    
+    // Get the current user
+    const user = getCurrentUser();
+    if (!user) {
+      console.warn('Cannot track Claude usage: No authenticated user');
+      return;
+    }
+    
+    // Get today's date
+    const today = getTodayDateString();
+    
+    // First get current usage
+    const { data: usageData, error: usageError } = await supabase
+      .from('usage')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (usageError) {
+      console.error('Error getting usage data:', usageError);
+      return;
+    }
+    
+    if (!usageData) {
+      console.warn('Cannot track Claude usage: No usage data found');
+      return;
+    }
+    
+    // Parse daily usage or initialize if needed
+    let dailyUsage = {};
+    try {
+      if (typeof usageData.daily_usage === 'string') {
+        dailyUsage = JSON.parse(usageData.daily_usage);
+      } else if (usageData.daily_usage) {
+        dailyUsage = usageData.daily_usage;
+      }
+    } catch (error) {
+      console.warn('Error parsing daily usage:', error);
+    }
+    
+    // Initialize today's usage if not exists
+    if (!dailyUsage[today]) {
+      dailyUsage[today] = {
+        date: today,
+        whisper_minutes: 0,
+        claude_input_tokens: 0,
+        claude_output_tokens: 0,
+        tts_characters: 0
+      };
+    }
+    
+    // Update daily usage
+    dailyUsage[today].claude_input_tokens += inputTokens;
+    dailyUsage[today].claude_output_tokens += outputTokens;
+    
+    // Update total usage
+    const newInputTokens = (usageData.claude_input_tokens || 0) + inputTokens;
+    const newOutputTokens = (usageData.claude_output_tokens || 0) + outputTokens;
+    
+    // Update the database - ONLY raw metrics, NOT calculated fields
+    const { error: updateError } = await supabase
+      .from('usage')
+      .update({
+        claude_input_tokens: newInputTokens,
+        claude_output_tokens: newOutputTokens,
+        daily_usage: JSON.stringify(dailyUsage)
+      })
+      .eq('user_id', user.id);
+    
+    if (updateError) {
+      console.error('Error updating Claude usage:', updateError);
+      return;
+    }
+    
+    console.log(`Tracked Claude usage: ${inputTokens} input tokens, ${outputTokens} output tokens`);
+  } catch (error) {
+    console.error('Error in trackClaudeUsage:', error);
+  }
 };
 
 /**
@@ -421,6 +493,7 @@ export const trackClaudeUsage = async (
 export const trackTTSUsage = async (text: string): Promise<void> => {
   const characterCount = text.length;
   await trackApiUsage({ ttsCharacters: characterCount });
+  console.log(`Tracked TTS usage: ${characterCount} characters`);
 };
 
 /**
@@ -438,12 +511,12 @@ export const getUserUsageInTokens = async (): Promise<{
     const usage = await getUserUsage(user.id);
     if (!usage) return null;
     
-    // Calculate used tokens based on total cost (derived value)
+    // Calculate used tokens (costs * 100)
     const usedTokens = creditsToTokens(usage.calculatedCosts.totalCost);
     
     return {
       usedTokens: Math.round(usedTokens),
-      tokenLimit: creditsToTokens(usage.creditLimit),
+      tokenLimit: usage.creditLimit * 100, // Convert credits to tokens
       percentageUsed: usage.percentageUsed
     };
   } catch (error) {
@@ -474,7 +547,6 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
     if (!usage) return false;
     
     // Check if percentage used is less than 100%
-    // This is now calculated on-the-fly, not stored
     const localQuotaAvailable = usage.percentageUsed < 100;
     
     // If local quota check fails, no need to check server
@@ -484,6 +556,9 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
     
     // Optionally verify with server (every 5 minutes)
     // This helps sync local usage data with server data
+    const now = Date.now();
+    
+    // Import isExpoGo and isDevelopment from deviceInfo.ts
     try {
       const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
       
@@ -530,26 +605,28 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
 
 /**
  * Force local quota to be marked as exceeded (used for syncing with server)
+ * For normalized schema, this requires adding lots of usage
  */
 export const forceQuotaExceeded = async (): Promise<void> => {
   try {
     const user = getCurrentUser();
     if (!user) return;
     
-    // Get the current usage
+    // Get current usage and credit limit
     const usage = await getUserUsage(user.id);
     if (!usage) return;
     
-    // Instead of directly updating percentage_used (which doesn't exist in DB anymore),
-    // we'll add enough usage to max out the quota
-    const remainingCredit = usage.creditLimit - usage.calculatedCosts.totalCost;
+    // Calculate how much usage to add to exceed quota
+    const currentCost = usage.calculatedCosts.totalCost;
+    const creditLimit = usage.creditLimit;
     
-    if (remainingCredit > 0) {
-      // Add enough tokens to max out the credit limit
-      await trackApiUsage({
-        claudeOutputTokens: Math.ceil((remainingCredit / 0.0000075) * 1000000)
-      });
-    }
+    // Add enough usage to exceed limit (add usage equivalent to 2x credit limit)
+    const tokensToAdd = creditLimit * 1000000 * 2; // large number to ensure quota exceeded
+    
+    // Update with excessive claude usage
+    await trackApiUsage({
+      claudeInputTokens: tokensToAdd,
+    }, user.id);
     
     console.log('Quota marked as exceeded to sync with server');
   } catch (error) {
@@ -588,7 +665,7 @@ export const verifySubscriptionWithServer = async (): Promise<boolean> => {
 };
 
 /**
- * Update the user's subscription tier and adjust token limits accordingly
+ * Update the user's subscription tier and adjust credit limits accordingly
  * Called when a user upgrades or downgrades their subscription
  */
 export const updateSubscriptionTier = async (newTier: string): Promise<void> => {
@@ -602,12 +679,13 @@ export const updateSubscriptionTier = async (newTier: string): Promise<void> => 
     
     const creditLimit = plan.monthlyCredits;
     
-    // Update only users table (normalized schema)
+    // For normalized schema, only update the users table
     const { error } = await supabase
       .from('users')
       .update({
         subscription_tier: newTier,
-        credit_limit: creditLimit
+        credit_limit: creditLimit,
+        updated_at: new Date().toISOString()
       })
       .eq('user_id', user.id);
     
