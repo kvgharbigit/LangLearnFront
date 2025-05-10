@@ -10,9 +10,9 @@ import { supabase } from '../supabase/config';
 import { estimateTokens } from '../types/usage.normalized';
 
 // Update this to your actual API URL
-//const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
+const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
 //const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
-export const API_URL = 'http://192.168.86.241:8004'; // Desktop WiFi IP address
+//export const API_URL = 'http://192.168.86.241:8004'; // Desktop WiFi IP address
 //const API_URL = 'http://172.29.224.1:8004'; // WSL adapter IP
 //const API_URL = 'http://192.168.86.26:8004'; /// Previous IP
 //const API_URL = 'https://a84f-128-250-0-218.ngrok-free.app'; //work
@@ -338,8 +338,21 @@ export const sendTextMessage = async (
           // Get the current user
           const user = getCurrentUser();
           if (user) {
-            const inputTokens = estimateTokens(message);
-            const outputTokens = estimateTokens(lastMessage.content);
+            // Use actual token counts from API if available, otherwise estimate
+            let inputTokens = 0;
+            let outputTokens = 0;
+            
+            if (data.token_usage) {
+              // Use accurate token counts from API
+              inputTokens = data.token_usage.input_tokens;
+              outputTokens = data.token_usage.output_tokens;
+              console.log(`Using accurate token counts from API: ${inputTokens} input, ${outputTokens} output`);
+            } else {
+              // Fall back to estimation (this will undercount system prompt tokens)
+              inputTokens = estimateTokens(message);
+              outputTokens = estimateTokens(lastMessage.content);
+              console.log(`Using estimated token counts: ${inputTokens} input, ${outputTokens} output`);
+            }
             
             // Get today's date
             const today = new Date().toISOString().split('T')[0];
@@ -661,8 +674,21 @@ export const sendVoiceRecording = async ({
           // Get the current user
           const user = getCurrentUser();
           if (user) {
-            const inputTokens = estimateTokens(transcription);
-            const outputTokens = estimateTokens(lastMessage.content);
+            // Use actual token counts from API if available, otherwise estimate
+            let inputTokens = 0;
+            let outputTokens = 0;
+            
+            if (data.token_usage) {
+              // Use accurate token counts from API
+              inputTokens = data.token_usage.input_tokens;
+              outputTokens = data.token_usage.output_tokens;
+              console.log(`Using accurate token counts from API (voice): ${inputTokens} input, ${outputTokens} output`);
+            } else {
+              // Fall back to estimation (this will undercount system prompt tokens)
+              inputTokens = estimateTokens(transcription);
+              outputTokens = estimateTokens(lastMessage.content);
+              console.log(`Using estimated token counts (voice): ${inputTokens} input, ${outputTokens} output`);
+            }
             
             // Get today's date
             const today = new Date().toISOString().split('T')[0];
@@ -1039,8 +1065,21 @@ export const createConversation = async ({
           // Get the current user
           const user = getCurrentUser();
           if (user) {
-            const inputTokens = estimateTokens(contextInput);
-            const outputTokens = estimateTokens(welcomeMessage.content);
+            // Use actual token counts from API if available, otherwise estimate
+            let inputTokens = 0;
+            let outputTokens = 0;
+            
+            if (data.token_usage) {
+              // Use accurate token counts from API
+              inputTokens = data.token_usage.input_tokens;
+              outputTokens = data.token_usage.output_tokens;
+              console.log(`Using accurate token counts from API (conversation): ${inputTokens} input, ${outputTokens} output`);
+            } else {
+              // Fall back to estimation (this will undercount system prompt tokens)
+              inputTokens = estimateTokens(contextInput);
+              outputTokens = estimateTokens(welcomeMessage.content);
+              console.log(`Using estimated token counts (conversation): ${inputTokens} input, ${outputTokens} output`);
+            }
             
             // Get today's date
             const today = new Date().toISOString().split('T')[0];
