@@ -12,7 +12,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   speechThreshold,
   silenceThreshold
 }) => {
-  // Generate an array of 50 bars if no samples are provided
+  // Generate an array of 50 bars if no samples are provided.
   const samples = audioSamples.length === 0
     ? Array(50).fill(0)
     : audioSamples;
