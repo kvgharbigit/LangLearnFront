@@ -27,10 +27,31 @@ import {
   restorePurchases
 } from '../services/revenueCatService';
 import { getUserUsage, getUserUsageInTokens } from '../services/usageService';
-import { isExpoGo, getStoreText } from '../utils/deviceInfo';
+import { isExpoGo, getStoreText, isDevelopment } from '../utils/deviceInfo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 const { width } = Dimensions.get('window');
+
+// Debug function to verify environment
+const logEnvironmentInfo = () => {
+  try {
+    console.log('Environment: __DEV__ =', __DEV__);
+    
+    const Constants = require('expo-constants');
+    console.log('Constants.appOwnership =', Constants.appOwnership);
+    console.log('Constants.executionEnvironment =', Constants.executionEnvironment);
+    
+    // Check if running in TestFlight
+    const isTestFlight = 
+      Constants.appOwnership === 'standalone' && 
+      Constants.executionEnvironment === 'standalone';
+    
+    console.log('isTestFlight() =', isTestFlight);
+    console.log('isDevelopment() =', isDevelopment());
+  } catch (e) {
+    console.log('Error logging environment:', e);
+  }
+};
 
 const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -47,6 +68,9 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
 
   useEffect(() => {
     loadData();
+    
+    // Log environment info for debugging
+    logEnvironmentInfo();
     
     // Start animations
     Animated.parallel([

@@ -108,12 +108,27 @@ export const initializeRevenueCat = (userId?: string) => {
 // Import utilities at the top level
 import { shouldUseMockData, logDataSource } from '../utils/dataMode';
 
+// Detect if running in TestFlight
+const isTestFlight = (): boolean => {
+  if (Platform.OS === 'ios') {
+    try {
+      const Constants = require('expo-constants');
+      // Test if it's a standalone app (not Expo Go)
+      return Constants.appOwnership === 'standalone' && 
+             Constants.executionEnvironment === 'standalone';
+    } catch (e) {
+      return false;
+    }
+  }
+  return false;
+};
+
 // Get available packages
 export const getOfferings = async (): Promise<PurchasesPackage[]> => {
   try {
     // Check if we should be using mock data
     const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
-    const useMockData = isExpoGo() || isDevelopment(); // Only use mock data in development environments
+    const useMockData = (isExpoGo() || (isDevelopment() && !isTestFlight())); // Only use mock data in development environments, not TestFlight
     
     // In Expo Go or when configured to use mock data, return mock packages
     if (useMockData) {
@@ -175,8 +190,8 @@ export const purchasePackage = async (
     // Import isExpoGo and isDevelopment from deviceInfo.ts
     const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
     
-    // In Expo Go or development environment, simulate a successful purchase
-    if (isExpoGo() || isDevelopment()) {
+    // In Expo Go or development environment (but not TestFlight), simulate a successful purchase
+    if (isExpoGo() || (isDevelopment() && !isTestFlight())) {
       console.log('Simulating purchase in development environment for package:', pckg.identifier);
       
       // Create mock customerInfo response
@@ -251,7 +266,7 @@ export const getCurrentSubscription = async (): Promise<{
   try {
     // Check if we should be using mock data
     const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
-    const useMockData = isExpoGo() || isDevelopment(); // Only use mock data in development environments
+    const useMockData = isExpoGo() || (isDevelopment() && !isTestFlight()); // Only use mock data in development environments, not TestFlight
     
     // In Expo Go or when configured to use mock data, return simulated subscription
     if (useMockData) {
@@ -337,8 +352,8 @@ export const restorePurchases = async (): Promise<CustomerInfo> => {
     // Import isExpoGo and isDevelopment from deviceInfo.ts
     const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
     
-    // In Expo Go or development environment, return a mock response
-    if (isExpoGo() || isDevelopment()) {
+    // In Expo Go or development environment (but not TestFlight), return a mock response
+    if (isExpoGo() || (isDevelopment() && !isTestFlight())) {
       console.log('Simulating restore purchases in development environment');
       // Return a mock CustomerInfo object
       return {
@@ -366,9 +381,9 @@ export const restorePurchases = async (): Promise<CustomerInfo> => {
   } catch (error) {
     console.error('Error restoring purchases:', error);
     
-    // In development, return a default mock instead of throwing
+    // In development (but not TestFlight), return a default mock instead of throwing
     const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
-    if (isExpoGo() || isDevelopment()) {
+    if (isExpoGo() || (isDevelopment() && !isTestFlight())) {
       return {
         entitlements: { active: {}, all: {} },
         originalAppUserId: 'dev_mock_user',

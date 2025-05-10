@@ -13,6 +13,8 @@
     },
     "production": {
       "autoIncrement": true,
+      "developmentClient": false,
+      "distribution": "store",
       "ios": {
         "resourceClass": "default"
       }
