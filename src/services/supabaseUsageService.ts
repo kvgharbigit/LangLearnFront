@@ -584,6 +584,56 @@ export const verifySubscriptionWithServer = async (): Promise<boolean> => {
   }
 };
 
+/**
+ * Update the user's subscription tier and adjust token limits accordingly
+ * Called when a user upgrades or downgrades their subscription
+ */
+export const updateSubscriptionTier = async (newTier: string): Promise<void> => {
+  try {
+    const user = getCurrentUser();
+    if (!user) return;
+    
+    // Find the plan to get new credit limit
+    const plan = SUBSCRIPTION_PLANS.find(p => p.tier === newTier);
+    if (!plan) return;
+    
+    const creditLimit = plan.monthlyCredits;
+    const tokenLimit = plan.monthlyTokens;
+    
+    // Get current usage to preserve existing usage data
+    const { data, error: fetchError } = await supabase
+      .from('usage')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+      
+    if (fetchError || !data) return;
+    
+    // Calculate new percentage based on existing usage with new limits
+    const totalCost = data.total_cost || 0;
+    const percentageUsed = creditLimit > 0 
+      ? Math.min((totalCost / creditLimit) * 100, 100)
+      : 100;
+    
+    // Update only the limits and tier without resetting usage
+    const { error } = await supabase
+      .from('usage')
+      .update({
+        credit_limit: creditLimit,
+        token_limit: tokenLimit,
+        percentage_used: percentageUsed,
+        subscription_tier: newTier
+      })
+      .eq('user_id', user.id);
+    
+    if (error) throw error;
+    
+    console.log(`Subscription updated to ${newTier} tier with ${tokenLimit} token limit`);
+  } catch (error) {
+    console.error('Error updating subscription tier:', error);
+  }
+};
+
 export default {
   getUserUsage,
   getUserUsageInTokens,
@@ -593,5 +643,6 @@ export default {
   trackTTSUsage,
   hasAvailableQuota,
   forceQuotaExceeded,
-  verifySubscriptionWithServer
+  verifySubscriptionWithServer,
+  updateSubscriptionTier
 };

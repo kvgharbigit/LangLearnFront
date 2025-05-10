@@ -33,7 +33,8 @@ export const {
   getUserUsageInTokens,
   hasAvailableQuota,
   forceQuotaExceeded,
-  verifySubscriptionWithServer
+  verifySubscriptionWithServer,
+  updateSubscriptionTier
 } = supabaseUsageService;
 
 // Export the default object

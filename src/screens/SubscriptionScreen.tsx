@@ -124,6 +124,20 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
       
+      // Let user know about mid-cycle upgrades
+      if (currentTier !== 'free' && plan.tier !== 'free') {
+        // Only show for actual subscription changes, not free tier
+        Alert.alert(
+          'Subscription Change',
+          `You're about to change your subscription from ${currentTier} to ${plan.tier}. Your billing will be adjusted immediately and your token limit will be updated to ${plan.monthlyTokens}. Continue?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Continue', onPress: () => processPurchase(plan) }
+          ]
+        );
+        return;
+      }
+      
       // If in Expo Go, show a special dialog for simulating purchases
       if (isExpoGo()) {
         Alert.alert(
@@ -168,28 +182,57 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
       
+      // Process the purchase directly for free tier or if not changing tiers
+      processPurchase(plan);
+    }
+  };
+  
+  // Extracted purchase logic to separate function
+  const processPurchase = async (plan: SubscriptionPlan) => {
       // For real builds, proceed with actual purchase
       setPurchasing(true);
       
-      // Find the package for this plan
-      const packageToPurchase = packages.find(pkg => 
-        pkg.product.identifier.includes(plan.id)
-      );
-      
-      if (!packageToPurchase) {
-        throw new Error('Subscription package not found');
+      try {
+        // Find the package for this plan
+        const packageToPurchase = packages.find(pkg => 
+          pkg.product.identifier.includes(plan.id)
+        );
+        
+        if (!packageToPurchase) {
+          throw new Error('Subscription package not found');
+        }
+        
+        // Purchase the package
+        await purchasePackage(packageToPurchase);
+        
+        // Reload data after purchase
+        await loadData();
+        
+        // Show appropriate message based on whether it was an upgrade or downgrade
+        const isUpgrade = 
+          (currentTier === 'free' && plan.tier !== 'free') || 
+          (currentTier === 'basic' && (plan.tier === 'premium' || plan.tier === 'gold')) ||
+          (currentTier === 'premium' && plan.tier === 'gold');
+            
+        const isDowngrade = 
+          (currentTier === 'gold' && (plan.tier === 'premium' || plan.tier === 'basic')) ||
+          (currentTier === 'premium' && plan.tier === 'basic');
+        
+        let message = `You are now subscribed to the ${plan.name} plan!`;
+        
+        if (isUpgrade) {
+          message += ` Your token limit has been increased to ${plan.monthlyTokens} tokens for this billing cycle.`;
+        } else if (isDowngrade) {
+          message += ` Your new token limit of ${plan.monthlyTokens} will take effect at your next billing cycle.`;
+        }
+        
+        Alert.alert('Subscription Updated', message);
+      } catch (error) {
+        console.error('Error processing purchase:', error);
+        throw error;
+      } finally {
+        setPurchasing(false);
       }
-      
-      // Purchase the package
-      await purchasePackage(packageToPurchase);
-      
-      // Reload data after purchase
-      await loadData();
-      
-      Alert.alert(
-        'Subscription Updated',
-        `You are now subscribed to the ${plan.name} plan!`
-      );
       
     } catch (error: any) {
       // Check for user cancellation

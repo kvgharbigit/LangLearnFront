@@ -1,6 +1,7 @@
 // src/services/revenueCatService.ts
 import { Platform } from 'react-native';
 import { SubscriptionTier, SUBSCRIPTION_PLANS } from '../types/subscription';
+import { updateSubscriptionTier } from './supabaseUsageService';
 
 // Define types for RevenueCat APIs to maintain type safety
 export type PurchasesPackage = {
@@ -230,6 +231,21 @@ export const purchasePackage = async (
       // Make the purchase with the SDK
       const purchaseResult = await Purchases.purchasePackage(pckg);
       console.log('Purchase successful');
+      
+      // If successful purchase, update the subscription tier in our usage tracking system
+      if (purchaseResult.customerInfo) {
+        try {
+          // Determine the tier from the purchased package
+          const newTier = getTierFromProductIdentifier(pckg.product.identifier);
+          
+          // Update the usage limits for the new tier
+          await updateSubscriptionTier(newTier);
+          console.log(`Usage limits updated for new tier: ${newTier}`);
+        } catch (err) {
+          console.error('Error updating usage limits after purchase:', err);
+          // Continue with the purchase flow even if updating usage limits fails
+        }
+      }
       
       return purchaseResult.customerInfo;
     } catch (err) {
