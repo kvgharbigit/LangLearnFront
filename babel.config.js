@@ -3,7 +3,7 @@ module.exports = function(api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      // Add any Babel plugins you need here
+      // Add plugins here if needed
     ],
   };
 };

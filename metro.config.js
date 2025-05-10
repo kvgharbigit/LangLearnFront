@@ -1,32 +1,20 @@
 // Learn more https://docs.expo.io/guides/customizing-metro
 const { getDefaultConfig } = require('expo/metro-config');
+
 const config = getDefaultConfig(__dirname);
 
-// Create resolver for Node.js modules
+// Add Node.js polyfills
 config.resolver = {
   ...config.resolver,
-  // Provide fallbacks for Node.js core modules
   extraNodeModules: {
     // Node.js core modules that might be used by dependencies
     'stream': require.resolve('readable-stream'),
-    'buffer': require.resolve('buffer'),
-    'events': require.resolve('events'),
-    'path': require.resolve('path-browserify'),
-    'util': require.resolve('util'),
+    'http': require.resolve('stream-http'),
+    'https': require.resolve('https-browserify'),
     'crypto': require.resolve('crypto-browserify'),
-    'assert': require.resolve('assert'),
+    'buffer': require.resolve('buffer'),
+    'process': require.resolve('process/browser'),
   }
-};
-
-// Configure the transformer
-config.transformer = {
-  ...config.transformer,
-  getTransformOptions: async () => ({
-    transform: {
-      experimentalImportSupport: false,
-      inlineRequires: true,
-    },
-  }),
 };
 
 module.exports = config;
