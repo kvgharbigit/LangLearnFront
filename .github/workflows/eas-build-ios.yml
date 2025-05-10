@@ -1,13 +1,20 @@
 name: EAS Build iOS
 on:
+  # Only run manually, not on push
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '**'
-      - '!**.md'
-      - '!.github/**'
+    inputs:
+      build_profile:
+        description: 'EAS build profile to use'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - preview
+      comment:
+        description: 'Build comment (optional)'
+        required: false
+        type: string
 
 jobs:
   build:
@@ -51,7 +58,12 @@ jobs:
         run: npx expo-doctor
 
       - name: Build iOS app
-        run: eas build --platform ios --profile production --non-interactive
+        run: |
+          echo "Starting iOS build with profile: ${{ github.event.inputs.build_profile }}"
+          if [ -n "${{ github.event.inputs.comment }}" ]; then
+            echo "Build comment: ${{ github.event.inputs.comment }}"
+          fi
+          eas build --platform ios --profile ${{ github.event.inputs.build_profile }} --non-interactive
         env:
           EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
