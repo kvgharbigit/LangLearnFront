@@ -7,21 +7,23 @@
     "icon": "./assets/transparent_background_icon.png",
     "userInterfaceStyle": "light",
     "scheme": "confluency",
-    "intentFilters": [
-      {
-        "action": "VIEW",
-        "autoVerify": true,
-        "data": [
-          {
-            "scheme": "confluency"
-          }
-        ],
-        "category": [
-          "BROWSABLE",
-          "DEFAULT"
-        ]
-      }
-    ],
+    "android": {
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "confluency"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "cover",
@@ -33,11 +35,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.github.kvgharbigit.langlearn",
-      "config": {
-        "googleSignIn": {
-          "reservedClientId": "com.googleusercontent.apps.984417336702-dhfmjetmjmn5lrp91erart3ouopipthc"
-        }
-      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "This app uses the microphone to record your speech for language practice.",
@@ -49,7 +46,8 @@
         "foregroundImage": "./assets/transparent_background_icon.png",
         "backgroundColor": "#4A6FA5"
       },
-      "package": "io.github.kvgharbigit.langlearn"
+      "package": "io.github.kvgharbigit.langlearn",
+      "permissions": ["RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -63,10 +61,7 @@
         "projectId": "08897675-6d90-4552-ab1f-b81ecea27c1a"
       },
       "supabaseUrl": "https://hkanndmudvnjrvkisklp.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrYW5uZG11ZHZuanJ2a2lza2xwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2Mjc0MDMsImV4cCI6MjA2MjIwMzQwM30.OsnzQS5EBT31LYeloAvc80yaxJ70AVsTEC3atNjWn4o",
-      "googleAndroidClientId": "205296109732-9j0a2h3b3qjvmf6gddd1t41rjt8a62p3.apps.googleusercontent.com",
-      "googleIosClientId": "205296109732-p98kdu02d8jva57j5oef4m3hgv09ufv7.apps.googleusercontent.com",
-      "googleExpoClientId": "205296109732-tiqvf6lkojlc2bj6gtp38h6p9v0a84rr.apps.googleusercontent.com"
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrYW5uZG11ZHZuanJ2a2lza2xwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2Mjc0MDMsImV4cCI6MjA2MjIwMzQwM30.OsnzQS5EBT31LYeloAvc80yaxJ70AVsTEC3atNjWn4o"
     }
   }
 }
