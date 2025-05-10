@@ -27,7 +27,7 @@ const { width } = Dimensions.get('window');
  * if user data has been properly initialized
  */
 const InitializationGate: React.FC<InitializationGateProps> = ({ children }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isVerifyingUser } = useAuth();
   const { 
     initStatus, 
     isInitialized, 
@@ -102,8 +102,8 @@ const InitializationGate: React.FC<InitializationGateProps> = ({ children }) => 
     }
   };
   
-  // If not authenticated or already initialized, render children
-  if (!isAuthenticated || isInitialized) {
+  // If not authenticated or already initialized (and not actively verifying), render children
+  if (!isAuthenticated || (isInitialized && !isVerifyingUser)) {
     return <>{children}</>;
   }
   
@@ -133,11 +133,11 @@ const InitializationGate: React.FC<InitializationGateProps> = ({ children }) => 
         
         <Text style={styles.title}>Confluency</Text>
         
-        {isInitializing ? (
+        {isInitializing || isVerifyingUser ? (
           <>
             <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
-            <Text style={styles.message}>Initializing your account...</Text>
-            <Text style={styles.submessage}>Please wait while we set up your account</Text>
+            <Text style={styles.message}>Setting up your account...</Text>
+            <Text style={styles.submessage}>Please wait while we verify and prepare your data</Text>
           </>
         ) : hasInitFailed ? (
           <>
@@ -186,6 +186,7 @@ const InitializationGate: React.FC<InitializationGateProps> = ({ children }) => 
           <>
             <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
             <Text style={styles.message}>Preparing your experience...</Text>
+            <Text style={styles.submessage}>Almost ready...</Text>
           </>
         )}
       </Animated.View>

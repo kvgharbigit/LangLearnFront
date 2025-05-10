@@ -10,7 +10,7 @@ import { supabase } from '../supabase/config';
 import { estimateTokens } from '../types/usage.normalized';
 
 // Update this to your actual API URL
-const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
+export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
 //const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
 //export const API_URL = 'http://192.168.86.241:8004'; // Desktop WiFi IP address
 //const API_URL = 'http://172.29.224.1:8004'; // WSL adapter IP

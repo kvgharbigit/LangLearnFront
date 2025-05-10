@@ -189,6 +189,12 @@ export const UserInitializationProvider: React.FC<UserInitializationProviderProp
       return false;
     }
 
+    // Set status to IN_PROGRESS immediately when verification starts
+    // This ensures loading indicator is shown during the verification process
+    setInitStatus(InitializationStatus.IN_PROGRESS);
+    setInitError(null);
+    await saveInitStatus(InitializationStatus.IN_PROGRESS);
+
     const verifyStartTime = Date.now();
     console.log(`UserInitContext: Starting user verification for ID ${userId} at ${new Date().toISOString()}`);
     
@@ -227,6 +233,7 @@ export const UserInitializationProvider: React.FC<UserInitializationProviderProp
       console.log(`UserInitContext: Verification took ${verifyDuration}ms before determining re-initialization is needed`);
       
       // If data is missing, attempt initialization
+      // (Note: initializeUser already sets the initStatus to IN_PROGRESS)
       const initSuccess = await initializeUser(userId);
       
       // Record final outcome
@@ -275,6 +282,11 @@ export const UserInitializationProvider: React.FC<UserInitializationProviderProp
         userId,
         timestamp: new Date().toISOString()
       });
+      
+      // Set status to FAILED only when we're absolutely sure there's an error
+      setInitStatus(InitializationStatus.FAILED);
+      setInitError(errorMessage);
+      await saveInitStatus(InitializationStatus.FAILED, errorMessage);
       
       // Record this error for diagnostics
       try {

@@ -11,6 +11,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   authError: Error | null;
+  isVerifyingUser: boolean; // Added to track user verification state
 }
 
 // Create context with default values
@@ -18,7 +19,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
   loading: true,
-  authError: null
+  authError: null,
+  isVerifyingUser: false
 });
 
 // Props for the AuthProvider component
@@ -31,6 +33,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<Error | null>(null);
+  const [verificationInProgress, setVerificationInProgress] = useState<boolean>(false);
   
   // Access the user initialization context
   const { 
@@ -52,8 +55,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (initialUser) {
           console.log('AuthContext: User authenticated, verifying user data in tables...');
           try {
+            // Set verification in progress flag to true
+            setVerificationInProgress(true);
+            
             // First verify the user exists in database tables and re-initialize if needed
             const dataExists = await verifyAndInitUser(initialUser.id);
+            
+            // Clear verification flag
+            setVerificationInProgress(false);
             
             if (!dataExists) {
               console.error('AuthContext: User data verification failed, signing out user');
@@ -164,9 +173,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // If this is a real sign-in after app is running (different user), verify the data
       if (user.id !== supabaseUser.id) {
         console.log('AuthContext: New user authenticated, verifying user data tables...');
-        verifyAndInitUser(supabaseUser.id).catch(error => {
-          console.error('AuthContext: Error verifying user data after auth change:', error);
-        });
+        // Set verification in progress flag to true
+        setVerificationInProgress(true);
+        
+        verifyAndInitUser(supabaseUser.id)
+          .catch(error => {
+            console.error('AuthContext: Error verifying user data after auth change:', error);
+          })
+          .finally(() => {
+            // Clear verification flag when done
+            setVerificationInProgress(false);
+          });
       }
     });
 
@@ -179,7 +196,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     isAuthenticated: !!user,
     loading,
-    authError
+    authError,
+    isVerifyingUser: verificationInProgress
   };
 
   return (
