@@ -66,19 +66,27 @@ const isExpoGo = () => {
 
 // Initialize RevenueCat
 export const initializeRevenueCat = (userId?: string) => {
-  // Import isExpoGo and isDevelopment from deviceInfo.ts to ensure we're using the updated detection
-  const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+  // Import isExpoGo and isPhysicalDevice from deviceInfo.ts
+  const { isExpoGo, isPhysicalDevice } = require('../utils/deviceInfo');
   
-  // Skip initialization in Expo Go or development environment
+  // Skip initialization in Expo Go
   if (isExpoGo()) {
-    console.log('RevenueCat initialization skipped in Expo Go');
+    console.log('📱 RevenueCat: DISABLED - Running in Expo Go');
     return;
   }
+
+  // Initialize on physical devices, skip on simulators/emulators
+  const isPhysical = isPhysicalDevice();
+  if (!isPhysical) {
+    console.log('📱 RevenueCat: DISABLED - Not running on physical device');
+    return;
+  }
+  
+  console.log(`📱 RevenueCat: ENABLED - Running on physical ${Platform.OS} device`);
 
   try {
     const apiKey = Platform.OS === 'ios' ? API_KEYS.ios : API_KEYS.android;
     
-    // Use Purchases SDK in production builds
     try {
       const Purchases = require('react-native-purchases');
       
@@ -128,12 +136,21 @@ const isTestFlight = (): boolean => {
 export const getOfferings = async (): Promise<PurchasesPackage[]> => {
   try {
     // Check if we should be using mock data
-    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
-    const useMockData = (isExpoGo() || (isDevelopment() && !isTestFlight())); // Only use mock data in development environments, not TestFlight
+    const { isExpoGo, isPhysicalDevice } = require('../utils/deviceInfo');
+    
+    // Only use RevenueCat on physical devices that are not running in Expo Go
+    const isExpoGoRunning = isExpoGo();
+    const isPhysicalDeviceRunning = isPhysicalDevice();
+    const useMockData = isExpoGoRunning || !isPhysicalDeviceRunning;
     
     // In Expo Go or when configured to use mock data, return mock packages
     if (useMockData) {
       logDataSource('SubscriptionService', true);
+      if (isExpoGoRunning) {
+        console.warn('📱 RevenueCat getOfferings: MOCK DATA - Running in Expo Go');
+      } else if (!isPhysicalDeviceRunning) {
+        console.warn('📱 RevenueCat getOfferings: MOCK DATA - Not running on physical device');
+      }
       console.warn('⚠️ Using mock subscription packages');
       
       // Create mock packages based on subscription plans
@@ -157,6 +174,7 @@ export const getOfferings = async (): Promise<PurchasesPackage[]> => {
     }
     
     logDataSource('SubscriptionService', false);
+    console.log('📱 RevenueCat getOfferings: REAL DATA - Using actual RevenueCat SDK');
 
     // Use actual RevenueCat SDK for production builds
     try {
@@ -188,11 +206,19 @@ export const purchasePackage = async (
   pckg: PurchasesPackage
 ): Promise<CustomerInfo> => {
   try {
-    // Import isExpoGo and isDevelopment from deviceInfo.ts
-    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    // Import isExpoGo and isPhysicalDevice from deviceInfo.ts
+    const { isExpoGo, isPhysicalDevice } = require('../utils/deviceInfo');
     
-    // In Expo Go or development environment (but not TestFlight), simulate a successful purchase
-    if (isExpoGo() || (isDevelopment() && !isTestFlight())) {
+    // Only use RevenueCat on physical devices that are not running in Expo Go
+    const isExpoGoRunning = isExpoGo();
+    const isPhysicalDeviceRunning = isPhysicalDevice();
+    
+    if (isExpoGoRunning || !isPhysicalDeviceRunning) {
+      if (isExpoGoRunning) {
+        console.warn('📱 RevenueCat purchasePackage: MOCK DATA - Running in Expo Go');
+      } else if (!isPhysicalDeviceRunning) {
+        console.warn('📱 RevenueCat purchasePackage: MOCK DATA - Not running on physical device');
+      }
       console.log('Simulating purchase in development environment for package:', pckg.identifier);
       
       // Create mock customerInfo response
@@ -223,9 +249,10 @@ export const purchasePackage = async (
       } as CustomerInfo;
     }
 
-    // Use actual RevenueCat SDK for production builds
+    // Use actual RevenueCat SDK 
     try {
       const Purchases = require('react-native-purchases');
+      console.log('📱 RevenueCat purchasePackage: REAL DATA - Using actual RevenueCat SDK');
       console.log('Purchasing package from RevenueCat:', pckg.identifier);
       
       // Make the purchase with the SDK
@@ -253,10 +280,19 @@ export const purchasePackage = async (
       throw err;
     }
   } catch (error) {
-    // Import isExpoGo and isDevelopment from deviceInfo.ts again to ensure it's available in this scope
-    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    // Import isExpoGo and isPhysicalDevice from deviceInfo.ts
+    const { isExpoGo, isPhysicalDevice } = require('../utils/deviceInfo');
     
-    if (isExpoGo() || isDevelopment()) {
+    // Only use RevenueCat on physical devices that are not running in Expo Go
+    const isExpoGoRunning = isExpoGo();
+    const isPhysicalDeviceRunning = isPhysicalDevice();
+    
+    if (isExpoGoRunning || !isPhysicalDeviceRunning) {
+      if (isExpoGoRunning) {
+        console.warn('📱 RevenueCat restorePurchases (error handler): MOCK DATA - Running in Expo Go');
+      } else if (!isPhysicalDeviceRunning) {
+        console.warn('📱 RevenueCat restorePurchases (error handler): MOCK DATA - Not running on physical device');
+      }
       // In development, return a mock response instead of throwing
       return {
         entitlements: {
@@ -281,12 +317,21 @@ export const getCurrentSubscription = async (): Promise<{
 }> => {
   try {
     // Check if we should be using mock data
-    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
-    const useMockData = isExpoGo() || (isDevelopment() && !isTestFlight()); // Only use mock data in development environments, not TestFlight
+    const { isExpoGo, isPhysicalDevice } = require('../utils/deviceInfo');
+    
+    // Only use RevenueCat on physical devices that are not running in Expo Go
+    const isExpoGoRunning = isExpoGo();
+    const isPhysicalDeviceRunning = isPhysicalDevice();
+    const useMockData = isExpoGoRunning || !isPhysicalDeviceRunning;
     
     // In Expo Go or when configured to use mock data, return simulated subscription
     if (useMockData) {
       logDataSource('SubscriptionService', true);
+      if (isExpoGoRunning) {
+        console.warn('📱 RevenueCat getCurrentSubscription: MOCK DATA - Running in Expo Go');
+      } else if (!isPhysicalDeviceRunning) {
+        console.warn('📱 RevenueCat getCurrentSubscription: MOCK DATA - Not running on physical device');
+      }
       console.warn('⚠️ Using mock free subscription');
       return {
         tier: 'free',
@@ -296,8 +341,9 @@ export const getCurrentSubscription = async (): Promise<{
     }
     
     logDataSource('SubscriptionService', false);
+    console.log('📱 RevenueCat getCurrentSubscription: REAL DATA - Using actual RevenueCat SDK');
 
-    // In production, use the actual RevenueCat SDK
+    // Use the actual RevenueCat SDK
     try {
       const Purchases = require('react-native-purchases');
       const customerInfo = await Purchases.getCustomerInfo();
@@ -365,11 +411,19 @@ const getTierFromProductIdentifier = (productId: string): SubscriptionTier => {
 // Restore purchases
 export const restorePurchases = async (): Promise<CustomerInfo> => {
   try {
-    // Import isExpoGo and isDevelopment from deviceInfo.ts
-    const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
+    // Import isExpoGo and isPhysicalDevice from deviceInfo.ts
+    const { isExpoGo, isPhysicalDevice } = require('../utils/deviceInfo');
     
-    // In Expo Go or development environment (but not TestFlight), return a mock response
-    if (isExpoGo() || (isDevelopment() && !isTestFlight())) {
+    // Only use RevenueCat on physical devices that are not running in Expo Go
+    const isExpoGoRunning = isExpoGo();
+    const isPhysicalDeviceRunning = isPhysicalDevice();
+    
+    if (isExpoGoRunning || !isPhysicalDeviceRunning) {
+      if (isExpoGoRunning) {
+        console.warn('📱 RevenueCat restorePurchases: MOCK DATA - Running in Expo Go');
+      } else if (!isPhysicalDeviceRunning) {
+        console.warn('📱 RevenueCat restorePurchases: MOCK DATA - Not running on physical device');
+      }
       console.log('Simulating restore purchases in development environment');
       // Return a mock CustomerInfo object
       return {
@@ -383,9 +437,10 @@ export const restorePurchases = async (): Promise<CustomerInfo> => {
       } as CustomerInfo;
     }
 
-    // In production, use the actual RevenueCat SDK
+    // Use the actual RevenueCat SDK
     try {
       const Purchases = require('react-native-purchases');
+      console.log('📱 RevenueCat restorePurchases: REAL DATA - Using actual RevenueCat SDK');
       const restoreResult = await Purchases.restorePurchases();
       
       console.log('Purchases restored successfully');

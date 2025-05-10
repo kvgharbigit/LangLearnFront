@@ -23,6 +23,37 @@ export const isExpoGo = (): boolean => {
 };
 
 /**
+ * Detects if the app is running on a physical device (vs simulator/emulator)
+ * This is used to enable RevenueCat on physical devices even in development
+ */
+export const isPhysicalDevice = (): boolean => {
+  try {
+    if (Platform.OS === 'ios') {
+      const Constants = require('expo-constants');
+      // On physical iOS devices, deviceName is typically "iPhone" or similar
+      // while simulator has names like "iPhone Simulator"
+      return !Constants.deviceName?.includes('Simulator');
+    } else if (Platform.OS === 'android') {
+      // For Android, check for emulator characteristics
+      const Constants = require('expo-constants');
+      
+      // Check for common emulator indicators
+      const brand = Constants.deviceName?.toLowerCase() || '';
+      const model = Constants.modelName?.toLowerCase() || '';
+      
+      // Common emulator identifiers
+      const emulatorIdentifiers = ['emulator', 'sdk', 'android sdk', 'genymotion', 'sdk_phone', 'sdk_gphone'];
+      
+      // Return true if none of the emulator identifiers are found in brand or model
+      return !emulatorIdentifiers.some(id => brand.includes(id) || model.includes(id));
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
  * Returns if the app is running in a development environment
  */
 export const isDevelopment = (): boolean => {
@@ -89,6 +120,7 @@ export const getDetailedDeviceInfo = () => {
 export default {
   isExpoGo,
   isDevelopment,
+  isPhysicalDevice,
   getPlatformInfo,
   getStoreText,
   getVersion,

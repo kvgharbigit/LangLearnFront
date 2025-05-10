@@ -20,6 +20,7 @@ import { RootStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
 import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '../types/subscription';
 import { MonthlyUsage, creditsToTokens } from '../types/usage';
+import RevenueCatErrorDisplay from '../components/RevenueCatErrorDisplay';
 import { 
   getCurrentSubscription, 
   getOfferings, 
@@ -61,6 +62,19 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const [usage, setUsage] = useState<MonthlyUsage | null>(null);
   const [tokenUsage, setTokenUsage] = useState<{usedTokens: number, tokenLimit: number, percentageUsed: number} | null>(null);
   const [packages, setPackages] = useState<any[]>([]);
+  // Always have a mock error for debugging
+  const [revenueCatError, setRevenueCatError] = useState<any>({
+    code: 'mock_error_code',
+    message: 'This is a mock RevenueCat error for debugging purposes',
+    readableErrorCode: 'MOCK_ERROR',
+    underlyingErrorMessage: 'Mock underlying error details',
+    details: {
+      productIdentifier: 'mock_product',
+      purchaseToken: 'mock_token',
+      isSandbox: true,
+      requestDate: new Date().toISOString()
+    }
+  });
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -90,6 +104,8 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const loadData = async () => {
     try {
       setLoading(true);
+      // Don't clear errors for debugging purposes
+      // setRevenueCatError(null);
       
       // Load current subscription
       const { tier, expirationDate } = await getCurrentSubscription();
@@ -110,6 +126,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       
     } catch (error) {
       console.error('Error loading subscription data:', error);
+      setRevenueCatError(error); // Store the error for display
       Alert.alert('Error', 'Failed to load subscription information.');
     } finally {
       setLoading(false);
@@ -237,6 +254,11 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         console.log('Purchase cancelled by user');
       } else {
         console.error('Error purchasing subscription:', error);
+        
+        // Store the error for display in the UI
+        setRevenueCatError(error);
+        
+        // Still show the alert for normal operation
         Alert.alert('Purchase Failed', 'Failed to complete the purchase. Please try again.');
       }
     } finally {
@@ -456,6 +478,11 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   Alert.alert('Success', 'Your purchases have been successfully restored!');
                 } catch (error) {
                   console.error('Error restoring purchases:', error);
+                  
+                  // Store the error for display in the UI
+                  setRevenueCatError(error);
+                  
+                  // Still show the alert for normal operation
                   Alert.alert('Error', 'Failed to restore purchases. Please try again.');
                 } finally {
                   setLoading(false);
@@ -484,6 +511,13 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 </Text>
               </View>
             )}
+            
+            {/* Always display RevenueCat error details for debugging */}
+            <RevenueCatErrorDisplay 
+              error={revenueCatError}
+              title="RevenueCat Error Details (Debug Mode)" 
+              onClear={() => setRevenueCatError(null)}
+            />
 
             <View style={styles.infoContainer}>
               <Text style={styles.infoText}>
