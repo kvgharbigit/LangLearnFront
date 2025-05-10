@@ -25,9 +25,9 @@
         "track": "internal"
       },
       "ios": {
-        "appleId": "${APPLE_ID}",
-        "ascAppId": "${ASC_APP_ID}",
-        "appleTeamId": "${APPLE_TEAM_ID}"
+        "appleId": "kvgharbi99@gmail.com",
+        "ascAppId": "6745500943",
+        "appleTeamId": "56X2U8K39D"
       }
     }
   }
