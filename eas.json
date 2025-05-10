@@ -12,7 +12,10 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "ios": {
+        "resourceClass": "default"
+      }
     }
   },
   "submit": {
@@ -20,6 +23,11 @@
       "android": {
         "serviceAccountKeyPath": "language-tutor-app-2025-5fcb9d8a55c2.json",
         "track": "internal"
+      },
+      "ios": {
+        "appleId": "${APPLE_ID}",
+        "ascAppId": "${ASC_APP_ID}",
+        "appleTeamId": "${APPLE_TEAM_ID}"
       }
     }
   }

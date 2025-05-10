@@ -10,7 +10,10 @@
     "setup-credentials": "./scripts/setup-credentials.sh",
     "build:android": "eas build --platform android --profile production",
     "submit:android": "eas submit --platform android --profile production",
-    "build-submit:android": "npm run build:android && npm run submit:android"
+    "build-submit:android": "npm run build:android && npm run submit:android",
+    "build:ios": "eas build --platform ios --profile production",
+    "submit:ios": "eas submit --platform ios --profile production",
+    "build-submit:ios": "npm run build:ios && npm run submit:ios"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.1.2",
