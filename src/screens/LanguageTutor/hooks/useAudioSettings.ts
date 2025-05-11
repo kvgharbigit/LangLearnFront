@@ -5,7 +5,7 @@
  * Handles loading, saving, and updating audio settings with persistence.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   AUDIO_SETTINGS, 
@@ -17,6 +17,62 @@ import {
   saveSingleAudioSetting, 
   PREFERENCE_KEYS 
 } from '../../../utils/userPreferences';
+
+// Improved debounce implementation with cancel method
+const debounce = (func: Function, wait: number) => {
+  let timeout: NodeJS.Timeout | null = null;
+  
+  const debouncedFunc = (...args: any[]) => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    
+    timeout = setTimeout(() => {
+      func(...args);
+      timeout = null;
+    }, wait);
+    
+    // Return an object with control methods
+    return {
+      // Flush method to immediately execute if needed
+      flush: () => {
+        if (timeout) {
+          clearTimeout(timeout);
+          func(...args);
+          timeout = null;
+        }
+      },
+      // Cancel method to abort without executing
+      cancel: () => {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
+      }
+    };
+  };
+  
+  // Add the control methods to the main function as well
+  debouncedFunc.flush = () => {
+    if (timeout && debouncedFunc.lastArgs) {
+      clearTimeout(timeout);
+      func(...debouncedFunc.lastArgs);
+      timeout = null;
+    }
+  };
+  
+  debouncedFunc.cancel = () => {
+    if (timeout) {
+      clearTimeout(timeout);
+      timeout = null;
+    }
+  };
+  
+  // Storage for the last arguments
+  debouncedFunc.lastArgs = null as any;
+  
+  return debouncedFunc;
+};
 
 // Interface for audio settings
 interface AudioSettings {
@@ -59,6 +115,17 @@ export default function useAudioSettings() {
   const [isMuted, setIsMuted] = useState<boolean>(
     (global as any).__SAVED_AUDIO_SETTINGS.isMuted || false
   );
+  
+  // Create refs to store the debounced save functions
+  const debouncedSaveRef = useRef<any>(null);
+  
+  // Create a debounced save function that will persist settings after 500ms
+  const createDebouncedSave = useCallback(() => {
+    return debounce(async (settings: AudioSettings) => {
+      console.log('⏱️ Executing debounced save for audio settings');
+      await saveAudioSettings(settings);
+    }, 500);
+  }, []);
 
   /**
    * Load audio settings from AsyncStorage
@@ -143,15 +210,52 @@ export default function useAudioSettings() {
     }
   }, []);
 
+  // Initialize debounced save on first render
+  useEffect(() => {
+    if (!debouncedSaveRef.current) {
+      debouncedSaveRef.current = createDebouncedSave();
+    }
+  }, [createDebouncedSave]);
+
+  // Helper to trigger debounced save with current settings
+  const triggerDebouncedSave = useCallback(() => {
+    if (debouncedSaveRef.current) {
+      const settings = {
+        tempo,
+        speechThreshold,
+        silenceThreshold,
+        silenceDuration,
+        isMuted
+      };
+      
+      // Update global reference first
+      (global as any).__SAVED_AUDIO_SETTINGS = { ...settings };
+      
+      // Trigger debounced save
+      debouncedSaveRef.current(settings);
+    }
+  }, [tempo, speechThreshold, silenceThreshold, silenceDuration, isMuted]);
+
   /**
    * Update the tempo setting
    * @param newTempo - New tempo value
    */
   const updateTempo = useCallback(async (newTempo: number) => {
-    setTempo(newTempo);
-    (global as any).__SAVED_AUDIO_SETTINGS.tempo = newTempo;
-    await saveSingleAudioSetting(PREFERENCE_KEYS.TEMPO, newTempo);
-  }, []);
+    // Only update if value has changed
+    if (tempo !== newTempo) {
+      console.log(`💾 Persisting tempo change: ${tempo} → ${newTempo} (${Math.round(newTempo * 100)}%)`);
+      setTempo(newTempo);
+      (global as any).__SAVED_AUDIO_SETTINGS.tempo = newTempo;
+      
+      // For tempo, we'll still use immediate save for a single setting
+      // because it's a critical setting that needs to be persisted immediately
+      await saveSingleAudioSetting(PREFERENCE_KEYS.TEMPO, newTempo);
+      console.log(`✅ Verify tempo saved: ${newTempo} (${Math.round(newTempo * 100)}%)`);
+      
+      // Log state after save for debugging
+      console.log(`🔍 After save - State: ${newTempo}, Global: ${(global as any).__SAVED_AUDIO_SETTINGS.tempo}, AsyncStorage: ${tempo}`);
+    }
+  }, [tempo]);
 
   /**
    * Toggle the mute state
@@ -160,43 +264,55 @@ export default function useAudioSettings() {
     const newMuteState = !isMuted;
     setIsMuted(newMuteState);
     (global as any).__SAVED_AUDIO_SETTINGS.isMuted = newMuteState;
-    await saveSingleAudioSetting(PREFERENCE_KEYS.IS_MUTED, newMuteState);
-  }, [isMuted]);
+    triggerDebouncedSave();
+  }, [isMuted, triggerDebouncedSave]);
 
   /**
    * Update the speech threshold
    * @param newThreshold - New speech threshold value
    */
   const updateSpeechThreshold = useCallback(async (newThreshold: number) => {
-    setSpeechThreshold(newThreshold);
-    (global as any).__SAVED_AUDIO_SETTINGS.speechThreshold = newThreshold;
-    await saveSingleAudioSetting(PREFERENCE_KEYS.SPEECH_THRESHOLD, newThreshold);
-  }, []);
+    // Only update if value has changed
+    if (speechThreshold !== newThreshold) {
+      setSpeechThreshold(newThreshold);
+      (global as any).__SAVED_AUDIO_SETTINGS.speechThreshold = newThreshold;
+      triggerDebouncedSave();
+    }
+  }, [speechThreshold, triggerDebouncedSave]);
 
   /**
    * Update the silence threshold
    * @param newThreshold - New silence threshold value
    */
   const updateSilenceThreshold = useCallback(async (newThreshold: number) => {
-    setSilenceThreshold(newThreshold);
-    (global as any).__SAVED_AUDIO_SETTINGS.silenceThreshold = newThreshold;
-    await saveSingleAudioSetting(PREFERENCE_KEYS.SILENCE_THRESHOLD, newThreshold);
-  }, []);
+    // Only update if value has changed
+    if (silenceThreshold !== newThreshold) {
+      setSilenceThreshold(newThreshold);
+      (global as any).__SAVED_AUDIO_SETTINGS.silenceThreshold = newThreshold;
+      triggerDebouncedSave();
+    }
+  }, [silenceThreshold, triggerDebouncedSave]);
 
   /**
    * Update the silence duration
    * @param newDuration - New silence duration value
    */
   const updateSilenceDuration = useCallback(async (newDuration: number) => {
-    setSilenceDuration(newDuration);
-    (global as any).__SAVED_AUDIO_SETTINGS.silenceDuration = newDuration;
-    await saveSingleAudioSetting(PREFERENCE_KEYS.SILENCE_DURATION, newDuration);
-  }, []);
+    // Only update if value has changed
+    if (silenceDuration !== newDuration) {
+      setSilenceDuration(newDuration);
+      (global as any).__SAVED_AUDIO_SETTINGS.silenceDuration = newDuration;
+      triggerDebouncedSave();
+    }
+  }, [silenceDuration, triggerDebouncedSave]);
 
   /**
-   * Save all audio settings at once
+   * Save all audio settings at once (immediately, without debouncing)
+   * Only uses batch save to avoid duplicates
    */
   const saveAllSettings = useCallback(async () => {
+    console.log('📝 Saving all audio settings in batch');
+    
     // Update global reference
     (global as any).__SAVED_AUDIO_SETTINGS = {
       tempo,
@@ -206,7 +322,7 @@ export default function useAudioSettings() {
       isMuted
     };
     
-    // Save all settings
+    // Save all settings at once - ONLY using the batch method
     await saveAudioSettings({
       speechThreshold,
       silenceThreshold,
@@ -215,16 +331,14 @@ export default function useAudioSettings() {
       isMuted
     });
     
-    // Also save each parameter separately for robustness
-    await Promise.all([
-      saveSingleAudioSetting(PREFERENCE_KEYS.TEMPO, tempo),
-      saveSingleAudioSetting(PREFERENCE_KEYS.SPEECH_THRESHOLD, speechThreshold),
-      saveSingleAudioSetting(PREFERENCE_KEYS.SILENCE_THRESHOLD, silenceThreshold),
-      saveSingleAudioSetting(PREFERENCE_KEYS.SILENCE_DURATION, silenceDuration),
-      saveSingleAudioSetting(PREFERENCE_KEYS.IS_MUTED, isMuted)
-    ]);
+    // Cancel any pending debounced saves
+    if (debouncedSaveRef.current) {
+      if (debouncedSaveRef.current.cancel) {
+        debouncedSaveRef.current.cancel();
+      }
+    }
     
-    console.log('All audio settings saved successfully');
+    console.log('✅ All settings saved in single batch operation');
   }, [tempo, speechThreshold, silenceThreshold, silenceDuration, isMuted]);
 
   // Load settings on mount
@@ -232,10 +346,20 @@ export default function useAudioSettings() {
     loadSavedAudioSettings();
   }, [loadSavedAudioSettings]);
 
-  // Save settings on unmount
+  // On unmount, flush any pending saves
   useEffect(() => {
     return () => {
-      // Update global reference first for safety
+      console.log(`🧹 Component unmounting - cleaning up all audio resources`);
+      console.log(`💾 Saving all audio settings on unmount`);
+      
+      // Log what the settings currently are
+      console.log(`🎵 Tempo: ${tempo} (${Math.round(tempo * 100)}%)`);
+      console.log(`🔊 Speech Threshold: ${speechThreshold}`);
+      console.log(`🔇 Silence Threshold: ${silenceThreshold}`);
+      console.log(`⏱️ Silence Duration: ${silenceDuration}ms`);
+      console.log(`🔕 Muted: ${isMuted}`);
+      
+      // Update global reference to ensure it reflects current values
       (global as any).__SAVED_AUDIO_SETTINGS = {
         tempo,
         speechThreshold,
@@ -244,36 +368,10 @@ export default function useAudioSettings() {
         isMuted
       };
       
-      // Save current audio settings to ensure they persist
-      console.log(`💾 Saving all audio settings on unmount`);
-      console.log(`🎵 Tempo: ${tempo} (${Math.round(tempo * 100)}%)`);
-      console.log(`🔊 Speech Threshold: ${speechThreshold}`);
-      console.log(`🔇 Silence Threshold: ${silenceThreshold}`);
-      console.log(`⏱️ Silence Duration: ${silenceDuration}ms`);
-      console.log(`🔕 Muted: ${isMuted}`);
-      
-      saveAudioSettings({
-        speechThreshold,
-        silenceThreshold,
-        silenceDuration,
-        tempo,
-        isMuted
-      }).then(() => {
-        console.log("✅ Audio settings saved on unmount");
-      }).catch(error => {
-        console.error("Error saving audio settings on unmount:", error);
-      });
-      
-      // Save each parameter separately as well to ensure they're definitely saved
-      Promise.all([
-        saveSingleAudioSetting(PREFERENCE_KEYS.TEMPO, tempo),
-        saveSingleAudioSetting(PREFERENCE_KEYS.SPEECH_THRESHOLD, speechThreshold),
-        saveSingleAudioSetting(PREFERENCE_KEYS.SILENCE_THRESHOLD, silenceThreshold),
-        saveSingleAudioSetting(PREFERENCE_KEYS.SILENCE_DURATION, silenceDuration),
-        saveSingleAudioSetting(PREFERENCE_KEYS.IS_MUTED, isMuted)
-      ])
-        .then(() => console.log(`✅ All audio parameters saved separately on unmount`))
-        .catch(err => console.error('Error saving parameters on unmount:', err));
+      // Flush any pending debounced saves to ensure all changes are persisted
+      if (debouncedSaveRef.current) {
+        debouncedSaveRef.current.flush();
+      }
     };
   }, [tempo, speechThreshold, silenceThreshold, silenceDuration, isMuted]);
 

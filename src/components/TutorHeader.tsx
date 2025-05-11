@@ -154,7 +154,7 @@ const TutorHeader: React.FC<Props> = ({
 
   // Save specific setting when it changes
   const saveSettingChange = (settingKey: string, value: any) => {
-    saveSingleAudioSetting(settingKey as any, value);
+    // Just mark as changed without saving individually - will be saved on modal close
     setSettingsChanged(true);
   };
 

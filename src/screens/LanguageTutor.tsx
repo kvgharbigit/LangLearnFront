@@ -1101,6 +1101,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       console.log(`⏱️ Silence Duration: ${silenceDuration}ms`);
       console.log(`🔕 Muted: ${isMuted}`);
       
+      // Save all settings in a single batch call - avoid separate calls to reduce duplicates
       saveAudioSettings({
         speechThreshold,
         silenceThreshold,
@@ -1108,27 +1109,16 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         tempo,
         isMuted
       }).then(() => {
-        console.log("✅ Audio settings saved on unmount");
+        console.log("✅ Audio settings saved on unmount - using single batch method");
       }).catch(error => {
         console.error("Error saving audio settings on unmount:", error);
       });
 
-      // Save each parameter separately as well to ensure they're definitely saved
-      Promise.all([
-        saveSingleAudioSetting('TEMPO', tempo),
-        saveSingleAudioSetting('SPEECH_THRESHOLD', speechThreshold),
-        saveSingleAudioSetting('SILENCE_THRESHOLD', silenceThreshold),
-        saveSingleAudioSetting('SILENCE_DURATION', silenceDuration),
-        saveSingleAudioSetting('IS_MUTED', isMuted)
-      ])
-        .then(() => console.log(`✅ All audio parameters saved separately on unmount`))
-        .catch(err => console.error('Error saving parameters on unmount:', err));
-
+      // Run audio cleanup
       if (soundRef.current) {
         // First remove any status update callbacks to prevent further updates
         if (playbackCallbackRef.current) {
-          try {
-            soundRef.current.setOnPlaybackStatusUpdate(null);
+          try {            soundRef.current.setOnPlaybackStatusUpdate(null);
             playbackCallbackRef.current = null;
           } catch (error) {
             console.error('Error removing status update callback:', error);
