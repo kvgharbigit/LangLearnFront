@@ -28,42 +28,98 @@ import {
   restorePurchases
 } from '../services/revenueCatService';
 import { getUserUsage, getUserUsageInTokens } from '../services/usageService';
-import { isExpoGo, getStoreText, getDeploymentEnvironment, isProductionBuild } from '../utils/deviceInfo';
+import { 
+  isExpoGo, 
+  getStoreText, 
+  getDeploymentEnvironment, 
+  isProductionBuild,
+  getDetailedDeviceInfo
+} from '../utils/deviceInfo';
 import { shouldUseSimulatedData } from '../services/revenueCatService';
 import { USE_SIMULATED_REVENUECAT } from '../utils/revenueCatConfig';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 const { width } = Dimensions.get('window');
 
-// Enhanced function to check environment status using both methods
+// Enhanced function to check environment status and collect diagnostics
 const logEnvironmentInfo = () => {
   try {
-    const { getDeploymentEnvironment } = require('../utils/deviceInfo');
+    const { getDeploymentEnvironment, getDetailedDeviceInfo } = require('../utils/deviceInfo');
     const deployEnv = getDeploymentEnvironment();
+    const deviceInfo = getDetailedDeviceInfo();
     
     console.log('=== ENVIRONMENT INFO ===');
-    console.log('Running in Expo Go:', isExpoGo());
+    console.log('Environment detection priority:');
+    console.log('1. __DEV__ =', __DEV__, '(primary check)');
+    console.log('2. Process.env.DEPLOY_ENV =', process.env.DEPLOY_ENV || 'not set', '(secondary check)');
+    console.log('3. Constants.appOwnership =', require('expo-constants').appOwnership, '(fallback check)');
+    
+    console.log('Computed environment:');
     console.log('Development mode:', __DEV__);
+    console.log('USE_SIMULATED_REVENUECAT:', USE_SIMULATED_REVENUECAT);
+    console.log('Running in Expo Go:', isExpoGo());
     console.log('Deployment Environment:', deployEnv);
-    console.log('EAS Build Env:', process.env.DEPLOY_ENV || 'not set');
+    console.log('Is Production Build:', isProductionBuild());
     
     const Constants = require('expo-constants');
-    console.log('appOwnership:', Constants.appOwnership);
-    console.log('executionEnvironment:', Constants.executionEnvironment);
+    console.log('Device info:');
+    console.log('Platform:', deviceInfo.platform, deviceInfo.version);
+    console.log('App Version:', deviceInfo.appVersion);
+    console.log('Device:', Constants.deviceName || 'unknown');
+    console.log('Constants.executionEnvironment:', Constants.executionEnvironment);
     
-    // Try to check RevenueCat status
-    if (!isExpoGo()) {
+    // Try to check RevenueCat status - now using __DEV__ as primary check
+    if (__DEV__ === false || !isExpoGo()) {
       try {
         const Purchases = require('react-native-purchases');
         console.log('RevenueCat SDK loaded successfully');
+        
+        // Check if we can access RevenueCat APIs
+        if (Purchases.getAppUserID) {
+          console.log('RevenueCat API accessible');
+          try {
+            const userID = Purchases.getAppUserID();
+            console.log('RevenueCat User ID:', userID || 'not available');
+          } catch (e) {
+            console.log('Could not get RevenueCat User ID:', e.message);
+          }
+        } else {
+          console.log('RevenueCat API not fully accessible');
+        }
       } catch (e) {
-        console.log('RevenueCat SDK not available');
+        console.log('RevenueCat SDK not available:', e.message);
       }
     } else {
-      console.log('RevenueCat SDK not initialized (using simulated data in Expo Go)');
+      console.log('RevenueCat SDK not initialized (using simulated data in __DEV__ mode/Expo Go)');
+      if (USE_SIMULATED_REVENUECAT) {
+        console.log('Using explicitly configured simulated data (USE_SIMULATED_REVENUECAT=true)');
+      }
     }
+    
+    // Log React Native environment
+    const reactNativeVersion = Platform.constants?.reactNativeVersion || 'unknown';
+    console.log('React Native:', 
+      typeof reactNativeVersion === 'object' 
+        ? `${reactNativeVersion.major}.${reactNativeVersion.minor}.${reactNativeVersion.patch}` 
+        : reactNativeVersion
+    );
+    
+    return {
+      __DEV__,
+      USE_SIMULATED_REVENUECAT,
+      isExpoGo: isExpoGo(),
+      deployEnv: process.env.DEPLOY_ENV || 'not set',
+      deploySetting: deployEnv,
+      isProductionBuild: isProductionBuild(),
+      deviceInfo
+    };
   } catch (e) {
     console.log('Error logging environment:', e);
+    return {
+      error: e.message,
+      __DEV__,
+      USE_SIMULATED_REVENUECAT
+    };
   }
 };
 
@@ -157,8 +213,20 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
       
-      // If in Expo Go, show a special dialog for simulating purchases
-      if (isExpoGo()) {
+      // IMPORTANT: Check both isExpoGo() and USE_SIMULATED_REVENUECAT flag
+      // This ensures we only show simulated purchase dialogs in actual development environments
+      // and never in TestFlight or production builds
+      if (isExpoGo() || USE_SIMULATED_REVENUECAT) {
+        // Double-check we're not in TestFlight
+        const deployEnv = process.env.DEPLOY_ENV;
+        if (deployEnv === 'testflight' || deployEnv === 'production') {
+          // We're in TestFlight or Production - do a real purchase, never a simulated one
+          console.log('TestFlight or Production environment detected - using real purchase flow');
+          processPurchase(plan);
+          return;
+        }
+        
+        // Show the simulation dialog
         Alert.alert(
           'Simulate Purchase',
           `This is a simulated purchase for ${plan.name} plan ($${plan.price.toFixed(2)}/month). In Expo Go, no actual purchase will be made.`,
@@ -514,55 +582,170 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             )}
             
-            {/* Display RevenueCat status information */}
+            {/* Enhanced RevenueCat & Environment Diagnostic Information */}
             <View style={styles.revenueCatStatusContainer}>
-              <Text style={styles.revenueCatStatusTitle}>RevenueCat Status</Text>
-              <View style={styles.revenueCatStatusItem}>
-                <Text style={styles.revenueCatStatusLabel}>Simulated:</Text>
-                <Text style={styles.revenueCatStatusValue}>
-                  {USE_SIMULATED_REVENUECAT ? 'YES' : 'NO'}
-                </Text>
+              <Text style={styles.revenueCatStatusTitle}>Diagnostic Information</Text>
+              
+              {/* Core Environment Variables - Critical section */}
+              <View style={styles.diagnosticSection}>
+                <Text style={styles.diagnosticSectionTitle}>Core Environment</Text>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>__DEV__:</Text>
+                  <Text style={[
+                    styles.revenueCatStatusValue, 
+                    {color: __DEV__ ? '#059669' : '#1E40AF'}
+                  ]}>
+                    {__DEV__ ? 'TRUE' : 'FALSE'}
+                  </Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>USE_SIMULATED_REVENUECAT:</Text>
+                  <Text style={[
+                    styles.revenueCatStatusValue,
+                    {color: USE_SIMULATED_REVENUECAT ? '#D97706' : '#1E40AF'}
+                  ]}>
+                    {USE_SIMULATED_REVENUECAT ? 'TRUE' : 'FALSE'}
+                  </Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>process.env.DEPLOY_ENV:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {process.env.DEPLOY_ENV || 'not set'}
+                  </Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>Is Expo Go:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {isExpoGo() ? 'YES' : 'NO'}
+                  </Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>Is Production Build:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {isProductionBuild() ? 'YES' : 'NO'}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.revenueCatStatusItem}>
-                <Text style={styles.revenueCatStatusLabel}>Build Type:</Text>
-                <Text style={styles.revenueCatStatusValue}>
-                  {getDeploymentEnvironment().toUpperCase()}
-                </Text>
+              
+              {/* RevenueCat Status */}
+              <View style={styles.diagnosticSection}>
+                <Text style={styles.diagnosticSectionTitle}>RevenueCat Status</Text>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>Mode:</Text>
+                  <Text style={[
+                    styles.revenueCatStatusValue,
+                    {
+                      color: USE_SIMULATED_REVENUECAT 
+                        ? '#D97706'  // Amber for simulated
+                        : __DEV__ 
+                          ? '#059669'  // Green for sandbox
+                          : '#1E40AF'  // Blue for production
+                    }
+                  ]}>
+                    {USE_SIMULATED_REVENUECAT ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
+                  </Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>Current Tier:</Text>
+                  <Text style={styles.revenueCatStatusValue}>{currentTier.toUpperCase()}</Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>Expiration:</Text>
+                  <Text style={styles.revenueCatStatusValue}>{formatDate(expirationDate)}</Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>Offerings:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {packages.length > 0 ? `${packages.length} available` : 'None loaded'}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.revenueCatStatusItem}>
-                <Text style={styles.revenueCatStatusLabel}>Mode:</Text>
-                <Text style={styles.revenueCatStatusValue}>
-                  {USE_SIMULATED_REVENUECAT ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
-                </Text>
+              
+              {/* Platform & Device Info */}
+              <View style={styles.diagnosticSection}>
+                <Text style={styles.diagnosticSectionTitle}>Platform Info</Text>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>Platform:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {Platform.OS.toUpperCase()} {Platform.Version}
+                  </Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>Deployment Env:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {getDeploymentEnvironment().toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>App Version:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {require('expo-constants').manifest?.version || 
+                     require('expo-constants').manifest2?.version || 'unknown'}
+                  </Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>Device:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {require('expo-constants').deviceName || 'unknown'}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.revenueCatStatusItem}>
-                <Text style={styles.revenueCatStatusLabel}>Current Tier:</Text>
-                <Text style={styles.revenueCatStatusValue}>{currentTier.toUpperCase()}</Text>
+              
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity 
+                  style={styles.refreshButton}
+                  onPress={loadData}
+                  disabled={loading}
+                >
+                  <Ionicons name="refresh" size={16} color="#FFF" />
+                  <Text style={styles.refreshButtonText}>Refresh Info</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.copyButton}
+                  onPress={() => {
+                    // Collect diagnostic info and display it
+                    const envInfo = logEnvironmentInfo();
+                    const diagInfo = {
+                      environment: {
+                        __DEV__,
+                        USE_SIMULATED_REVENUECAT,
+                        DEPLOY_ENV: process.env.DEPLOY_ENV || 'not set',
+                        isExpoGo: isExpoGo(),
+                        isProductionBuild: isProductionBuild(),
+                        deploymentEnvironment: getDeploymentEnvironment()
+                      },
+                      revenueCat: {
+                        currentTier,
+                        expirationDate: expirationDate ? formatDate(expirationDate) : 'N/A',
+                        packages: packages.length,
+                        tokenUsage: tokenUsage ? {
+                          usedTokens: tokenUsage.usedTokens,
+                          tokenLimit: tokenUsage.tokenLimit,
+                          percentageUsed: tokenUsage.percentageUsed
+                        } : 'Not available'
+                      },
+                      platform: {
+                        OS: Platform.OS,
+                        version: Platform.Version,
+                        constants: Platform.constants,
+                        timestamp: new Date().toISOString()
+                      }
+                    };
+                    
+                    // Show the diagnostic information in an alert instead of copying
+                    Alert.alert(
+                      'Diagnostic Information',
+                      JSON.stringify(diagInfo, null, 2),
+                      [{ text: 'OK' }],
+                      { cancelable: true }
+                    );
+                  }}
+                >
+                  <Ionicons name="information-circle-outline" size={16} color="#FFF" />
+                  <Text style={styles.refreshButtonText}>Show Diagnostics</Text>
+                </TouchableOpacity>
               </View>
-              <View style={styles.revenueCatStatusItem}>
-                <Text style={styles.revenueCatStatusLabel}>Expiration:</Text>
-                <Text style={styles.revenueCatStatusValue}>{formatDate(expirationDate)}</Text>
-              </View>
-              <View style={styles.revenueCatStatusItem}>
-                <Text style={styles.revenueCatStatusLabel}>Offerings:</Text>
-                <Text style={styles.revenueCatStatusValue}>
-                  {packages.length > 0 ? `${packages.length} available` : 'None loaded'}
-                </Text>
-              </View>
-              <View style={styles.revenueCatStatusItem}>
-                <Text style={styles.revenueCatStatusLabel}>Build Type:</Text>
-                <Text style={styles.revenueCatStatusValue}>
-                  {__DEV__ ? 'DEVELOPMENT' : 'PRODUCTION'}
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.refreshButton}
-                onPress={loadData}
-                disabled={loading}
-              >
-                <Ionicons name="refresh" size={16} color="#FFF" />
-                <Text style={styles.refreshButtonText}>Refresh</Text>
-              </TouchableOpacity>
             </View>
             
             {/* Always display RevenueCat error details for debugging */}
@@ -660,9 +843,25 @@ const styles = StyleSheet.create({
   },
   revenueCatStatusTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1E40AF', // Darker blue text
-    marginBottom: 12,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  diagnosticSection: {
+    marginBottom: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#BFDBFE',
+  },
+  diagnosticSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#3B82F6',
+    marginBottom: 8,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DBEAFE',
   },
   revenueCatStatusItem: {
     flexDirection: 'row',
@@ -676,11 +875,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#3B82F6',
+    flex: 1,
   },
   revenueCatStatusValue: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1E3A8A',
+    textAlign: 'right',
+    flex: 1,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
   },
   refreshButton: {
     flexDirection: 'row',
@@ -690,7 +897,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    marginTop: 8,
+    flex: 1,
+    marginRight: 8,
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4B5563',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    flex: 1,
+    marginLeft: 8,
   },
   refreshButtonText: {
     fontSize: 14,

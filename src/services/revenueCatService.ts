@@ -62,9 +62,32 @@ const TIER_MAPPING = {
 let _hasLoggedRevenueCatInit = false;
 
 // Function to determine if we should use simulated data
-// Uses the manual flag from revenueCatConfig.ts instead of automatic detection
+// Prioritizes __DEV__ flag over other environment checks
 export const shouldUseSimulatedData = (): boolean => {
-  return USE_SIMULATED_REVENUECAT;
+  // HIGHEST PRIORITY: If we're in production mode (__DEV__ is false), always use real data
+  if (__DEV__ === false) {
+    console.log('💰 Production environment detected via __DEV__ - forcing real RevenueCat');
+    return false;
+  }
+  
+  // SECONDARY CHECK: If manually set to false, always use real data
+  if (USE_SIMULATED_REVENUECAT === false) {
+    return false;
+  }
+  
+  // FALLBACK CHECK: If we're in TestFlight or Production according to DEPLOY_ENV, NEVER use simulated data
+  try {
+    const deployEnv = process.env.DEPLOY_ENV;
+    if (deployEnv === 'testflight' || deployEnv === 'production') {
+      console.log('💰 TestFlight/Production environment detected via DEPLOY_ENV - forcing real RevenueCat');
+      return false;
+    }
+  } catch (e) {
+    // Ignore errors checking process.env
+  }
+  
+  // In development mode with manual config set to true, use simulated data
+  return __DEV__ && USE_SIMULATED_REVENUECAT;
 };
 
 // Initialize RevenueCat
@@ -76,10 +99,11 @@ export const initializeRevenueCat = (userId?: string) => {
   // Only log initialization details once
   if (!_hasLoggedRevenueCatInit) {
     console.log('------ RevenueCat Initialization ------');
-    console.log('Manual Config (USE_SIMULATED_REVENUECAT) =', USE_SIMULATED_REVENUECAT);
+    console.log('Environment detection priority:');
+    console.log('1. __DEV__ =', __DEV__, '(primary check)');
+    console.log('2. Manual Config (USE_SIMULATED_REVENUECAT) =', USE_SIMULATED_REVENUECAT, '(secondary check)');
+    console.log('3. Deployment Environment =', deployEnv, '(fallback check)');
     console.log('Using simulated data =', useSimulatedData);
-    console.log('__DEV__ =', __DEV__);
-    console.log('Deployment Environment =', deployEnv);
     
     try {
       const Constants = require('expo-constants');

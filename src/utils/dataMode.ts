@@ -7,16 +7,18 @@
 
 // Environment detection functions
 export const isDevelopment = (): boolean => {
-  // React Native __DEV__ global
+  // React Native __DEV__ global - HIGHEST PRIORITY check
+  // This flag is the most reliable way to detect development mode in React Native
   if (typeof __DEV__ !== 'undefined') {
     return __DEV__;
   }
   
-  // Node.js environment variable
+  // FALLBACK: Node.js environment variable (only used if __DEV__ is unavailable)
   if (process.env.NODE_ENV) {
     return process.env.NODE_ENV === 'development';
   }
   
+  // If all checks fail, assume we're not in development
   return false;
 };
 

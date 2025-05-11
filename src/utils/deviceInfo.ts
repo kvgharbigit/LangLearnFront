@@ -20,12 +20,22 @@ export const isExpoGo = (): boolean => {
     return false;
   }
   
-  // Production builds CANNOT be running in Expo Go
-  // This provides an absolute guarantee
+  // HIGHEST PRIORITY CHECK: If __DEV__ is false, we're in a production build,
+  // which means we're DEFINITELY NOT in Expo Go
+  if (__DEV__ === false) {
+    _isExpoGoCache = false;
+    console.log('📱 Environment Detection: __DEV__ is false');
+    console.log('- This is definitely NOT Expo Go (production build)');
+    return false;
+  }
+  
+  // SECONDARY CHECK: If DEPLOY_ENV is set to 'production' or 'testflight',
+  // we're DEFINITELY NOT in Expo Go, regardless of other indicators
   try {
-    // Check for production build signals first
-    if (process.env.DEPLOY_ENV === 'production') {
+    if (process.env.DEPLOY_ENV === 'production' || process.env.DEPLOY_ENV === 'testflight') {
       _isExpoGoCache = false;
+      console.log('📱 Environment Detection: DEPLOY_ENV explicitly set to', process.env.DEPLOY_ENV);
+      console.log('- This is definitely NOT Expo Go');
       return false;
     }
   } catch (e) {
@@ -115,17 +125,26 @@ export const isExpoGo = (): boolean => {
 /**
  * Returns the deployment environment based on EAS build configuration
  * This is useful for different behaviors in different environments
+ * Prioritizes __DEV__ over DEPLOY_ENV and other checks
  */
 export const getDeploymentEnvironment = (): 'development' | 'testflight' | 'production' | 'unknown' => {
   try {
-    // Check for environment variable from eas.json
+    // HIGHEST PRIORITY: First check __DEV__ flag - most reliable
+    if (__DEV__ === true) {
+      return 'development';
+    } else if (__DEV__ === false) {
+      // When __DEV__ is definitely false, may still need to distinguish between testflight/production
+      // so continue with other checks to determine specific production environment
+    }
+    
+    // SECONDARY CHECK: Check for environment variable from eas.json
     const deployEnv = process.env.DEPLOY_ENV;
     
     if (deployEnv === 'dev') return 'development';
     if (deployEnv === 'testflight') return 'testflight';
     if (deployEnv === 'production') return 'production';
     
-    // Fallback to checking Constants.appOwnership
+    // FALLBACK CHECK: Check Constants.appOwnership
     const Constants = require('expo-constants');
     
     if (Constants.appOwnership === 'expo') return 'development';
@@ -135,9 +154,18 @@ export const getDeploymentEnvironment = (): 'development' | 'testflight' | 'prod
       return 'production';
     }
     
+    // If __DEV__ was false but we couldn't identify a specific production env, return production
+    if (__DEV__ === false) {
+      return 'production';
+    }
+    
     return 'unknown';
   } catch (e) {
     console.log('Error determining deployment environment:', e);
+    // If we can't check through normal means, use __DEV__ as fallback if available
+    if (typeof __DEV__ !== 'undefined') {
+      return __DEV__ ? 'development' : 'production';
+    }
     return 'unknown';
   }
 };
@@ -179,25 +207,26 @@ export const isPhysicalDevice = (): boolean => {
  */
 export const isProductionBuild = (): boolean => {
   try {
-    // Process.env.DEPLOY_ENV from EAS.json is the most reliable way to check
+    // HIGHEST PRIORITY: Check __DEV__ flag - most reliable and always available
+    // If __DEV__ is false, we're in a production build
+    if (__DEV__ === false) {
+      return true;
+    }
+    
+    // SECONDARY CHECK: Process.env.DEPLOY_ENV from EAS.json
     if (process.env.DEPLOY_ENV === 'production') {
       return true;
     }
     
-    // Check Constants.appOwnership - 'standalone' means App Store or TestFlight
+    // FALLBACK CHECK: Constants.appOwnership - 'standalone' means App Store or TestFlight
     const Constants = require('expo-constants');
     if (Constants.appOwnership === 'standalone') {
       return true;
     }
     
-    // If __DEV__ is false, we're almost certainly in a production build
-    if (__DEV__ === false) {
-      return true;
-    }
-    
     return false;
   } catch (e) {
-    // If we can't check, assume based on __DEV__
+    // If we can't check, rely on __DEV__ as the safest fallback
     return __DEV__ === false;
   }
 };
