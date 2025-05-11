@@ -12,6 +12,15 @@ export const isExpoGo = (): boolean => {
   try {
     // Check for Expo Constants
     const Constants = require('expo-constants');
+    
+    // Check for TestFlight - this should never count as Expo Go
+    if (Platform.OS === 'ios' && 
+        Constants.appOwnership === 'standalone') {
+      // If running in TestFlight or App Store, it's definitely not Expo Go
+      return false;
+    }
+    
+    // For all other cases, check executionEnvironment
     // executionEnvironment will be 'storeClient' if it's a production build from store
     return Constants.executionEnvironment !== 'storeClient' && 
            Constants.executionEnvironment !== 'standalone';

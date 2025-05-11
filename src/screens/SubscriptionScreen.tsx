@@ -33,14 +33,17 @@ import { isExpoGo, getStoreText, isDevelopment } from '../utils/deviceInfo';
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 const { width } = Dimensions.get('window');
 
-// Debug function to verify environment
+// Debug function to verify environment and subscription status
 const logEnvironmentInfo = () => {
   try {
+    console.log('=== ENVIRONMENT INFO ===');
     console.log('Environment: __DEV__ =', __DEV__);
     
     const Constants = require('expo-constants');
     console.log('Constants.appOwnership =', Constants.appOwnership);
     console.log('Constants.executionEnvironment =', Constants.executionEnvironment);
+    console.log('Constants.manifest.sdkVersion =', Constants.manifest?.sdkVersion);
+    console.log('App Version =', Constants.manifest?.version || Constants.expoVersion);
     
     // Check if running in TestFlight
     const isTestFlight = 
@@ -49,6 +52,40 @@ const logEnvironmentInfo = () => {
     
     console.log('isTestFlight() =', isTestFlight);
     console.log('isDevelopment() =', isDevelopment());
+    console.log('isExpoGo() =', isExpoGo());
+    
+    // Device info
+    console.log('Platform =', Platform.OS);
+    console.log('Platform Version =', Platform.Version);
+    if (Platform.OS === 'ios') {
+      console.log('Model =', Constants.platform?.ios?.model);
+    } else {
+      console.log('Device =', Constants.deviceName);
+    }
+    
+    // RevenueCat status
+    console.log('=== REVENUECAT STATUS ===');
+    console.log('RevenueCat should be enabled =', !isExpoGo());
+    
+    // Try to check if RevenueCat is actually initialized
+    try {
+      const Purchases = require('react-native-purchases');
+      console.log('RevenueCat SDK available =', true);
+      Purchases.getCustomerInfo()
+        .then((info: any) => {
+          console.log('RevenueCat active entitlements =', 
+            Object.keys(info?.entitlements?.active || {}).length > 0 
+              ? Object.keys(info.entitlements.active) 
+              : 'None');
+          console.log('RevenueCat management URL =', info?.managementURL || 'None');
+          console.log('RevenueCat originalAppUserId =', info?.originalAppUserId);
+        })
+        .catch((err: any) => {
+          console.log('RevenueCat getCustomerInfo error =', err?.message || err);
+        });
+    } catch (e) {
+      console.log('RevenueCat SDK not available', e);
+    }
   } catch (e) {
     console.log('Error logging environment:', e);
   }
@@ -62,19 +99,8 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const [usage, setUsage] = useState<MonthlyUsage | null>(null);
   const [tokenUsage, setTokenUsage] = useState<{usedTokens: number, tokenLimit: number, percentageUsed: number} | null>(null);
   const [packages, setPackages] = useState<any[]>([]);
-  // Always have a mock error for debugging
-  const [revenueCatError, setRevenueCatError] = useState<any>({
-    code: 'mock_error_code',
-    message: 'This is a mock RevenueCat error for debugging purposes',
-    readableErrorCode: 'MOCK_ERROR',
-    underlyingErrorMessage: 'Mock underlying error details',
-    details: {
-      productIdentifier: 'mock_product',
-      purchaseToken: 'mock_token',
-      isSandbox: true,
-      requestDate: new Date().toISOString()
-    }
-  });
+  // Store RevenueCat errors for debugging
+  const [revenueCatError, setRevenueCatError] = useState<any>(null);
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -512,6 +538,39 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             )}
             
+            {/* Display RevenueCat status information */}
+            <View style={styles.revenueCatStatusContainer}>
+              <Text style={styles.revenueCatStatusTitle}>RevenueCat Status</Text>
+              <View style={styles.revenueCatStatusItem}>
+                <Text style={styles.revenueCatStatusLabel}>Mode:</Text>
+                <Text style={styles.revenueCatStatusValue}>
+                  {isExpoGo() ? 'SIMULATED' : isDevelopment() ? 'SANDBOX' : 'PRODUCTION'}
+                </Text>
+              </View>
+              <View style={styles.revenueCatStatusItem}>
+                <Text style={styles.revenueCatStatusLabel}>Current Tier:</Text>
+                <Text style={styles.revenueCatStatusValue}>{currentTier.toUpperCase()}</Text>
+              </View>
+              <View style={styles.revenueCatStatusItem}>
+                <Text style={styles.revenueCatStatusLabel}>Expiration:</Text>
+                <Text style={styles.revenueCatStatusValue}>{formatDate(expirationDate)}</Text>
+              </View>
+              <View style={styles.revenueCatStatusItem}>
+                <Text style={styles.revenueCatStatusLabel}>Offerings:</Text>
+                <Text style={styles.revenueCatStatusValue}>
+                  {packages.length > 0 ? `${packages.length} available` : 'None loaded'}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.refreshButton}
+                onPress={loadData}
+                disabled={loading}
+              >
+                <Ionicons name="refresh" size={16} color="#FFF" />
+                <Text style={styles.refreshButtonText}>Refresh</Text>
+              </TouchableOpacity>
+            </View>
+            
             {/* Always display RevenueCat error details for debugging */}
             <RevenueCatErrorDisplay 
               error={revenueCatError}
@@ -596,6 +655,54 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 3,
+  },
+  revenueCatStatusContainer: {
+    backgroundColor: '#EFF6FF', // Light blue background
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  revenueCatStatusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E40AF', // Darker blue text
+    marginBottom: 12,
+  },
+  revenueCatStatusItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DBEAFE',
+  },
+  revenueCatStatusLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#3B82F6',
+  },
+  revenueCatStatusValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E3A8A',
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3B82F6',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  refreshButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 8,
   },
   currentPlanHeader: {
     flexDirection: 'row',
