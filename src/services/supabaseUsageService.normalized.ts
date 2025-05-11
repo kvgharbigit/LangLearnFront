@@ -554,15 +554,14 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
       return false;
     }
     
-    // Optionally verify with server (every 5 minutes)
-    // This helps sync local usage data with server data
-    const now = Date.now();
+    // Log current usage for debugging
+    console.log(`Usage check - Percentage used: ${usage.percentageUsed.toFixed(2)}%, Tier: ${usage.subscriptionTier}, Credits: ${usage.calculatedCosts.totalCost.toFixed(4)}/${usage.creditLimit}`);
     
     // Import isExpoGo and isDevelopment from deviceInfo.ts
     try {
       const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
       
-      // Skip server verification in development environment
+      // Check if we're in development or Expo environment
       if (isDevelopment() || isExpoGo()) {
         // Use the subscription tier we already have from Supabase
         const tier = usage.subscriptionTier;
@@ -574,27 +573,47 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
           // In dev mode with free tier, check local percentage
           return usage.percentageUsed < 100;
         }
-      }
-      
-      // Get token for auth (for production)
-      const token = await getIdToken(user, true);
-      
-      // Verify with server
-      const response = await fetch(`${API_URL}/verify-subscription?user_id=${user.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
+      } else {
+        // Production flow
+        console.log("In production environment, using local quota check");
         
-        // Return server's decision on quota
-        return data.has_quota;
+        // TEMPORARY FIX: Skip server verification and use local data
+        // This prevents incorrectly showing quota exceeded
+        const tier = usage.subscriptionTier;
+        const hasQuota = usage.percentageUsed < 100;
+        console.log(`Using local subscription data: Tier=${tier}, Has Quota=${hasQuota}`);
+        return hasQuota;
+        
+        /* Temporarily disabled server check
+        // Get token for auth (for production)
+        const token = await getIdToken(user, true);
+        
+        // Verify with server
+        console.log(`Verifying subscription with server: ${API_URL}/verify-subscription?user_id=${user.id}`);
+        const response = await fetch(`${API_URL}/verify-subscription?user_id=${user.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`Server response for quota check:`, data);
+          // Return server's decision on quota
+          return data.has_quota;
+        } else {
+          console.warn(`Server returned ${response.status} for quota check`);
+          // Fall back to local check
+          return usage.percentageUsed < 100;
+        }
+        */
       }
     } catch (error) {
-      console.error('Error verifying quota with server:', error);
-      // Fall back to local decision if server check fails
+      console.error('Error in quota check:', error);
+      // Fall back to local decision if anything fails
+      const hasQuota = usage.percentageUsed < 100;
+      console.log(`Falling back to local quota check due to error: ${hasQuota}`);
+      return hasQuota;
     }
     
     // Default to local decision
@@ -637,33 +656,19 @@ export const forceQuotaExceeded = async (): Promise<void> => {
 };
 
 /**
- * Verify subscription with backend server directly
+ * DEPRECATED - This function has been removed as it was faulty and unused.
+ * @deprecated This function uses an endpoint that may return incorrect results.
+ * Use local Supabase data through getUserUsage() instead.
  */
 export const verifySubscriptionWithServer = async (): Promise<boolean> => {
-  try {
-    const user = getCurrentUser();
-    if (!user) return false;
-    
-    // Get token for auth
-    const token = await getIdToken(user, true);
-    
-    // Verify with server
-    const response = await fetch(`${API_URL}/verify-subscription?user_id=${user.id}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      return data.has_quota;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Error verifying subscription with server:', error);
-    return false;
-  }
+  console.warn(
+    'DEPRECATED: verifySubscriptionWithServer() is no longer supported. ' +
+    'This function may return incorrect results. ' + 
+    'Use local Supabase data through getUserUsage() instead.'
+  );
+  
+  // Return true as a safety measure to prevent false negatives
+  return true;
 };
 
 /**
