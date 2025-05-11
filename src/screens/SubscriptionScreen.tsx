@@ -28,63 +28,37 @@ import {
   restorePurchases
 } from '../services/revenueCatService';
 import { getUserUsage, getUserUsageInTokens } from '../services/usageService';
-import { isExpoGo, getStoreText, isDevelopment } from '../utils/deviceInfo';
+import { isExpoGo, getStoreText, getDeploymentEnvironment } from '../utils/deviceInfo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 const { width } = Dimensions.get('window');
 
-// Debug function to verify environment and subscription status
+// Enhanced function to check environment status using both methods
 const logEnvironmentInfo = () => {
   try {
+    const { getDeploymentEnvironment } = require('../utils/deviceInfo');
+    const deployEnv = getDeploymentEnvironment();
+    
     console.log('=== ENVIRONMENT INFO ===');
-    console.log('Environment: __DEV__ =', __DEV__);
+    console.log('Running in Expo Go:', isExpoGo());
+    console.log('Development mode:', __DEV__);
+    console.log('Deployment Environment:', deployEnv);
+    console.log('EAS Build Env:', process.env.DEPLOY_ENV || 'not set');
     
     const Constants = require('expo-constants');
-    console.log('Constants.appOwnership =', Constants.appOwnership);
-    console.log('Constants.executionEnvironment =', Constants.executionEnvironment);
-    console.log('Constants.manifest.sdkVersion =', Constants.manifest?.sdkVersion);
-    console.log('App Version =', Constants.manifest?.version || Constants.expoVersion);
+    console.log('appOwnership:', Constants.appOwnership);
+    console.log('executionEnvironment:', Constants.executionEnvironment);
     
-    // Check if running in TestFlight
-    const isTestFlight = 
-      Constants.appOwnership === 'standalone' && 
-      Constants.executionEnvironment === 'standalone';
-    
-    console.log('isTestFlight() =', isTestFlight);
-    console.log('isDevelopment() =', isDevelopment());
-    console.log('isExpoGo() =', isExpoGo());
-    
-    // Device info
-    console.log('Platform =', Platform.OS);
-    console.log('Platform Version =', Platform.Version);
-    if (Platform.OS === 'ios') {
-      console.log('Model =', Constants.platform?.ios?.model);
+    // Try to check RevenueCat status
+    if (!isExpoGo()) {
+      try {
+        const Purchases = require('react-native-purchases');
+        console.log('RevenueCat SDK loaded successfully');
+      } catch (e) {
+        console.log('RevenueCat SDK not available');
+      }
     } else {
-      console.log('Device =', Constants.deviceName);
-    }
-    
-    // RevenueCat status
-    console.log('=== REVENUECAT STATUS ===');
-    console.log('RevenueCat should be enabled =', !isExpoGo());
-    
-    // Try to check if RevenueCat is actually initialized
-    try {
-      const Purchases = require('react-native-purchases');
-      console.log('RevenueCat SDK available =', true);
-      Purchases.getCustomerInfo()
-        .then((info: any) => {
-          console.log('RevenueCat active entitlements =', 
-            Object.keys(info?.entitlements?.active || {}).length > 0 
-              ? Object.keys(info.entitlements.active) 
-              : 'None');
-          console.log('RevenueCat management URL =', info?.managementURL || 'None');
-          console.log('RevenueCat originalAppUserId =', info?.originalAppUserId);
-        })
-        .catch((err: any) => {
-          console.log('RevenueCat getCustomerInfo error =', err?.message || err);
-        });
-    } catch (e) {
-      console.log('RevenueCat SDK not available', e);
+      console.log('RevenueCat SDK not initialized (using simulated data in Expo Go)');
     }
   } catch (e) {
     console.log('Error logging environment:', e);
@@ -528,12 +502,14 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
             
             {/* Subscription Info */}
-            {/* Display notice for Expo Go (development mode) */}
-            {isExpoGo() && (
+            {/* Display notice for Expo Go or development mode */}
+            {(isExpoGo() || __DEV__) && (
               <View style={styles.expoGoNotice}>
                 <Ionicons name="information-circle" size={22} color="#F59E0B" style={{ marginRight: 8 }} />
                 <Text style={styles.expoGoText}>
-                  Running in development mode. Purchases are simulated and not charged.
+                  {isExpoGo() ? 
+                    "Running in Expo Go. Purchases are simulated and not charged." : 
+                    "Running in development mode. In-app purchase test environment active."}
                 </Text>
               </View>
             )}
@@ -542,9 +518,21 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.revenueCatStatusContainer}>
               <Text style={styles.revenueCatStatusTitle}>RevenueCat Status</Text>
               <View style={styles.revenueCatStatusItem}>
+                <Text style={styles.revenueCatStatusLabel}>Environment:</Text>
+                <Text style={styles.revenueCatStatusValue}>
+                  {isExpoGo() ? 'EXPO GO' : 'NATIVE BUILD'}
+                </Text>
+              </View>
+              <View style={styles.revenueCatStatusItem}>
+                <Text style={styles.revenueCatStatusLabel}>Build Type:</Text>
+                <Text style={styles.revenueCatStatusValue}>
+                  {getDeploymentEnvironment().toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.revenueCatStatusItem}>
                 <Text style={styles.revenueCatStatusLabel}>Mode:</Text>
                 <Text style={styles.revenueCatStatusValue}>
-                  {isExpoGo() ? 'SIMULATED' : isDevelopment() ? 'SANDBOX' : 'PRODUCTION'}
+                  {isExpoGo() ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
                 </Text>
               </View>
               <View style={styles.revenueCatStatusItem}>
@@ -559,6 +547,12 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.revenueCatStatusLabel}>Offerings:</Text>
                 <Text style={styles.revenueCatStatusValue}>
                   {packages.length > 0 ? `${packages.length} available` : 'None loaded'}
+                </Text>
+              </View>
+              <View style={styles.revenueCatStatusItem}>
+                <Text style={styles.revenueCatStatusLabel}>Build Type:</Text>
+                <Text style={styles.revenueCatStatusValue}>
+                  {__DEV__ ? 'DEVELOPMENT' : 'PRODUCTION'}
                 </Text>
               </View>
               <TouchableOpacity 

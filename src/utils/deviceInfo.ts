@@ -1,33 +1,132 @@
 import { Platform } from 'react-native';
 
 /**
- * Detects if the app is running in Expo Go
- * This can be used to provide alternate implementations for features that
- * require native modules not available in Expo Go
+ * Detects if the app is running in Expo Go or another environment that should use simulated RevenueCat
+ * This is the key check for determining whether to use real or simulated RevenueCat
  */
+
+// Cache variable to store the detection result
+let _isExpoGoCache: boolean | null = null;
+let _hasLoggedEnvironment = false;
+
 export const isExpoGo = (): boolean => {
-  // More reliable way to detect Expo Go environment
-  if (Platform.OS === 'web') return false;
+  // Return cached result if available to avoid repeated checks and logs
+  if (_isExpoGoCache !== null) {
+    return _isExpoGoCache;
+  }
+  
+  if (Platform.OS === 'web') {
+    _isExpoGoCache = false;
+    return false;
+  }
   
   try {
-    // Check for Expo Constants
+    // Method 1: Primary Check - Use the expo-constants package to check environment
     const Constants = require('expo-constants');
     
-    // Check for TestFlight - this should never count as Expo Go
-    if (Platform.OS === 'ios' && 
-        Constants.appOwnership === 'standalone') {
-      // If running in TestFlight or App Store, it's definitely not Expo Go
+    // IMPORTANT: In Expo Go builds, appOwnership will be 'expo'
+    // In standalone builds (TestFlight, App Store), it will be 'standalone'
+    // In custom dev builds (expo run:ios), it will be 'guest'
+    
+    // Method 2: Secondary Check - Use DEPLOY_ENV environment variable from eas.json
+    const deployEnv = process.env.DEPLOY_ENV;
+    
+    // Log environment details only once per app session
+    if (!_hasLoggedEnvironment) {
+      console.log('📱 Environment Detection:');
+      console.log('- Constants.appOwnership:', Constants.appOwnership);
+      console.log('- Constants.executionEnvironment:', Constants.executionEnvironment);
+      console.log('- Expo SDK Version:', Constants.expoVersion || 'unknown');
+      console.log('- App Version:', Constants.manifest?.version || Constants.manifest2?.version || 'unknown');
+      console.log('- React Native Version:', Platform.constants?.reactNativeVersion?.version || 'unknown');
+      console.log('- Is Device:', Constants.isDevice ? 'Yes' : 'No');
+      console.log('- __DEV__:', __DEV__);
+      console.log('- Device:', Platform.OS);
+      console.log('- DEPLOY_ENV:', deployEnv || 'not set');
+      _hasLoggedEnvironment = true;
+    }
+    
+    // Direct check for Expo Go
+    if (Constants.appOwnership === 'expo') {
+      _isExpoGoCache = true;
+      return true;
+    }
+    
+    // If we have a deployment environment set by EAS, it's a reliable indicator
+    if (deployEnv) {
+      // If it's explicitly set to production or testflight, we're not in Expo Go
+      if (deployEnv === 'production' || deployEnv === 'testflight') {
+        _isExpoGoCache = false;
+        return false;
+      }
+      // If it's set to dev, check if it's a development client
+      if (deployEnv === 'dev' && Constants.appOwnership === 'guest') {
+        _isExpoGoCache = false; // Custom dev client, not Expo Go
+        return false;
+      }
+    }
+    
+    // Fallback checks
+    // If appOwnership is standalone, we're definitely not in Expo Go
+    if (Constants.appOwnership === 'standalone') {
+      _isExpoGoCache = false;
       return false;
     }
     
-    // For all other cases, check executionEnvironment
-    // executionEnvironment will be 'storeClient' if it's a production build from store
-    return Constants.executionEnvironment !== 'storeClient' && 
-           Constants.executionEnvironment !== 'standalone';
+    // If appOwnership is undefined and we're in dev mode, assume Expo Go
+    if (Constants.appOwnership === undefined && __DEV__ === true) {
+      // Only log the 'uncertain' message once, not on every check
+      if (!_hasLoggedEnvironment) {
+        console.log('📱 Environment uncertain, defaulting to Expo Go behavior');
+        console.log('- This is likely an Expo Go session with incomplete environment data');
+        console.log('- Using simulated RevenueCat to prevent native module errors');
+      }
+      _isExpoGoCache = true;
+      return true;
+    }
+    
+    // If nothing else matched, default based on appOwnership
+    const result = Constants.appOwnership !== 'standalone' && Constants.appOwnership !== 'guest';
+    _isExpoGoCache = result;
+    return result;
   } catch (e) {
-    // Fallback method for detection (less reliable)
-    const noBundleIdentifier = !Platform.constants.reactNativeVersion;
-    return noBundleIdentifier || typeof Platform.constants.brand === 'undefined';
+    // If we can't access Constants properly, assume we need to use mocks
+    if (!_hasLoggedEnvironment) {
+      console.log('📱 Error in environment detection:', e);
+      console.log('- Defaulting to using simulated data');
+    }
+    _isExpoGoCache = true;
+    return true;
+  }
+};
+
+/**
+ * Returns the deployment environment based on EAS build configuration
+ * This is useful for different behaviors in different environments
+ */
+export const getDeploymentEnvironment = (): 'development' | 'testflight' | 'production' | 'unknown' => {
+  try {
+    // Check for environment variable from eas.json
+    const deployEnv = process.env.DEPLOY_ENV;
+    
+    if (deployEnv === 'dev') return 'development';
+    if (deployEnv === 'testflight') return 'testflight';
+    if (deployEnv === 'production') return 'production';
+    
+    // Fallback to checking Constants.appOwnership
+    const Constants = require('expo-constants');
+    
+    if (Constants.appOwnership === 'expo') return 'development';
+    if (Constants.appOwnership === 'guest') return 'development';
+    if (Constants.appOwnership === 'standalone') {
+      // If we can't distinguish between TestFlight and App Store, default to production
+      return 'production';
+    }
+    
+    return 'unknown';
+  } catch (e) {
+    console.log('Error determining deployment environment:', e);
+    return 'unknown';
   }
 };
 
@@ -64,10 +163,9 @@ export const isPhysicalDevice = (): boolean => {
 
 /**
  * Returns if the app is running in a development environment
+ * This is a simplified version that just uses the __DEV__ flag
  */
 export const isDevelopment = (): boolean => {
-  // More reliable way to detect development mode in React Native
-  // __DEV__ is a global variable set by React Native during development builds
   return __DEV__ === true;
 };
 
@@ -133,5 +231,6 @@ export default {
   getPlatformInfo,
   getStoreText,
   getVersion,
-  getDetailedDeviceInfo
+  getDetailedDeviceInfo,
+  getDeploymentEnvironment
 };

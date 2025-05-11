@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import colors from '../styles/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { isExpoGo } from '../utils/deviceInfo';
 
 interface RevenueCatErrorDisplayProps {
   error: any;
@@ -11,7 +12,7 @@ interface RevenueCatErrorDisplayProps {
 
 /**
  * Component to display detailed RevenueCat errors for debugging purposes
- * This is intended to be used during development only and should be removed in production
+ * This is intended to be used during development only and should not be visible in production or TestFlight
  */
 const RevenueCatErrorDisplay: React.FC<RevenueCatErrorDisplayProps> = ({ 
   error, 
@@ -113,9 +114,16 @@ const RevenueCatErrorDisplay: React.FC<RevenueCatErrorDisplayProps> = ({
         </ScrollView>
       </View>
       
-      <Text style={styles.note}>
-        Note: This error display is for debugging only and will be removed in production.
-      </Text>
+      {isExpoGo() && (
+        <Text style={styles.note}>
+          Note: This error display is for debugging simulated RevenueCat operations in Expo Go.
+        </Text>
+      )}
+      {!isExpoGo() && __DEV__ && (
+        <Text style={styles.note}>
+          Note: This error display is for debugging only and will not appear in production builds.
+        </Text>
+      )}
     </View>
   );
 };
