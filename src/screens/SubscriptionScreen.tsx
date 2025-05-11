@@ -205,6 +205,13 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       
       // Load available packages
       const offerings = await getOfferings();
+      
+      // Debug logging of all packages for troubleshooting
+      console.log("Available RevenueCat packages:");
+      offerings.forEach((pkg, index) => {
+        console.log(`[${index}] ID: ${pkg.product.identifier} | Title: ${pkg.product.title} | Price: ${pkg.product.priceString}`);
+      });
+      
       setPackages(offerings);
       
     } catch (error) {
@@ -262,14 +269,48 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               onPress: async () => {
                 setPurchasing(true);
                 try {
-                  // Find the package for this plan
-                  const packageToPurchase = packages.find(pkg => 
-                    pkg.product.identifier.includes(plan.id)
+                  // Get all available packages for debugging
+                  console.log('DEBUG: Available packages for simulation:', JSON.stringify(packages.map(p => ({
+                    id: p.product.identifier,
+                    offering: p.offering?.identifier
+                  })), null, 2));
+                  
+                  // Improved matching logic for finding the package - same as above
+                  let packageToPurchase = null;
+                  
+                  // Strategy 1: Exact identifier match
+                  packageToPurchase = packages.find(pkg => 
+                    pkg.product.identifier === plan.id
                   );
                   
+                  // Strategy 2: Check if identifier ends with the tier ID (e.g. "anything.basic_tier")
                   if (!packageToPurchase) {
-                    throw new Error('Subscription package not found');
+                    packageToPurchase = packages.find(pkg => 
+                      pkg.product.identifier.endsWith(plan.id)
+                    );
                   }
+                  
+                  // Strategy 3: Check if identifier contains the tier name (e.g. "basic")
+                  if (!packageToPurchase) {
+                    packageToPurchase = packages.find(pkg => 
+                      pkg.product.identifier.includes(plan.tier)
+                    );
+                  }
+                  
+                  // Strategy 4: Last resort, use the old method of partial matching
+                  if (!packageToPurchase) {
+                    packageToPurchase = packages.find(pkg => 
+                      pkg.product.identifier.includes(plan.id)
+                    );
+                  }
+                  
+                  if (!packageToPurchase) {
+                    console.error('Failed to find package for simulated plan:', plan);
+                    console.error('Available simulated packages:', packages.map(p => p.product.identifier));
+                    throw new Error(`Simulated subscription package not found for ${plan.name} (${plan.id})`);
+                  }
+                  
+                  console.log(`Selected simulated package for ${plan.name}: ${packageToPurchase.product.identifier}`)
                   
                   // Purchase the package (will be mocked in Expo Go)
                   await purchasePackage(packageToPurchase);
@@ -308,14 +349,49 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       // For real builds, proceed with actual purchase
       setPurchasing(true);
       
-      // Find the package for this plan
-      const packageToPurchase = packages.find(pkg => 
-        pkg.product.identifier.includes(plan.id)
+      // Get all available packages for debugging
+      console.log('DEBUG: Available packages:', JSON.stringify(packages.map(p => ({
+        id: p.product.identifier,
+        offering: p.offering?.identifier
+      })), null, 2));
+      
+      // Improved matching logic for finding the package
+      // Try multiple matching strategies in order of specificity
+      let packageToPurchase = null;
+      
+      // Strategy 1: Exact identifier match
+      packageToPurchase = packages.find(pkg => 
+        pkg.product.identifier === plan.id
       );
       
+      // Strategy 2: Check if identifier ends with the tier ID (e.g. "anything.basic_tier")
       if (!packageToPurchase) {
-        throw new Error('Subscription package not found');
+        packageToPurchase = packages.find(pkg => 
+          pkg.product.identifier.endsWith(plan.id)
+        );
       }
+      
+      // Strategy 3: Check if identifier contains the tier name (e.g. "basic")
+      if (!packageToPurchase) {
+        packageToPurchase = packages.find(pkg => 
+          pkg.product.identifier.includes(plan.tier)
+        );
+      }
+      
+      // Strategy 4: Last resort, use the old method of partial matching
+      if (!packageToPurchase) {
+        packageToPurchase = packages.find(pkg => 
+          pkg.product.identifier.includes(plan.id)
+        );
+      }
+      
+      if (!packageToPurchase) {
+        console.error('Failed to find package for plan:', plan);
+        console.error('Available packages:', packages.map(p => p.product.identifier));
+        throw new Error(`Subscription package not found for ${plan.name} (${plan.id})`);
+      }
+      
+      console.log(`Selected package for ${plan.name}: ${packageToPurchase.product.identifier}`)
       
       // Purchase the package
       await purchasePackage(packageToPurchase);
@@ -715,7 +791,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
               </View>
               
-              {/* RevenueCat Status */}
+              {/* RevenueCat Status - Enhanced */}
               <View style={styles.diagnosticSection}>
                 <Text style={styles.diagnosticSectionTitle}>RevenueCat Status</Text>
                 <View style={styles.revenueCatStatusItem}>
@@ -723,14 +799,14 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={[
                     styles.revenueCatStatusValue,
                     {
-                      color: USE_SIMULATED_REVENUECAT 
+                      color: USE_SIMULATED_REVENUECAT || debugOptions.simulateRevenueCat
                         ? '#D97706'  // Amber for simulated
                         : __DEV__ 
                           ? '#059669'  // Green for sandbox
                           : '#1E40AF'  // Blue for production
                     }
                   ]}>
-                    {USE_SIMULATED_REVENUECAT ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
+                    {(USE_SIMULATED_REVENUECAT || debugOptions.simulateRevenueCat) ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
                   </Text>
                 </View>
                 <View style={styles.revenueCatStatusItem}>
@@ -745,6 +821,84 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={styles.revenueCatStatusLabel}>Offerings:</Text>
                   <Text style={styles.revenueCatStatusValue}>
                     {packages.length > 0 ? `${packages.length} available` : 'None loaded'}
+                  </Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>Platform:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {Platform.OS.toUpperCase()} {Platform.Version}
+                  </Text>
+                </View>
+                
+                {/* Expected Product IDs (based on config) */}
+                <Text style={[styles.diagnosticSectionSubtitle, {marginTop: 12}]}>Expected Product IDs</Text>
+                <View style={styles.jsonPreviewBox}>
+                  <Text style={styles.jsonText}>
+                    {Platform.OS === 'ios' ? 
+                      'basic_tier, premium_tier, gold_tier' : 
+                      'basic_tier:monthly, premium_tier:monthly, gold_tier:monthly'}
+                  </Text>
+                </View>
+                
+                {/* Available Products */}
+                <Text style={[styles.diagnosticSectionSubtitle, {marginTop: 12}]}>Available Products</Text>
+                <View style={styles.jsonPreviewBox}>
+                  <ScrollView style={{maxHeight: 120}} nestedScrollEnabled={true}>
+                    {packages.length > 0 ? (
+                      packages.map((pkg, idx) => (
+                        <Text key={idx} style={styles.jsonText}>
+                          {idx+1}. {pkg.product.identifier} ({pkg.product.priceString})
+                        </Text>
+                      ))
+                    ) : (
+                      <Text style={styles.jsonText}>No packages available</Text>
+                    )}
+                  </ScrollView>
+                </View>
+                
+                {/* Purchase Flow Status */}
+                <Text style={[styles.diagnosticSectionSubtitle, {marginTop: 12}]}>Purchase Flow Status</Text>
+                <View style={styles.revenueCatStatusItemFlex}>
+                  <View style={[
+                    styles.statusIndicator, 
+                    {backgroundColor: currentTier !== 'free' ? '#22C55E' : '#9CA3AF'}
+                  ]} />
+                  <Text style={styles.revenueCatStatusLabel}>Active Subscription:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {currentTier !== 'free' ? `YES (${currentTier})` : 'NO'}
+                  </Text>
+                </View>
+                
+                <View style={styles.revenueCatStatusItemFlex}>
+                  <View style={[
+                    styles.statusIndicator, 
+                    {backgroundColor: packages.length > 0 ? '#22C55E' : '#EF4444'}
+                  ]} />
+                  <Text style={styles.revenueCatStatusLabel}>Products Available:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {packages.length > 0 ? 'YES' : 'NO'}
+                  </Text>
+                </View>
+                
+                <View style={styles.revenueCatStatusItemFlex}>
+                  <View style={[
+                    styles.statusIndicator, 
+                    {backgroundColor: (tokenUsage && !isNaN(tokenUsage.usedTokens)) ? '#22C55E' : '#EF4444'}
+                  ]} />
+                  <Text style={styles.revenueCatStatusLabel}>Usage Tracking:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {(tokenUsage && !isNaN(tokenUsage.usedTokens)) ? 'WORKING' : 'NOT WORKING'}
+                  </Text>
+                </View>
+                
+                <View style={styles.revenueCatStatusItemFlex}>
+                  <View style={[
+                    styles.statusIndicator, 
+                    {backgroundColor: purchasing ? '#F59E0B' : '#22C55E'}
+                  ]} />
+                  <Text style={styles.revenueCatStatusLabel}>Purchase State:</Text>
+                  <Text style={styles.revenueCatStatusValue}>
+                    {purchasing ? 'IN PROGRESS' : 'READY'}
                   </Text>
                 </View>
               </View>
@@ -951,11 +1105,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#DBEAFE',
   },
+  diagnosticSectionSubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+    marginBottom: 4,
+  },
   revenueCatStatusItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
     paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DBEAFE',
+  },
+  revenueCatStatusItemFlex: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#DBEAFE',
   },
@@ -1004,6 +1171,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     marginLeft: 8,
+  },
+  jsonPreviewBox: {
+    backgroundColor: '#1E293B',
+    borderRadius: 6,
+    padding: 8,
+    marginVertical: 4,
+  },
+  jsonText: {
+    color: '#94A3B8',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 12,
+  },
+  statusIndicator: {
+    width: 8, 
+    height: 8,
+    borderRadius: 4,
+    marginRight: 10,
   },
   currentPlanHeader: {
     flexDirection: 'row',

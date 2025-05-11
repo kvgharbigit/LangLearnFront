@@ -44,11 +44,25 @@ const ENTITLEMENTS = {
   GOLD: 'gold_entitlement'
 };
 
-// Map product IDs to our subscription tiers
-const PRODUCT_IDS = {
-  BASIC: 'basic_tier:monthly',
-  PREMIUM: 'premium_tier:monthly',
-  GOLD: 'gold_tier:monthly'
+// Map product IDs to our subscription tiers - platform specific
+const PRODUCT_IDS = Platform.select({
+  // iOS product IDs (App Store)
+  ios: {
+    BASIC: 'basic_tier',
+    PREMIUM: 'premium_tier',
+    GOLD: 'gold_tier'
+  },
+  // Android product IDs (Play Store)
+  android: {
+    BASIC: 'basic_tier:monthly',
+    PREMIUM: 'premium_tier:monthly',
+    GOLD: 'gold_tier:monthly'
+  }
+}) || {
+  // Default fallback if platform not detected
+  BASIC: 'basic_tier',
+  PREMIUM: 'premium_tier',
+  GOLD: 'gold_tier'
 };
 
 // Map entitlement IDs to subscription tiers
@@ -501,11 +515,38 @@ export const getCurrentSubscription = async (): Promise<{
 
 // Helper function to determine tier from product ID
 const getTierFromProductIdentifier = (productId: string): SubscriptionTier => {
+  // Log for debugging
+  console.log(`Trying to determine tier from product identifier: ${productId}`);
+  
+  // Check if productId directly contains a tier name
+  const tierNames: SubscriptionTier[] = ['basic', 'premium', 'gold'];
+  for (const tier of tierNames) {
+    if (productId.toLowerCase().includes(tier.toLowerCase())) {
+      console.log(`Found tier "${tier}" in product identifier`);
+      return tier;
+    }
+  }
+  
+  // Check if productId contains one of our known tier IDs
+  const tierIds = ['basic_tier', 'premium_tier', 'gold_tier'];
+  for (const tierId of tierIds) {
+    if (productId.toLowerCase().includes(tierId.toLowerCase())) {
+      // Extract the tier name from the ID
+      const tier = tierId.split('_')[0] as SubscriptionTier;
+      console.log(`Found tier ID "${tierId}" in product identifier, mapping to tier "${tier}"`);
+      return tier;
+    }
+  }
+  
+  // Fallback: Check entitlement mapping
   for (const [key, value] of Object.entries(TIER_MAPPING)) {
     if (productId.includes(key)) {
+      console.log(`Found entitlement key "${key}" in product identifier, mapping to tier "${value}"`);
       return value as SubscriptionTier;
     }
   }
+  
+  console.log(`Could not determine tier from product identifier, defaulting to free tier`);
   return 'free'; // Default to free tier
 };
 
