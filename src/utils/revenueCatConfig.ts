@@ -7,7 +7,7 @@
 
 // Set this to true to force using simulated RevenueCat data
 // Set this to false to force using real RevenueCat data
-export const USE_SIMULATED_REVENUECAT = false;
+export const USE_SIMULATED_REVENUECAT = true;
 
 // Explanation of settings:
 // 

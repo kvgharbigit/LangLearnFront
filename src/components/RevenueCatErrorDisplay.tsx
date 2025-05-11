@@ -19,7 +19,21 @@ const RevenueCatErrorDisplay: React.FC<RevenueCatErrorDisplayProps> = ({
   title = 'RevenueCat Error',
   onClear
 }) => {
-  if (!error) return null;
+  // Always show the component in TestFlight builds for debugging
+  if (!error) {
+    // Return a placeholder explaining no errors have occurred yet
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Ionicons name="information-circle" size={24} color="#4CAF50" />
+          <Text style={[styles.title, {color: '#4CAF50'}]}>No RevenueCat Errors</Text>
+        </View>
+        <Text style={styles.noErrorText}>
+          No RevenueCat errors have been recorded yet. If a purchase fails, detailed error information will appear here.
+        </Text>
+      </View>
+    );
+  }
 
   // Helper function to stringify the error object
   const stringifyError = (err: any): string => {
@@ -114,16 +128,11 @@ const RevenueCatErrorDisplay: React.FC<RevenueCatErrorDisplayProps> = ({
         </ScrollView>
       </View>
       
-      {isExpoGo() && (
-        <Text style={styles.note}>
-          Note: This error display is for debugging simulated RevenueCat operations in Expo Go.
-        </Text>
-      )}
-      {!isExpoGo() && __DEV__ && (
-        <Text style={styles.note}>
-          Note: This error display is for debugging only and will not appear in production builds.
-        </Text>
-      )}
+      {/* Always show debugging information in any build for now */}
+      <Text style={styles.note}>
+        Note: This error display is for debugging RevenueCat operations. 
+        Currently showing in all build types for troubleshooting.
+      </Text>
     </View>
   );
 };
@@ -136,6 +145,12 @@ const styles = StyleSheet.create({
     marginVertical: 12,
     borderWidth: 1,
     borderColor: '#555',
+  },
+  noErrorText: {
+    fontSize: 14,
+    color: '#CCC',
+    marginBottom: 8,
+    padding: 8,
   },
   header: {
     flexDirection: 'row',

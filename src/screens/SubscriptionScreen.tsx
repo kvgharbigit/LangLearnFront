@@ -328,8 +328,62 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         // Store the error for display in the UI
         setRevenueCatError(error);
         
-        // Still show the alert for normal operation
-        Alert.alert('Purchase Failed', 'Failed to complete the purchase. Please try again.');
+        // Show detailed error information for debugging
+        let errorMessage = 'Failed to complete the purchase. Please try again.';
+        if (error) {
+          const errorCode = error.code || 'unknown';
+          const errorDesc = error.message || 'No detail available';
+          const underlyingError = error.underlyingErrorMessage || '';
+          const readableCode = error.readableErrorCode || '';
+          
+          // Build comprehensive error message
+          errorMessage = `Error Code: ${errorCode}\n\n`;
+          
+          if (readableCode) {
+            errorMessage += `Readable Code: ${readableCode}\n\n`;
+          }
+          
+          errorMessage += `Description: ${errorDesc}\n\n`;
+          
+          if (underlyingError) {
+            errorMessage += `Underlying Error: ${underlyingError}\n\n`;
+          }
+          
+          // Add tips for common error codes
+          if (errorCode === 'PurchaseInvalidError') {
+            errorMessage += '\nTIP: Make sure you are signed in with a Sandbox Apple ID created in App Store Connect.';
+          }
+          
+          if (errorCode === 'ProductNotAvailableForPurchaseError') {
+            errorMessage += '\nTIP: This product might not be properly configured in App Store Connect or RevenueCat.';
+          }
+          
+          console.log('PURCHASE ERROR DETAILS:', JSON.stringify(error, null, 2));
+        }
+        
+        // Show detailed error for debugging in TestFlight
+        Alert.alert(
+          'Purchase Failed', 
+          errorMessage,
+          [
+            { 
+              text: 'OK', 
+              onPress: () => {} 
+            },
+            { 
+              text: 'View Details',
+              onPress: () => {
+                // This will scroll to make the error display visible
+                setTimeout(() => {
+                  Alert.alert(
+                    'Debug Info', 
+                    'Check the detailed error information in the RevenueCat Error section below on the screen.'
+                  );
+                }, 500);
+              }
+            }
+          ]
+        );
       }
     } finally {
       setPurchasing(false);
@@ -748,7 +802,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             </View>
             
-            {/* Always display RevenueCat error details for debugging */}
+            {/* Always display RevenueCat error details for debugging - force visible in all builds */}
             <RevenueCatErrorDisplay 
               error={revenueCatError}
               title="RevenueCat Error Details (Debug Mode)" 
