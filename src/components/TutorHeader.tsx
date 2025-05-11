@@ -134,12 +134,16 @@ const TutorHeader: React.FC<Props> = ({
         isMuted
       });
 
-      // Save UI settings
+      // Save UI settings - Get current RevenueCat simulation setting and preserve it
+      const { getUISettings } = await import('../utils/userPreferences');
+      const currentSettings = await getUISettings();
+      
       await saveUISettings({
         voiceInputEnabled,
         autoSendEnabled,
         autoRecordEnabled,
-        debugMode
+        debugMode,
+        simulateRevenueCat: currentSettings.simulateRevenueCat
       });
 
       console.log("All settings saved successfully");
