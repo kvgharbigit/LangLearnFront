@@ -562,10 +562,12 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
     try {
       const { isExpoGo, isDevelopment } = require('../utils/deviceInfo');
       
-      // Skip server verification only in development environment
+      // Skip server verification in development environment
       if (isDevelopment() || isExpoGo()) {
-        // For development environment, check subscription tier and set appropriate quota
-        const { tier } = await getCurrentSubscription();
+        // Use the subscription tier we already have from Supabase
+        const tier = usage.subscriptionTier;
+        console.log(`Using subscription tier from Supabase: ${tier}`);
+        
         if (tier !== 'free') {
           return true; // In dev mode, paid tiers always have quota
         } else {
