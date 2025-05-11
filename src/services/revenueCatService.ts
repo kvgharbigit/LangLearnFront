@@ -62,11 +62,50 @@ const TIER_MAPPING = {
 let _hasLoggedRevenueCatInit = false;
 
 // Function to determine if we should use simulated data
-// Prioritizes __DEV__ flag over other environment checks
-export const shouldUseSimulatedData = (): boolean => {
+// Checks user preferences and environment settings
+export const shouldUseSimulatedData = async (): Promise<boolean> => {
   // HIGHEST PRIORITY: If we're in production mode (__DEV__ is false), always use real data
   if (__DEV__ === false) {
     console.log('💰 Production environment detected via __DEV__ - forcing real RevenueCat');
+    return false;
+  }
+  
+  try {
+    // SECONDARY CHECK: Check user preference (highest priority in development)
+    const { getUseSimulatedRevenueCat } = await import('../utils/revenueCatConfig');
+    const simulateFromPrefs = await getUseSimulatedRevenueCat();
+    
+    // Use the user preference if in dev mode
+    if (__DEV__) {
+      return simulateFromPrefs;
+    }
+    
+    // FALLBACK CHECK: If we're in TestFlight or Production according to DEPLOY_ENV, NEVER use simulated data
+    try {
+      const deployEnv = process.env.DEPLOY_ENV;
+      if (deployEnv === 'testflight' || deployEnv === 'production') {
+        console.log('💰 TestFlight/Production environment detected via DEPLOY_ENV - forcing real RevenueCat');
+        return false;
+      }
+    } catch (e) {
+      // Ignore errors checking process.env
+    }
+    
+    // In development mode, use the user preference
+    return simulateFromPrefs;
+  } catch (error) {
+    console.error('Error checking simulation preference:', error);
+    
+    // Fallback to the legacy constant for backward compatibility
+    return __DEV__ && USE_SIMULATED_REVENUECAT;
+  }
+};
+
+// Synchronous version for backward compatibility
+// This will eventually be deprecated in favor of the async version
+export const shouldUseSimulatedDataSync = (): boolean => {
+  // HIGHEST PRIORITY: If we're in production mode (__DEV__ is false), always use real data
+  if (__DEV__ === false) {
     return false;
   }
   
@@ -79,7 +118,6 @@ export const shouldUseSimulatedData = (): boolean => {
   try {
     const deployEnv = process.env.DEPLOY_ENV;
     if (deployEnv === 'testflight' || deployEnv === 'production') {
-      console.log('💰 TestFlight/Production environment detected via DEPLOY_ENV - forcing real RevenueCat');
       return false;
     }
   } catch (e) {
@@ -91,8 +129,8 @@ export const shouldUseSimulatedData = (): boolean => {
 };
 
 // Initialize RevenueCat
-export const initializeRevenueCat = (userId?: string) => {
-  const useSimulatedData = shouldUseSimulatedData();
+export const initializeRevenueCat = async (userId?: string) => {
+  const useSimulatedData = await shouldUseSimulatedData();
   const { getDeploymentEnvironment } = require('../utils/deviceInfo');
   const deployEnv = getDeploymentEnvironment();
   
@@ -101,9 +139,20 @@ export const initializeRevenueCat = (userId?: string) => {
     console.log('------ RevenueCat Initialization ------');
     console.log('Environment detection priority:');
     console.log('1. __DEV__ =', __DEV__, '(primary check)');
-    console.log('2. Manual Config (USE_SIMULATED_REVENUECAT) =', USE_SIMULATED_REVENUECAT, '(secondary check)');
-    console.log('3. Deployment Environment =', deployEnv, '(fallback check)');
-    console.log('Using simulated data =', useSimulatedData);
+    
+    // Get the user preference for logging
+    let userPref = "unknown";
+    try {
+      const { getUseSimulatedRevenueCat } = await import('../utils/revenueCatConfig');
+      userPref = String(await getUseSimulatedRevenueCat());
+    } catch (e) {
+      userPref = "error";
+    }
+    
+    console.log('2. User Preference =', userPref, '(secondary check - development only)');
+    console.log('3. Manual Config (USE_SIMULATED_REVENUECAT) =', USE_SIMULATED_REVENUECAT, '(fallback check)');
+    console.log('4. Deployment Environment =', deployEnv, '(safety check)');
+    console.log('Final decision: Using simulated data =', useSimulatedData);
     
     try {
       const Constants = require('expo-constants');
@@ -123,9 +172,9 @@ export const initializeRevenueCat = (userId?: string) => {
     _hasLoggedRevenueCatInit = true;
   }
   
-  // Check if we should use simulated data (based on manual flag)
+  // Check if we should use simulated data (based on user preference)
   if (useSimulatedData) {
-    console.log('📱 RevenueCat: SIMULATED MODE - Using manual configuration');
+    console.log('📱 RevenueCat: SIMULATED MODE - Using user preference or config');
     console.log('📱 Using mock data for purchases and subscriptions');
     return;
   }
@@ -175,8 +224,10 @@ let _hasLoggedOfferingsInfo = false;
 // Get available packages
 export const getOfferings = async (): Promise<PurchasesPackage[]> => {
   try {
-    // Use mock data based on manual configuration
-    if (shouldUseSimulatedData()) {
+    // Use mock data based on user preference or environment
+    const useSimulatedData = await shouldUseSimulatedData();
+    
+    if (useSimulatedData) {
       logDataSource('SubscriptionService', true);
       // Log only the first time
       if (!_hasLoggedOfferingsInfo) {
@@ -231,7 +282,13 @@ export const getOfferings = async (): Promise<PurchasesPackage[]> => {
   } catch (error) {
     console.error('Error fetching offerings:', error);
     // Return empty array instead of throwing in Expo Go
-    if (shouldUseSimulatedData()) return [];
+    try {
+      // Check if we should use simulated data as a fallback
+      if (await shouldUseSimulatedData()) return [];
+    } catch {
+      // If that fails, use the sync version as a last resort
+      if (shouldUseSimulatedDataSync()) return [];
+    }
     throw error;
   }
 };
@@ -244,8 +301,10 @@ export const purchasePackage = async (
   pckg: PurchasesPackage
 ): Promise<CustomerInfo> => {
   try {
-    // Use mock data based on manual configuration
-    if (shouldUseSimulatedData()) {
+    // Use mock data based on user preference or environment
+    const useSimulatedData = await shouldUseSimulatedData();
+    
+    if (useSimulatedData) {
       // Log only the first time, plus the specific package ID
       if (!_hasLoggedPurchaseInfo) {
         console.warn('📱 RevenueCat purchasePackage: MOCK DATA - Using simulated mode');
@@ -316,20 +375,37 @@ export const purchasePackage = async (
       throw err;
     }
   } catch (error) {
-    // Use mock data when in simulated mode
-    if (shouldUseSimulatedData()) {
-      console.warn('📱 RevenueCat error handler: MOCK DATA - Using simulated mode');
-      // In development, return a mock response instead of throwing
-      return {
-        entitlements: {
-          active: {},
-          all: {}
-        },
-        originalAppUserId: 'dev_mock_user',
-        managementURL: null,
-        originalPurchaseDate: new Date().toISOString(),
-      } as CustomerInfo;
+    // Check if we should use simulated data in the error handler
+    try {
+      const useSimulatedData = await shouldUseSimulatedData();
+      
+      // Use mock data when in simulated mode
+      if (useSimulatedData) {
+        console.warn('📱 RevenueCat error handler: MOCK DATA - Using simulated mode');
+        // In development, return a mock response instead of throwing
+        return {
+          entitlements: {
+            active: {},
+            all: {}
+          },
+          originalAppUserId: 'dev_mock_user',
+          managementURL: null,
+          originalPurchaseDate: new Date().toISOString(),
+        } as CustomerInfo;
+      }
+    } catch (e) {
+      // If checking simulation mode fails, use the sync version as fallback
+      if (shouldUseSimulatedDataSync()) {
+        console.warn('📱 RevenueCat error handler: MOCK DATA (fallback) - Using simulated mode');
+        return {
+          entitlements: { active: {}, all: {} },
+          originalAppUserId: 'dev_mock_user',
+          managementURL: null,
+          originalPurchaseDate: new Date().toISOString(),
+        } as CustomerInfo;
+      }
     }
+    
     console.error('Error purchasing package:', error);
     throw error;
   }

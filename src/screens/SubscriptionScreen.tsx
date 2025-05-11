@@ -133,6 +133,11 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const [packages, setPackages] = useState<any[]>([]);
   // Store RevenueCat errors for debugging
   const [revenueCatError, setRevenueCatError] = useState<any>(null);
+  // Track whether we're using simulated data based on user preference
+  const [debugOptions, setDebugOptions] = useState<{
+    debugMode: boolean;
+    simulateRevenueCat: boolean;
+  }>({ debugMode: false, simulateRevenueCat: false });
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -143,6 +148,26 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     
     // Log environment info for debugging
     logEnvironmentInfo();
+    
+    // Load debug settings for UI indicators
+    const loadUserPreferences = async () => {
+      try {
+        // Get user simulation preference
+        const { getUISettings } = await import('../utils/userPreferences');
+        const settings = await getUISettings();
+        
+        setDebugOptions({
+          debugMode: settings.debugMode,
+          simulateRevenueCat: settings.simulateRevenueCat
+        });
+        
+        console.log('Loaded user preferences:', settings);
+      } catch (error) {
+        console.error('Error loading user preferences:', error);
+      }
+    };
+    
+    loadUserPreferences();
     
     // Start animations
     Animated.parallel([
@@ -626,8 +651,8 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
             
             {/* Subscription Info */}
-            {/* Display notice based on USE_SIMULATED_REVENUECAT flag */}
-            {USE_SIMULATED_REVENUECAT && (
+            {/* Simulated purchase warning - now checks both config and user preference */}
+            {(USE_SIMULATED_REVENUECAT || debugOptions.simulateRevenueCat) && (
               <View style={styles.expoGoNotice}>
                 <Ionicons name="information-circle" size={22} color="#F59E0B" style={{ marginRight: 8 }} />
                 <Text style={styles.expoGoText}>
@@ -658,7 +683,16 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                     styles.revenueCatStatusValue,
                     {color: USE_SIMULATED_REVENUECAT ? '#D97706' : '#1E40AF'}
                   ]}>
-                    {USE_SIMULATED_REVENUECAT ? 'TRUE' : 'FALSE'}
+                    {USE_SIMULATED_REVENUECAT ? 'TRUE' : 'FALSE'} (default)
+                  </Text>
+                </View>
+                <View style={styles.revenueCatStatusItem}>
+                  <Text style={styles.revenueCatStatusLabel}>User Preference:</Text>
+                  <Text style={[
+                    styles.revenueCatStatusValue,
+                    {color: debugOptions.simulateRevenueCat ? '#D97706' : '#1E40AF'}
+                  ]}>
+                    {debugOptions.simulateRevenueCat ? 'TRUE' : 'FALSE'} (active)
                   </Text>
                 </View>
                 <View style={styles.revenueCatStatusItem}>

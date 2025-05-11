@@ -31,11 +31,84 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { appLanguage, translate, getLanguageName } = useLanguage();
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [debugOptions, setDebugOptions] = useState<{
+    debugMode: boolean;
+    simulateRevenueCat: boolean;
+  }>({ debugMode: false, simulateRevenueCat: false });
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(15)).current;
   
+  // Load debug settings
+  const loadDebugSettings = async () => {
+    try {
+      const { getUISettings } = await import('../utils/userPreferences');
+      const settings = await getUISettings();
+      setDebugOptions({
+        debugMode: settings.debugMode,
+        simulateRevenueCat: settings.simulateRevenueCat
+      });
+    } catch (error) {
+      console.error('Error loading debug settings:', error);
+    }
+  };
+
+  // Toggle debug options
+  const toggleDebugOption = async (option: 'debugMode' | 'simulateRevenueCat') => {
+    try {
+      const { saveUISettings, getUISettings } = await import('../utils/userPreferences');
+      const currentSettings = await getUISettings();
+      
+      // Create updated settings with the toggled option
+      const updatedSettings = {
+        ...currentSettings,
+        [option]: !currentSettings[option]
+      };
+      
+      // Save the updated settings
+      await saveUISettings(updatedSettings);
+      
+      // Update local state
+      setDebugOptions(prev => ({
+        ...prev,
+        [option]: !prev[option]
+      }));
+      
+      // Special handling for RevenueCat simulation to ensure it updates everywhere
+      if (option === 'simulateRevenueCat') {
+        try {
+          const { setUseSimulatedRevenueCat } = await import('../utils/revenueCatConfig');
+          // Also update the RevenueCat config setting to keep in sync
+          await setUseSimulatedRevenueCat(updatedSettings.simulateRevenueCat);
+          
+          console.log(`RevenueCat simulation ${updatedSettings.simulateRevenueCat ? 'enabled' : 'disabled'}`);
+          
+          // Show special message for RevenueCat toggling
+          Alert.alert(
+            'RevenueCat Setting Updated',
+            `RevenueCat simulation has been ${updatedSettings.simulateRevenueCat ? 'enabled' : 'disabled'}.\n\nThis will take effect the next time you restart the app or attempt a purchase.`,
+            [{ text: 'OK' }]
+          );
+          return; // Skip the generic alert below
+        } catch (err) {
+          console.error('Error updating RevenueCat config:', err);
+        }
+      }
+      
+      // Show feedback for other options
+      Alert.alert(
+        'Setting Updated',
+        `${option === 'debugMode' ? 'Debug mode' : 'Setting'} has been ${updatedSettings[option] ? 'enabled' : 'disabled'}.`,
+        [{ text: 'OK' }]
+      );
+
+    } catch (error) {
+      console.error(`Error toggling ${option}:`, error);
+      Alert.alert('Error', `Failed to update ${option} setting.`);
+    }
+  };
+
   useEffect(() => {
     // Run entrance animations
     Animated.parallel([
@@ -50,6 +123,9 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         useNativeDriver: true,
       })
     ]).start();
+    
+    // Load debug settings
+    loadDebugSettings();
   }, []);
 
   const handleLogout = async () => {
@@ -222,6 +298,35 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
             </TouchableOpacity>
+            
+            {/* RevenueCat Simulation Toggle - Available in all builds */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => toggleDebugOption('simulateRevenueCat')}
+              accessibilityLabel="Toggle RevenueCat Simulation"
+            >
+              <View style={[
+                styles.menuIconContainer,
+                debugOptions.simulateRevenueCat ? { backgroundColor: colors.primaryLight } : { backgroundColor: colors.gray200 }
+              ]}>
+                <Ionicons name="card-outline" size={22} color={debugOptions.simulateRevenueCat ? colors.primary : colors.gray500} />
+              </View>
+              <View style={styles.menuTextContainer}>
+                <Text style={styles.menuText}>Simulate RevenueCat</Text>
+                <Text style={styles.menuSubtext}>
+                  {debugOptions.simulateRevenueCat ? 'Using simulated purchases' : 'Using real purchases'}
+                </Text>
+              </View>
+              <View style={[
+                styles.toggleContainer,
+                debugOptions.simulateRevenueCat ? styles.toggleActive : styles.toggleInactive
+              ]}>
+                <View style={[
+                  styles.toggleCircle,
+                  debugOptions.simulateRevenueCat ? styles.toggleCircleActive : styles.toggleCircleInactive
+                ]} />
+              </View>
+            </TouchableOpacity>
           </View>
           
           {/* Legal Section */}
@@ -254,6 +359,73 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
               <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
             </TouchableOpacity>
           </View>
+          
+          {/* Developer Section - Only visible in __DEV__ mode */}
+          {__DEV__ && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Developer Options</Text>
+              
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => toggleDebugOption('debugMode')}
+                accessibilityLabel="Toggle Debug Mode"
+              >
+                <View style={[
+                  styles.menuIconContainer,
+                  debugOptions.debugMode ? { backgroundColor: colors.primaryLight } : { backgroundColor: colors.gray200 }
+                ]}>
+                  <Ionicons name="bug-outline" size={22} color={debugOptions.debugMode ? colors.primary : colors.gray500} />
+                </View>
+                <View style={styles.menuTextContainer}>
+                  <Text style={styles.menuText}>Debug Mode</Text>
+                  <Text style={styles.menuSubtext}>
+                    {debugOptions.debugMode ? 'Enabled' : 'Disabled'}
+                  </Text>
+                </View>
+                <View style={[
+                  styles.toggleContainer,
+                  debugOptions.debugMode ? styles.toggleActive : styles.toggleInactive
+                ]}>
+                  <View style={[
+                    styles.toggleCircle,
+                    debugOptions.debugMode ? styles.toggleCircleActive : styles.toggleCircleInactive
+                  ]} />
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => toggleDebugOption('simulateRevenueCat')}
+                accessibilityLabel="Toggle RevenueCat Simulation"
+              >
+                <View style={[
+                  styles.menuIconContainer,
+                  debugOptions.simulateRevenueCat ? { backgroundColor: colors.primaryLight } : { backgroundColor: colors.gray200 }
+                ]}>
+                  <Ionicons name="card-outline" size={22} color={debugOptions.simulateRevenueCat ? colors.primary : colors.gray500} />
+                </View>
+                <View style={styles.menuTextContainer}>
+                  <Text style={styles.menuText}>Simulate RevenueCat</Text>
+                  <Text style={styles.menuSubtext}>
+                    {debugOptions.simulateRevenueCat ? 'Using simulated purchases' : 'Using real purchases'}
+                  </Text>
+                </View>
+                <View style={[
+                  styles.toggleContainer,
+                  debugOptions.simulateRevenueCat ? styles.toggleActive : styles.toggleInactive
+                ]}>
+                  <View style={[
+                    styles.toggleCircle,
+                    debugOptions.simulateRevenueCat ? styles.toggleCircleActive : styles.toggleCircleInactive
+                  ]} />
+                </View>
+              </TouchableOpacity>
+              
+              <Text style={styles.developerNote}>
+                Changes to these settings will take effect immediately.
+              </Text>
+            </View>
+          )}
           
           {/* Logout Button */}
           <TouchableOpacity
@@ -438,6 +610,47 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 13,
     color: colors.gray500,
+  },
+  toggleContainer: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    padding: 2,
+  },
+  toggleActive: {
+    backgroundColor: colors.primary,
+  },
+  toggleInactive: {
+    backgroundColor: colors.gray300,
+  },
+  toggleCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    position: 'absolute',
+    top: 2,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+  toggleCircleActive: {
+    right: 2,
+  },
+  toggleCircleInactive: {
+    left: 2,
+  },
+  developerNote: {
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+    fontSize: 13,
+    color: colors.gray500,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });
 

@@ -14,6 +14,7 @@ export const PREFERENCE_KEYS = {
   AUTO_SEND_ENABLED: 'pref_auto_send_enabled',
   AUTO_RECORD_ENABLED: 'pref_auto_record_enabled',
   DEBUG_MODE: 'pref_debug_mode',
+  SIMULATE_REVENUECAT: 'pref_simulate_revenuecat',
   // Learning preferences
   DIFFICULTY_LEVEL: 'pref_difficulty_level',
   // Session preferences
@@ -40,6 +41,7 @@ export interface UISettings {
   autoSendEnabled: boolean;
   autoRecordEnabled: boolean;
   debugMode: boolean;
+  simulateRevenueCat: boolean;
 }
 
 /**
@@ -80,6 +82,7 @@ export const saveUISettings = async (settings: UISettings): Promise<void> => {
       [PREFERENCE_KEYS.AUTO_SEND_ENABLED]: settings.autoSendEnabled.toString(),
       [PREFERENCE_KEYS.AUTO_RECORD_ENABLED]: settings.autoRecordEnabled.toString(),
       [PREFERENCE_KEYS.DEBUG_MODE]: settings.debugMode.toString(),
+      [PREFERENCE_KEYS.SIMULATE_REVENUECAT]: settings.simulateRevenueCat.toString(),
     };
 
     await AsyncStorage.multiSet(Object.entries(data));
@@ -185,6 +188,7 @@ export const getUISettings = async (): Promise<UISettings> => {
       PREFERENCE_KEYS.AUTO_SEND_ENABLED,
       PREFERENCE_KEYS.AUTO_RECORD_ENABLED,
       PREFERENCE_KEYS.DEBUG_MODE,
+      PREFERENCE_KEYS.SIMULATE_REVENUECAT,
     ];
 
     const results = await AsyncStorage.multiGet(keys);
@@ -195,6 +199,7 @@ export const getUISettings = async (): Promise<UISettings> => {
       autoSendEnabled: true,
       autoRecordEnabled: true,
       debugMode: false,
+      simulateRevenueCat: false,
     };
 
     // Parse saved values
@@ -215,6 +220,9 @@ export const getUISettings = async (): Promise<UISettings> => {
           case PREFERENCE_KEYS.DEBUG_MODE:
             savedSettings.debugMode = value === 'true';
             break;
+          case PREFERENCE_KEYS.SIMULATE_REVENUECAT:
+            savedSettings.simulateRevenueCat = value === 'true';
+            break;
         }
       }
     });
@@ -233,6 +241,7 @@ export const getUISettings = async (): Promise<UISettings> => {
       autoSendEnabled: true,
       autoRecordEnabled: true,
       debugMode: false,
+      simulateRevenueCat: false,
     };
   }
 };
