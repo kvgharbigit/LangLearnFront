@@ -18,8 +18,8 @@ import {
 } from '../types/usage.normalized';
 import { SUBSCRIPTION_PLANS } from '../types/subscription';
 
-// Import API URL from the api.ts file
-const API_URL = 'http://192.168.86.241:8004'; // Update to match your API_URL in api.ts
+// Import API URL from the api.ts file - single source of truth
+import { API_URL } from '../utils/api';
 
 // Import data mode helpers
 import { shouldUseMockData, logDataSource } from '../utils/dataMode';
