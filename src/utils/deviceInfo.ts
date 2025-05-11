@@ -20,6 +20,18 @@ export const isExpoGo = (): boolean => {
     return false;
   }
   
+  // Production builds CANNOT be running in Expo Go
+  // This provides an absolute guarantee
+  try {
+    // Check for production build signals first
+    if (process.env.DEPLOY_ENV === 'production') {
+      _isExpoGoCache = false;
+      return false;
+    }
+  } catch (e) {
+    // Ignore errors checking process.env
+  }
+  
   try {
     // Method 1: Primary Check - Use the expo-constants package to check environment
     const Constants = require('expo-constants');
@@ -162,11 +174,40 @@ export const isPhysicalDevice = (): boolean => {
 };
 
 /**
+ * Checks if the app is running in a production build
+ * Production builds will NEVER be running in Expo Go
+ */
+export const isProductionBuild = (): boolean => {
+  try {
+    // Process.env.DEPLOY_ENV from EAS.json is the most reliable way to check
+    if (process.env.DEPLOY_ENV === 'production') {
+      return true;
+    }
+    
+    // Check Constants.appOwnership - 'standalone' means App Store or TestFlight
+    const Constants = require('expo-constants');
+    if (Constants.appOwnership === 'standalone') {
+      return true;
+    }
+    
+    // If __DEV__ is false, we're almost certainly in a production build
+    if (__DEV__ === false) {
+      return true;
+    }
+    
+    return false;
+  } catch (e) {
+    // If we can't check, assume based on __DEV__
+    return __DEV__ === false;
+  }
+};
+
+/**
  * Returns if the app is running in a development environment
- * This is a simplified version that just uses the __DEV__ flag
+ * This is the opposite of isProductionBuild
  */
 export const isDevelopment = (): boolean => {
-  return __DEV__ === true;
+  return !isProductionBuild();
 };
 
 /**
@@ -227,6 +268,7 @@ export const getDetailedDeviceInfo = () => {
 export default {
   isExpoGo,
   isDevelopment,
+  isProductionBuild,
   isPhysicalDevice,
   getPlatformInfo,
   getStoreText,

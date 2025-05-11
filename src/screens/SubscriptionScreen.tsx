@@ -28,7 +28,9 @@ import {
   restorePurchases
 } from '../services/revenueCatService';
 import { getUserUsage, getUserUsageInTokens } from '../services/usageService';
-import { isExpoGo, getStoreText, getDeploymentEnvironment } from '../utils/deviceInfo';
+import { isExpoGo, getStoreText, getDeploymentEnvironment, isProductionBuild } from '../utils/deviceInfo';
+import { shouldUseSimulatedData } from '../services/revenueCatService';
+import { USE_SIMULATED_REVENUECAT } from '../utils/revenueCatConfig';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 const { width } = Dimensions.get('window');
@@ -502,14 +504,12 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
             
             {/* Subscription Info */}
-            {/* Display notice for Expo Go or development mode */}
-            {(isExpoGo() || __DEV__) && (
+            {/* Display notice based on USE_SIMULATED_REVENUECAT flag */}
+            {USE_SIMULATED_REVENUECAT && (
               <View style={styles.expoGoNotice}>
                 <Ionicons name="information-circle" size={22} color="#F59E0B" style={{ marginRight: 8 }} />
                 <Text style={styles.expoGoText}>
-                  {isExpoGo() ? 
-                    "Running in Expo Go. Purchases are simulated and not charged." : 
-                    "Running in development mode. In-app purchase test environment active."}
+                  Using simulated RevenueCat data. Purchases are not real and will not be charged.
                 </Text>
               </View>
             )}
@@ -518,9 +518,9 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.revenueCatStatusContainer}>
               <Text style={styles.revenueCatStatusTitle}>RevenueCat Status</Text>
               <View style={styles.revenueCatStatusItem}>
-                <Text style={styles.revenueCatStatusLabel}>Environment:</Text>
+                <Text style={styles.revenueCatStatusLabel}>Simulated:</Text>
                 <Text style={styles.revenueCatStatusValue}>
-                  {isExpoGo() ? 'EXPO GO' : 'NATIVE BUILD'}
+                  {USE_SIMULATED_REVENUECAT ? 'YES' : 'NO'}
                 </Text>
               </View>
               <View style={styles.revenueCatStatusItem}>
@@ -532,7 +532,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.revenueCatStatusItem}>
                 <Text style={styles.revenueCatStatusLabel}>Mode:</Text>
                 <Text style={styles.revenueCatStatusValue}>
-                  {isExpoGo() ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
+                  {USE_SIMULATED_REVENUECAT ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
                 </Text>
               </View>
               <View style={styles.revenueCatStatusItem}>

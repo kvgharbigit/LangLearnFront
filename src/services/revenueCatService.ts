@@ -2,7 +2,7 @@
 import { Platform } from 'react-native';
 import { SubscriptionTier, SUBSCRIPTION_PLANS } from '../types/subscription';
 import { updateSubscriptionTier } from './supabaseUsageService';
-import { isExpoGo } from '../utils/deviceInfo';
+import { USE_SIMULATED_REVENUECAT } from '../utils/revenueCatConfig';
 
 // Define types for RevenueCat APIs to maintain type safety
 export type PurchasesPackage = {
@@ -61,16 +61,23 @@ const TIER_MAPPING = {
 // Whether we've logged the RevenueCat initialization info
 let _hasLoggedRevenueCatInit = false;
 
+// Function to determine if we should use simulated data
+// Uses the manual flag from revenueCatConfig.ts instead of automatic detection
+export const shouldUseSimulatedData = (): boolean => {
+  return USE_SIMULATED_REVENUECAT;
+};
+
 // Initialize RevenueCat
 export const initializeRevenueCat = (userId?: string) => {
-  const isExpoGoEnv = isExpoGo();
+  const useSimulatedData = shouldUseSimulatedData();
   const { getDeploymentEnvironment } = require('../utils/deviceInfo');
   const deployEnv = getDeploymentEnvironment();
   
   // Only log initialization details once
   if (!_hasLoggedRevenueCatInit) {
     console.log('------ RevenueCat Initialization ------');
-    console.log('isExpoGo() =', isExpoGoEnv);
+    console.log('Manual Config (USE_SIMULATED_REVENUECAT) =', USE_SIMULATED_REVENUECAT);
+    console.log('Using simulated data =', useSimulatedData);
     console.log('__DEV__ =', __DEV__);
     console.log('Deployment Environment =', deployEnv);
     
@@ -80,7 +87,7 @@ export const initializeRevenueCat = (userId?: string) => {
       console.log('Constants.executionEnvironment =', Constants.executionEnvironment);
       console.log('process.env.DEPLOY_ENV =', process.env.DEPLOY_ENV || 'not set');
 
-      // 🧪 More specific debugging for Expo Go detection
+      // 🧪 More specific debugging for environment detection
       const expoSDKVersion = Constants.expoVersion || 'unknown';
       const appVersion = Constants.manifest?.version || Constants.manifest2?.version || 'unknown';
       console.log('SDK Version:', expoSDKVersion);
@@ -92,9 +99,9 @@ export const initializeRevenueCat = (userId?: string) => {
     _hasLoggedRevenueCatInit = true;
   }
   
-  // Handle production or expo environment
-  if (isExpoGoEnv) {
-    console.log('📱 RevenueCat: SIMULATED MODE - Running in Expo Go or development environment');
+  // Check if we should use simulated data (based on manual flag)
+  if (useSimulatedData) {
+    console.log('📱 RevenueCat: SIMULATED MODE - Using manual configuration');
     console.log('📱 Using mock data for purchases and subscriptions');
     return;
   }
@@ -144,12 +151,12 @@ let _hasLoggedOfferingsInfo = false;
 // Get available packages
 export const getOfferings = async (): Promise<PurchasesPackage[]> => {
   try {
-    // Use mock data only in Expo Go
-    if (isExpoGo()) {
+    // Use mock data based on manual configuration
+    if (shouldUseSimulatedData()) {
       logDataSource('SubscriptionService', true);
       // Log only the first time
       if (!_hasLoggedOfferingsInfo) {
-        console.warn('📱 RevenueCat getOfferings: MOCK DATA - Running in Expo Go');
+        console.warn('📱 RevenueCat getOfferings: MOCK DATA - Using simulated mode');
         console.warn('⚠️ Using mock subscription packages');
         _hasLoggedOfferingsInfo = true;
       }
@@ -200,7 +207,7 @@ export const getOfferings = async (): Promise<PurchasesPackage[]> => {
   } catch (error) {
     console.error('Error fetching offerings:', error);
     // Return empty array instead of throwing in Expo Go
-    if (isExpoGo()) return [];
+    if (shouldUseSimulatedData()) return [];
     throw error;
   }
 };
@@ -213,11 +220,11 @@ export const purchasePackage = async (
   pckg: PurchasesPackage
 ): Promise<CustomerInfo> => {
   try {
-    // Use mock data only in Expo Go
-    if (isExpoGo()) {
+    // Use mock data based on manual configuration
+    if (shouldUseSimulatedData()) {
       // Log only the first time, plus the specific package ID
       if (!_hasLoggedPurchaseInfo) {
-        console.warn('📱 RevenueCat purchasePackage: MOCK DATA - Running in Expo Go');
+        console.warn('📱 RevenueCat purchasePackage: MOCK DATA - Using simulated mode');
         _hasLoggedPurchaseInfo = true;
       }
       console.log('Simulating purchase for package:', pckg.identifier);
@@ -285,12 +292,9 @@ export const purchasePackage = async (
       throw err;
     }
   } catch (error) {
-    // Use mock data when in Expo Go
-    if (isExpoGo()) {
-      // Skip verbose warning if we've already logged the init info
-      if (!_hasLoggedRevenueCatInit) {
-        console.warn('📱 RevenueCat error handler: MOCK DATA - Running in Expo Go');
-      }
+    // Use mock data when in simulated mode
+    if (shouldUseSimulatedData()) {
+      console.warn('📱 RevenueCat error handler: MOCK DATA - Using simulated mode');
       // In development, return a mock response instead of throwing
       return {
         entitlements: {
@@ -317,12 +321,12 @@ export const getCurrentSubscription = async (): Promise<{
   isActive: boolean;
 }> => {
   try {
-    // Use mock data only in Expo Go
-    if (isExpoGo()) {
+    // Use mock data based on manual configuration
+    if (shouldUseSimulatedData()) {
       logDataSource('SubscriptionService', true);
       // Log only the first time
       if (!_hasLoggedSubscriptionInfo) {
-        console.warn('📱 RevenueCat getCurrentSubscription: MOCK DATA - Running in Expo Go');
+        console.warn('📱 RevenueCat getCurrentSubscription: MOCK DATA - Using simulated mode');
         console.warn('⚠️ Using mock free subscription');
         _hasLoggedSubscriptionInfo = true;
       }
@@ -411,11 +415,11 @@ let _hasLoggedRestorePurchasesInfo = false;
 // Restore purchases
 export const restorePurchases = async (): Promise<CustomerInfo> => {
   try {
-    // Use mock data only in Expo Go
-    if (isExpoGo()) {
+    // Use mock data based on manual configuration
+    if (shouldUseSimulatedData()) {
       // Log only the first time
       if (!_hasLoggedRestorePurchasesInfo) {
-        console.warn('📱 RevenueCat restorePurchases: MOCK DATA - Running in Expo Go');
+        console.warn('📱 RevenueCat restorePurchases: MOCK DATA - Using simulated mode');
         console.log('Simulating restore purchases in development environment');
         _hasLoggedRestorePurchasesInfo = true;
       }
@@ -450,8 +454,8 @@ export const restorePurchases = async (): Promise<CustomerInfo> => {
   } catch (error) {
     console.error('Error restoring purchases:', error);
     
-    // In Expo Go, return a default mock instead of throwing
-    if (isExpoGo()) {
+    // In simulated mode, return a default mock instead of throwing
+    if (shouldUseSimulatedData()) {
       return {
         entitlements: { active: {}, all: {} },
         originalAppUserId: 'dev_mock_user',
