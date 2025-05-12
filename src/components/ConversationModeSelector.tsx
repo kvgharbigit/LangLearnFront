@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
 
 // Define conversation mode types
-export type ConversationMode = 'language_lesson' | 'topic_lesson' | 'free_conversation' | 'interview' | 'verb_challenge' | 'noun_challenge' | 'situation_simulation';
+export type ConversationMode = 'grammar_lesson' | 'topic_lesson' | 'free_conversation' | 'interview' | 'verb_challenge' | 'noun_challenge' | 'situation_simulation';
 
 interface ConversationModeSelectorProps {
   selectedMode: ConversationMode;
@@ -64,7 +64,7 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
       title: 'Language Lessons',
       modes: [
         {
-          id: 'language_lesson' as ConversationMode,
+          id: 'grammar_lesson' as ConversationMode,
           label: 'Grammar Lesson',
           icon: 'book-outline',
           description: 'Master specific grammar rules, verb forms, and language structures with focused guidance.',

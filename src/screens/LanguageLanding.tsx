@@ -172,11 +172,20 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   };
 
   // Handle conversation mode selection
-  const handleConversationModeSelect = (mode: ConversationMode) => {
-  console.log(`🔍 Debug - Mode selected in selector: ${mode}`);
-  setConversationMode(mode);
-  console.log(`🔍 Debug - State updated, conversationMode is now: ${mode}`);
-};
+  const handleConversationModeSelect = async (mode: ConversationMode) => {
+    setConversationMode(mode);
+    
+    // Save conversation mode to AsyncStorage
+    try {
+      await userPreferences.saveSingleAudioSetting('CONVERSATION_MODE', mode);
+      // Only log in dev mode
+      if (__DEV__) {
+        console.log(`🔍 Conversation mode: ${mode}`);
+      }
+    } catch (error) {
+      console.error('Error saving conversation mode:', error);
+    }
+  };
 
   // Handle start learning button press
   const handleStartLearning = (): void => {
@@ -186,7 +195,11 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
     }
 
     setIsSaving(true);
-    console.log(`🔍 Debug - About to navigate with conversationMode: ${conversationMode}`);
+    
+    // Only log in dev mode
+    if (__DEV__) {
+      console.log(`🔍 Navigating with mode: ${conversationMode}`);
+    }
 
     // Simulate loading for a better UX
     setTimeout(() => {

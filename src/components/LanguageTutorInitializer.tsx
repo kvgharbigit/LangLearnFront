@@ -46,8 +46,8 @@ const LanguageTutorInitializer: React.FC<LanguageTutorInitializerProps> = ({
   // Helper function to get conversation mode display name
   const getConversationModeDisplayName = (mode: ConversationMode): string => {
     switch (mode) {
-      case 'language_lesson':
-        return 'Language Lesson';
+      case 'grammar_lesson':
+        return 'Grammar Lesson';
       case 'topic_lesson':
         return 'Content Learning';
       case 'free_conversation':

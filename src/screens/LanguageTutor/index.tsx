@@ -49,6 +49,7 @@ import ReplayButton from '../../components/ReplayButton';
 
 // Import styles and constants
 import colors from '../../styles/colors';
+import userPreferences from '../../utils/userPreferences';
 
 // Define props type for this screen
 type Props = NativeStackScreenProps<RootStackParamList, 'LanguageTutor'>;
@@ -88,7 +89,17 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const getNativeLanguage = () => route.params.nativeLanguage || 'en';
   const getDifficulty = () => route.params.difficulty || 'beginner';
   const getLearningObjective = () => route.params.learningObjective || '';
-  const getConversationMode = () => route.params.conversationMode || 'language_lesson';
+  
+  // For conversation mode, ensure we use the value saved in AsyncStorage for consistency
+  // Initialize with route params to avoid undefined value during initial render
+  const [storedConversationMode, setStoredConversationMode] = useState<string>(
+    route.params.conversationMode || 'free_conversation'
+  );
+  
+  // Function to get conversation mode - always uses stored value
+  const getConversationMode = () => {
+    return storedConversationMode;
+  };
   
   // Use custom hooks
   const {
@@ -218,6 +229,8 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       setHistory(prev => [...prev, userMessage]);
       
       // Send message to API
+      // Always use the same conversation mode that was used to create the conversation
+      // to prevent mode mismatch issues with the backend
       const response = await api.sendTextMessage(
         message,
         conversationId,
@@ -398,6 +411,42 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     playAudio
   ]);
   
+  /**
+   * Load saved conversation mode from AsyncStorage
+   * This runs once when the component mounts
+   */
+  useEffect(() => {
+    const loadSavedConversationMode = async () => {
+      try {
+        // First, immediately save route params mode to AsyncStorage to ensure consistency
+        // This makes sure any mode selected on the landing page is saved
+        if (route.params.conversationMode) {
+          await userPreferences.saveSingleAudioSetting('CONVERSATION_MODE', route.params.conversationMode);
+          
+          // Only log in dev mode
+          if (__DEV__) {
+            console.log(`🔍 Conversation mode: ${route.params.conversationMode}`);
+          }
+          
+          // Update local state with route params immediately
+          setStoredConversationMode(route.params.conversationMode);
+        } else {
+          // If no route params, check what's in AsyncStorage
+          const savedMode = await userPreferences.getSingleSetting('CONVERSATION_MODE', 'language_lesson');
+          setStoredConversationMode(savedMode as string);
+        }
+      } catch (error) {
+        console.error('Error handling conversation mode:', error);
+        // Fall back to route params or default
+        setStoredConversationMode(route.params.conversationMode || 'language_lesson');
+      }
+    };
+    
+    loadSavedConversationMode();
+    // Only run this effect once on mount, not on route params changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /**
    * Prepare welcome data when component mounts
    */

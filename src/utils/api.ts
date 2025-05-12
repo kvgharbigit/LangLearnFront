@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import offlineAssets from './offlineAssets';
 import { supabase } from '../supabase/config';
 import { estimateTokens } from '../types/usage.normalized';
+import userPreferences from './userPreferences';
 
 // Update this to your actual API URL
 export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
@@ -210,7 +211,7 @@ export const sendTextMessage = async (
   targetLanguage: string = 'es',
   learningObjective: string = '',
   isMuted: boolean = false,
-  conversationMode: ConversationMode = 'language_lesson'
+  conversationMode: ConversationMode = 'free_conversation'
 ) => {
   try {
     // Check for network connectivity first
@@ -271,10 +272,30 @@ export const sendTextMessage = async (
       conversation_mode: conversationMode
     };
 
-    // Add debug logging
+    // Add minimal debug logging in dev mode
     if (__DEV__) {
-      console.log("🔍 Debug - API sendTextMessage params:", JSON.stringify(params, null, 2));
-      console.log("🔍 Debug - conversation_mode value:", conversationMode);
+      console.log("🔍 Debug - conversation_mode:", params.conversation_mode);
+    }
+    
+    // When we have a conversation_id, we should preserve the original mode
+    // to prevent mismatches between welcome message and response
+    if (conversationId) {
+      try {
+        // Check AsyncStorage for the original conversation mode
+        const originalMode = await userPreferences.getSingleSetting('CONVERSATION_MODE', 'free_conversation');
+        
+        if (originalMode && originalMode !== params.conversation_mode) {
+          // Only log in dev mode
+          if (__DEV__) {
+            console.log(`⚠️ Mode corrected: ${params.conversation_mode} → ${originalMode}`);
+          }
+          
+          // Apply the saved mode to ensure consistency
+          params.conversation_mode = originalMode as ConversationMode;
+        }
+      } catch (error) {
+        console.error('Error checking saved conversation mode:', error);
+      }
     }
 
     // Use fetchWithRetry instead of fetch
@@ -342,14 +363,22 @@ export const sendTextMessage = async (
             
             if (data.token_usage) {
               // Use accurate token counts from API
-              inputTokens = data.token_usage.input_tokens;
-              outputTokens = data.token_usage.output_tokens;
-              console.log(`Using accurate token counts from API: ${inputTokens} input, ${outputTokens} output`);
+              inputTokens = data.token_usage.input_tokens || 0;
+              outputTokens = data.token_usage.output_tokens || 0;
+              
+              // Check if we have combined token usage (for multi-request flows)
+              if (data.token_usage.combined_input_tokens && data.token_usage.combined_output_tokens) {
+                inputTokens = data.token_usage.combined_input_tokens;
+                outputTokens = data.token_usage.combined_output_tokens;
+                console.log(`Using combined token counts from API: ${inputTokens} input, ${outputTokens} output`);
+              } else {
+                console.log(`Using primary request token counts from API: ${inputTokens} input, ${outputTokens} output`);
+              }
             } else {
               // Fall back to estimation (this will undercount system prompt tokens)
               inputTokens = estimateTokens(message);
               outputTokens = estimateTokens(lastMessage.content);
-              console.log(`Using estimated token counts: ${inputTokens} input, ${outputTokens} output`);
+              console.log(`Using estimated token counts (not accurate): ${inputTokens} input, ${outputTokens} output`);
             }
             
             // Get today's date
@@ -486,7 +515,7 @@ export const sendVoiceRecording = async ({
   targetLanguage = 'es',
   learningObjective = '',
   isMuted = false,
-  conversationMode = 'language_lesson'
+  conversationMode = 'free_conversation'
 }: VoiceParams) => {
   try {
     // Check for network connectivity first
@@ -561,7 +590,29 @@ export const sendVoiceRecording = async ({
     formData.append('target_language', targetLanguage);
     formData.append('learning_objective', learningObjective);
     formData.append('is_muted', isMuted.toString());
-    formData.append('conversation_mode', conversationMode);
+    
+    // When we have a conversation_id, we should preserve the original mode
+    // to prevent mismatches between welcome message and response
+    let finalConversationMode = conversationMode;
+    if (conversationId) {
+      try {
+        // Check AsyncStorage for the original conversation mode
+        const originalMode = await userPreferences.getSingleSetting('CONVERSATION_MODE', 'free_conversation');
+        
+        if (originalMode && originalMode !== conversationMode) {
+          // Only log in dev mode
+          if (__DEV__) {
+            console.log(`⚠️ Voice message - Mode corrected: ${conversationMode} → ${originalMode}`);
+          }
+          
+          // Apply the saved mode to ensure consistency
+          finalConversationMode = originalMode as ConversationMode;
+        }
+      } catch (error) {
+        console.error('Error checking saved conversation mode:', error);
+      }
+    }
+    formData.append('conversation_mode', finalConversationMode);
 
     // Add auth headers to formData for user identification
     const userId = authHeaders['X-User-ID'];
@@ -678,14 +729,22 @@ export const sendVoiceRecording = async ({
             
             if (data.token_usage) {
               // Use accurate token counts from API
-              inputTokens = data.token_usage.input_tokens;
-              outputTokens = data.token_usage.output_tokens;
-              console.log(`Using accurate token counts from API (voice): ${inputTokens} input, ${outputTokens} output`);
+              inputTokens = data.token_usage.input_tokens || 0;
+              outputTokens = data.token_usage.output_tokens || 0;
+              
+              // Check if we have combined token usage (for multi-request flows)
+              if (data.token_usage.combined_input_tokens && data.token_usage.combined_output_tokens) {
+                inputTokens = data.token_usage.combined_input_tokens;
+                outputTokens = data.token_usage.combined_output_tokens;
+                console.log(`Using combined token counts from API (voice): ${inputTokens} input, ${outputTokens} output`);
+              } else {
+                console.log(`Using primary request token counts from API (voice): ${inputTokens} input, ${outputTokens} output`);
+              }
             } else {
               // Fall back to estimation (this will undercount system prompt tokens)
               inputTokens = estimateTokens(transcription);
               outputTokens = estimateTokens(lastMessage.content);
-              console.log(`Using estimated token counts (voice): ${inputTokens} input, ${outputTokens} output`);
+              console.log(`Using estimated token counts (voice - not accurate): ${inputTokens} input, ${outputTokens} output`);
             }
             
             // Get today's date
@@ -948,7 +1007,7 @@ export const createConversation = async ({
   nativeLanguage,
   targetLanguage,
   learningObjective,
-  conversationMode = 'language_lesson',
+  conversationMode = 'free_conversation',
   tempo,
   isMuted = false
 }: {
@@ -1069,14 +1128,22 @@ export const createConversation = async ({
             
             if (data.token_usage) {
               // Use accurate token counts from API
-              inputTokens = data.token_usage.input_tokens;
-              outputTokens = data.token_usage.output_tokens;
-              console.log(`Using accurate token counts from API (conversation): ${inputTokens} input, ${outputTokens} output`);
+              inputTokens = data.token_usage.input_tokens || 0;
+              outputTokens = data.token_usage.output_tokens || 0;
+              
+              // Check if we have combined token usage (for multi-request flows)
+              if (data.token_usage.combined_input_tokens && data.token_usage.combined_output_tokens) {
+                inputTokens = data.token_usage.combined_input_tokens;
+                outputTokens = data.token_usage.combined_output_tokens;
+                console.log(`Using combined token counts from API (conversation): ${inputTokens} input, ${outputTokens} output`);
+              } else {
+                console.log(`Using primary request token counts from API (conversation): ${inputTokens} input, ${outputTokens} output`);
+              }
             } else {
               // Fall back to estimation (this will undercount system prompt tokens)
               inputTokens = estimateTokens(contextInput);
               outputTokens = estimateTokens(welcomeMessage.content);
-              console.log(`Using estimated token counts (conversation): ${inputTokens} input, ${outputTokens} output`);
+              console.log(`Using estimated token counts (conversation - not accurate): ${inputTokens} input, ${outputTokens} output`);
             }
             
             // Get today's date
