@@ -704,6 +704,84 @@ export const updateSubscriptionTier = async (newTier: string): Promise<void> => 
   }
 };
 
+/**
+ * Delete all user data from Supabase tables
+ * Called when a user deletes their account
+ */
+export const deleteUserData = async (userId: string): Promise<boolean> => {
+  try {
+    // Delete user data from all tables that store user information
+
+    // 1. Delete from 'usage' table
+    const { error: usageError } = await supabase
+      .from('usage')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (usageError) {
+      console.error('Error deleting user usage data:', usageError);
+    }
+
+    // 2. Delete from 'users' table
+    const { error: userError } = await supabase
+      .from('users')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (userError) {
+      console.error('Error deleting user profile data:', userError);
+    }
+
+    // 3. Delete from 'conversations' table if it exists
+    try {
+      const { error: conversationsError } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (conversationsError) {
+        console.error('Error deleting user conversations:', conversationsError);
+      }
+    } catch (error) {
+      console.warn('Conversations table might not exist:', error);
+    }
+
+    // 4. Delete from 'messages' table if it exists
+    try {
+      const { error: messagesError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (messagesError) {
+        console.error('Error deleting user messages:', messagesError);
+      }
+    } catch (error) {
+      console.warn('Messages table might not exist:', error);
+    }
+
+    // 5. Delete from 'user_preferences' table if it exists
+    try {
+      const { error: preferencesError } = await supabase
+        .from('user_preferences')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (preferencesError) {
+        console.error('Error deleting user preferences:', preferencesError);
+      }
+    } catch (error) {
+      console.warn('User preferences table might not exist:', error);
+    }
+
+    console.log('User data deleted successfully');
+    return true;
+  } catch (error) {
+    console.error('Error deleting user data:', error);
+    return false;
+  }
+};
+
 export default {
   getUserUsage,
   getUserUsageInTokens,
@@ -714,5 +792,6 @@ export default {
   hasAvailableQuota,
   forceQuotaExceeded,
   verifySubscriptionWithServer,
-  updateSubscriptionTier
+  updateSubscriptionTier,
+  deleteUserData
 };

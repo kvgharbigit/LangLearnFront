@@ -10,7 +10,9 @@ import {
   ActivityIndicator,
   Platform,
   Animated,
-  Dimensions
+  Dimensions,
+  Modal,
+  TextInput
 } from 'react-native';
 import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
@@ -18,7 +20,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { logoutUser } from '../services/supabaseAuthService';
+import { logoutUser, deleteAccount } from '../services/supabaseAuthService';
 import { ProfileStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
 
@@ -35,6 +37,11 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     debugMode: boolean;
     simulateRevenueCat: boolean;
   }>({ debugMode: false, simulateRevenueCat: false });
+  
+  // Delete account confirmation state
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [confirmationText, setConfirmationText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -181,6 +188,56 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         }
       ]
     );
+  };
+  
+  // Handle delete account button press
+  const handleDeleteAccount = () => {
+    // Show confirmation dialog
+    setShowDeleteConfirmation(true);
+  };
+  
+  // Handle account deletion confirmation
+  const confirmDeleteAccount = async () => {
+    if (confirmationText.toLowerCase() !== 'delete') {
+      Alert.alert(
+        'Confirmation Failed',
+        'Please type "delete" to confirm account deletion.'
+      );
+      return;
+    }
+    
+    setIsDeletingAccount(true);
+    try {
+      // Call the deleteAccount function
+      const result = await deleteAccount();
+      
+      if (result.success) {
+        // Account deleted successfully
+        // The app will automatically navigate to the login screen via AuthContext
+        Alert.alert(
+          'Account Deleted',
+          'Your account and all data have been permanently deleted.'
+        );
+        
+        // Close the confirmation modal
+        setShowDeleteConfirmation(false);
+        setConfirmationText('');
+      } else {
+        // Error deleting account
+        Alert.alert(
+          'Error',
+          'Failed to delete your account. Please try again later.',
+        );
+      }
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      Alert.alert(
+        'Error',
+        'An unexpected error occurred. Please try again later.'
+      );
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   return (
@@ -358,6 +415,20 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
             </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.deleteAccountButton}
+              onPress={handleDeleteAccount}
+              accessibilityLabel="Delete Account"
+            >
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="trash-outline" size={22} color={colors.error} />
+              </View>
+              <View style={styles.menuTextContainer}>
+                <Text style={styles.deleteAccountText}>Delete Account</Text>
+                <Text style={styles.deleteAccountSubtext}>Permanently delete your account and all data</Text>
+              </View>
+            </TouchableOpacity>
           </View>
           
           {/* Developer Section - Only visible in __DEV__ mode */}
@@ -450,6 +521,65 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
         </Animated.View>
       </ScrollView>
+      
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={showDeleteConfirmation}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteConfirmation(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Delete Account</Text>
+            
+            <Text style={styles.modalDescription}>
+              This action is permanent and cannot be undone. All your data will be deleted.
+            </Text>
+            
+            <Text style={styles.confirmText}>
+              To confirm, type "delete" below:
+            </Text>
+            
+            <TextInput
+              style={styles.confirmInput}
+              value={confirmationText}
+              onChangeText={setConfirmationText}
+              placeholder="Type 'delete' to confirm"
+              autoCapitalize="none"
+              editable={!isDeletingAccount}
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowDeleteConfirmation(false);
+                  setConfirmationText('');
+                }}
+                disabled={isDeletingAccount}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton,
+                  confirmationText.toLowerCase() === 'delete' ? styles.confirmButtonEnabled : styles.confirmButtonDisabled
+                ]}
+                onPress={confirmDeleteAccount}
+                disabled={confirmationText.toLowerCase() !== 'delete' || isDeletingAccount}
+              >
+                {isDeletingAccount ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Delete Account</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeView>
   );
 };
@@ -651,6 +781,106 @@ const styles = StyleSheet.create({
     color: colors.gray500,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  // Delete account styles
+  deleteAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray100,
+  },
+  deleteAccountText: {
+    fontSize: 16,
+    color: colors.error,
+    marginBottom: 2,
+  },
+  deleteAccountSubtext: {
+    fontSize: 13,
+    color: colors.gray500,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 500,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.error,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: colors.gray700,
+    marginBottom: 20,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  confirmText: {
+    fontSize: 14,
+    color: colors.gray800,
+    marginBottom: 10,
+  },
+  confirmInput: {
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: colors.gray200,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  cancelButtonText: {
+    color: colors.gray800,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  confirmButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  confirmButtonEnabled: {
+    backgroundColor: '#22c55e', // Green color
+  },
+  confirmButtonDisabled: {
+    backgroundColor: 'rgba(239, 68, 68, 0.5)', // Faded red
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
 
