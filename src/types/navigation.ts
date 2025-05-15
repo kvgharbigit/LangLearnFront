@@ -16,6 +16,8 @@ export type RootStackParamList = {
   EditProfile: undefined;
   Subscription: undefined;
   AppLanguage: undefined;
+  PrivacyPolicy: undefined;
+  TermsOfService: undefined;
   // Keep other screen types if you have any
 };
 
@@ -45,4 +47,6 @@ export type ProfileStackParamList = {
   ProfileMain: undefined;
   EditProfile: undefined;
   Subscription: undefined; // New subscription screen
+  PrivacyPolicy: undefined;
+  TermsOfService: undefined;
 };

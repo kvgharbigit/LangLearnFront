@@ -7,6 +7,8 @@
     "icon": "./assets/transparent_background_icon.png",
     "userInterfaceStyle": "light",
     "scheme": "confluency",
+    "privacy": "unlisted",
+    "description": "Interactive language learning app with AI-powered tutoring. By using this app, you agree to our Terms of Service (https://persistent-lychee-e09.notion.site/Confluency-Terms-of-Service-EULA-1f2282c115ae804ba5aec1f6239b6962?pvs=4) and Privacy Policy (https://persistent-lychee-e09.notion.site/Confluency-Privacy-Policy-1e4282c115ae80ed8f27ce8c8cfb2e9e?pvs=4).",
     "android": {
       "intentFilters": [
         {
@@ -39,6 +41,10 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "This app uses the microphone to record your speech for language practice.",
         "UIBackgroundModes": ["audio"]
+      },
+      "appStoreUrl": "https://langlearn.kvgharbi.repl.co",
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {

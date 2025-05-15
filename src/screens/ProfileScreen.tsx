@@ -12,7 +12,8 @@ import {
   Animated,
   Dimensions,
   Modal,
-  TextInput
+  TextInput,
+  Linking
 } from 'react-native';
 import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
@@ -393,6 +394,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
             <TouchableOpacity
               style={styles.menuItem}
               accessibilityLabel={translate('profile.privacyPolicy')}
+              onPress={() => Linking.openURL('https://persistent-lychee-e09.notion.site/Confluency-Privacy-Policy-1e4282c115ae80ed8f27ce8c8cfb2e9e?pvs=4')}
             >
               <View style={styles.menuIconContainer}>
                 <Ionicons name="shield-outline" size={22} color={colors.primary} />
@@ -406,6 +408,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
             <TouchableOpacity
               style={styles.menuItem}
               accessibilityLabel={translate('profile.termsOfService')}
+              onPress={() => Linking.openURL('https://persistent-lychee-e09.notion.site/Confluency-Terms-of-Service-EULA-1f2282c115ae804ba5aec1f6239b6962?pvs=4')}
             >
               <View style={styles.menuIconContainer}>
                 <Ionicons name="document-text-outline" size={22} color={colors.primary} />

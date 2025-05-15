@@ -9,7 +9,8 @@ import {
   Alert,
   Platform,
   Animated,
-  Dimensions
+  Dimensions,
+  Linking
 } from 'react-native';
 import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
@@ -998,12 +999,72 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             />
 
             <View style={styles.infoContainer}>
-              <Text style={styles.infoText}>
-                Subscriptions will automatically renew unless auto-renew is turned off at least 24 hours before the end of the current period.
-              </Text>
-              <Text style={styles.infoText}>
-                You can manage your subscriptions in your {getStoreText()} account settings after purchase.
-              </Text>
+              <Text style={styles.infoSectionTitle}>Subscription Information</Text>
+              
+              {/* Subscription Details */}
+              <View style={styles.subscriptionDetailsContainer}>
+                <Text style={styles.subscriptionDetailsTitle}>Basic Tier - $4.99/month</Text>
+                <Text style={styles.subscriptionDetail}>• Monthly subscription (30 days)</Text>
+                <Text style={styles.subscriptionDetail}>• 300 token limit per month</Text>
+                <Text style={styles.subscriptionDetail}>• Price: $4.99 USD per month</Text>
+              </View>
+              
+              <View style={styles.subscriptionDetailsContainer}>
+                <Text style={styles.subscriptionDetailsTitle}>Premium Tier - $11.99/month</Text>
+                <Text style={styles.subscriptionDetail}>• Monthly subscription (30 days)</Text>
+                <Text style={styles.subscriptionDetail}>• 800 token limit per month</Text>
+                <Text style={styles.subscriptionDetail}>• Price: $11.99 USD per month</Text>
+              </View>
+              
+              <View style={styles.subscriptionDetailsContainer}>
+                <Text style={styles.subscriptionDetailsTitle}>Gold Tier - $19.99/month</Text>
+                <Text style={styles.subscriptionDetail}>• Monthly subscription (30 days)</Text>
+                <Text style={styles.subscriptionDetail}>• 1600 token limit per month</Text>
+                <Text style={styles.subscriptionDetail}>• Price: $19.99 USD per month</Text>
+              </View>
+              
+              {/* Renewal and Management Information */}
+              <View style={styles.renewalInfoContainer}>
+                <Text style={styles.renewalInfoTitle}>Renewal and Management Information</Text>
+                <Text style={styles.infoText}>
+                  • Payment will be charged to your Apple ID account at confirmation of purchase
+                </Text>
+                <Text style={styles.infoText}>
+                  • Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period
+                </Text>
+                <Text style={styles.infoText}>
+                  • Account will be charged for renewal within 24 hours prior to the end of the current period
+                </Text>
+                <Text style={styles.infoText}>
+                  • You can manage your subscriptions in your {getStoreText()} account settings after purchase
+                </Text>
+                <Text style={styles.infoText}>
+                  • No cancellation of the current subscription is allowed during active subscription period
+                </Text>
+                <Text style={styles.infoText}>
+                  • Any unused portion of a free trial period, if offered, will be forfeited when the user purchases a subscription
+                </Text>
+              </View>
+              
+              {/* Links to Terms and Privacy */}
+              <View style={styles.legalLinksContainer}>
+                <Text style={styles.legalLinksText}>
+                  By purchasing a subscription, you confirm that you have read and agree to our{' '}
+                  <Text 
+                    style={styles.legalLink} 
+                    onPress={() => Linking.openURL('https://persistent-lychee-e09.notion.site/Confluency-Terms-of-Service-EULA-1f2282c115ae804ba5aec1f6239b6962?pvs=4')}
+                  >
+                    Terms of Service
+                  </Text>{' '}
+                  and{' '}
+                  <Text 
+                    style={styles.legalLink} 
+                    onPress={() => Linking.openURL('https://persistent-lychee-e09.notion.site/Confluency-Privacy-Policy-1e4282c115ae80ed8f27ce8c8cfb2e9e?pvs=4')}
+                  >
+                    Privacy Policy
+                  </Text>
+                </Text>
+              </View>
             </View>
           </Animated.View>
         </ScrollView>
@@ -1454,6 +1515,57 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#92400E', // Amber/yellow dark text
+  },
+  infoSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.gray800,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  subscriptionDetailsContainer: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+  },
+  subscriptionDetailsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+    marginBottom: 8,
+  },
+  subscriptionDetail: {
+    fontSize: 14,
+    color: colors.gray700,
+    lineHeight: 22,
+    paddingLeft: 8,
+  },
+  renewalInfoContainer: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+  },
+  renewalInfoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.gray800,
+    marginBottom: 12,
+  },
+  legalLinksContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+  },
+  legalLinksText: {
+    fontSize: 13,
+    color: colors.gray700,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  legalLink: {
+    color: colors.primary,
+    textDecorationLine: 'underline',
   },
 });
 
