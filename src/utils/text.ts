@@ -142,27 +142,58 @@ export const highlightDifferences = (
     return result.join(' ');
   }
   else {
-    // For natural message, highlight words not in user message in ORANGE and bold
+    // For natural message, highlight words in similar positions in GREEN and non-matching words in ORANGE
     const naturalWords = suggestion.split(/\s+/);
     const userWords = original.split(/\s+/);
     
-    // Create a normalized set of user words for faster lookup
-    const normalizedUserWords = new Set(
-      userWords.map(word => normalizeText(word))
-    );
+    // Convert to normalized forms for comparison
+    const normalizedNaturalWords = naturalWords.map(w => normalizeText(w));
+    const normalizedUserWords = userWords.map(w => normalizeText(w));
     
-    // Mark words that don't appear in the user message as new (orange and bold)
-    const result = naturalWords.map(word => {
+    // Create a map of word positions in user text
+    const userWordPositions = new Map();
+    normalizedUserWords.forEach((word, index) => {
+      if (!userWordPositions.has(word)) {
+        userWordPositions.set(word, []);
+      }
+      userWordPositions.get(word).push(index);
+    });
+    
+    // Mark words based on matching and position
+    const result = naturalWords.map((word, index) => {
       const normalizedWord = normalizeText(word);
       
-      // Words not in user message are orange and bold
-      if (!normalizedUserWords.has(normalizedWord)) {
+      // If the word doesn't exist in user message at all
+      if (!userWordPositions.has(normalizedWord)) {
         // Using orangetext for words not in user message
         return `<orangetext>${word}</orangetext>`;
       }
       
-      // Words in user message remain plain black text (no special marking)
-      return word;
+      // Check if the word appears in a similar position
+      const positionsInUser = userWordPositions.get(normalizedWord);
+      
+      // Find the closest position match
+      let bestPositionMatch = -1;
+      let minPositionDiff = Infinity;
+      
+      positionsInUser.forEach(position => {
+        const positionDiff = Math.abs(position - index);
+        if (positionDiff < minPositionDiff) {
+          minPositionDiff = positionDiff;
+          bestPositionMatch = position;
+        }
+      });
+      
+      // If position is within a reasonable threshold (allow for some words to be added/removed)
+      // The threshold of 2 allows words to be up to 2 positions away and still match
+      const POSITION_THRESHOLD = 2;
+      if (minPositionDiff <= POSITION_THRESHOLD) {
+        // Words in correct position are green - same as corrected messages
+        return `<greentext>${word}</greentext>`;
+      } else {
+        // Words that exist in user message but in different positions - keep as regular text
+        return word;
+      }
     });
     
     const joinedResult = result.join(' ');

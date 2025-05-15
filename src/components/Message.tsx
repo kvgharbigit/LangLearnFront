@@ -164,7 +164,7 @@ const Message: React.FC<MessageProps> = ({
       color: '#FF0000', // Red for non-matching words
     },
     greentext: {
-      color: '#4CAF50', // Green for matching words
+      color: '#4CAF50', // Green for matching words in similar positions
     },
     orangetext: {
       fontWeight: 'bold', // Bold text
@@ -425,6 +425,7 @@ const Message: React.FC<MessageProps> = ({
                           </Text>
                         ) : (
                           // When not perfectly correct, use the highlighting approach
+                          // Now includes green highlighting for matching words in similar positions
                           <HTML
                             source={{ html: highlightedNative }}
                             contentWidth={screenWidth * 0.75} // Increased available width
