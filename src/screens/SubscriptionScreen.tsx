@@ -30,14 +30,12 @@ import {
 } from '../services/revenueCatService';
 import { getUserUsage, getUserUsageInTokens } from '../services/usageService';
 import { 
-  isExpoGo, 
   getStoreText, 
   getDeploymentEnvironment, 
   isProductionBuild,
   getDetailedDeviceInfo
 } from '../utils/deviceInfo';
 import { shouldUseSimulatedData } from '../services/revenueCatService';
-import { USE_SIMULATED_REVENUECAT } from '../utils/revenueCatConfig';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 const { width } = Dimensions.get('window');
@@ -57,8 +55,6 @@ const logEnvironmentInfo = () => {
     
     console.log('Computed environment:');
     console.log('Development mode:', __DEV__);
-    console.log('USE_SIMULATED_REVENUECAT:', USE_SIMULATED_REVENUECAT);
-    console.log('Running in Expo Go:', isExpoGo());
     console.log('Deployment Environment:', deployEnv);
     console.log('Is Production Build:', isProductionBuild());
     
@@ -69,32 +65,25 @@ const logEnvironmentInfo = () => {
     console.log('Device:', Constants.deviceName || 'unknown');
     console.log('Constants.executionEnvironment:', Constants.executionEnvironment);
     
-    // Try to check RevenueCat status - now using __DEV__ as primary check
-    if (__DEV__ === false || !isExpoGo()) {
-      try {
-        const Purchases = require('react-native-purchases');
-        console.log('RevenueCat SDK loaded successfully');
-        
-        // Check if we can access RevenueCat APIs
-        if (Purchases.getAppUserID) {
-          console.log('RevenueCat API accessible');
-          try {
-            const userID = Purchases.getAppUserID();
-            console.log('RevenueCat User ID:', userID || 'not available');
-          } catch (e) {
-            console.log('Could not get RevenueCat User ID:', e.message);
-          }
-        } else {
-          console.log('RevenueCat API not fully accessible');
+    // Try to check RevenueCat status
+    try {
+      const Purchases = require('react-native-purchases');
+      console.log('RevenueCat SDK loaded successfully');
+      
+      // Check if we can access RevenueCat APIs
+      if (Purchases.getAppUserID) {
+        console.log('RevenueCat API accessible');
+        try {
+          const userID = Purchases.getAppUserID();
+          console.log('RevenueCat User ID:', userID || 'not available');
+        } catch (e) {
+          console.log('Could not get RevenueCat User ID:', e.message);
         }
-      } catch (e) {
-        console.log('RevenueCat SDK not available:', e.message);
+      } else {
+        console.log('RevenueCat API not fully accessible');
       }
-    } else {
-      console.log('RevenueCat SDK not initialized (using simulated data in __DEV__ mode/Expo Go)');
-      if (USE_SIMULATED_REVENUECAT) {
-        console.log('Using explicitly configured simulated data (USE_SIMULATED_REVENUECAT=true)');
-      }
+    } catch (e) {
+      console.log('RevenueCat SDK not available:', e.message);
     }
     
     // Log React Native environment
@@ -107,8 +96,6 @@ const logEnvironmentInfo = () => {
     
     return {
       __DEV__,
-      USE_SIMULATED_REVENUECAT,
-      isExpoGo: isExpoGo(),
       deployEnv: process.env.DEPLOY_ENV || 'not set',
       deploySetting: deployEnv,
       isProductionBuild: isProductionBuild(),
@@ -118,8 +105,7 @@ const logEnvironmentInfo = () => {
     console.log('Error logging environment:', e);
     return {
       error: e.message,
-      __DEV__,
-      USE_SIMULATED_REVENUECAT
+      __DEV__
     };
   }
 };
@@ -246,23 +232,14 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
       
-      // IMPORTANT: Check both isExpoGo() and USE_SIMULATED_REVENUECAT flag
-      // This ensures we only show simulated purchase dialogs in actual development environments
-      // and never in TestFlight or production builds
-      if (isExpoGo() || USE_SIMULATED_REVENUECAT) {
-        // Double-check we're not in TestFlight
-        const deployEnv = process.env.DEPLOY_ENV;
-        if (deployEnv === 'testflight' || deployEnv === 'production') {
-          // We're in TestFlight or Production - do a real purchase, never a simulated one
-          console.log('TestFlight or Production environment detected - using real purchase flow');
-          processPurchase(plan);
-          return;
-        }
-        
+      // Check if simulation mode is enabled by user preference
+      const useSimulatedData = await shouldUseSimulatedData();
+      
+      if (useSimulatedData) {
         // Show the simulation dialog
         Alert.alert(
           'Simulate Purchase',
-          `This is a simulated purchase for ${plan.name} plan ($${plan.price.toFixed(2)}/month). In Expo Go, no actual purchase will be made.`,
+          `This is a simulated purchase for ${plan.name} plan ($${plan.price.toFixed(2)}/month). No actual purchase will be made.`,
           [
             { text: 'Cancel', style: 'cancel' },
             { 
@@ -728,8 +705,8 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
             
             {/* Subscription Info */}
-            {/* Simulated purchase warning - now checks both config and user preference */}
-            {(USE_SIMULATED_REVENUECAT || debugOptions.simulateRevenueCat) && (
+            {/* Simulated purchase warning - based on user preference only */}
+            {debugOptions.simulateRevenueCat && (
               <View style={styles.expoGoNotice}>
                 <Ionicons name="information-circle" size={22} color="#F59E0B" style={{ marginRight: 8 }} />
                 <Text style={styles.expoGoText}>
@@ -755,15 +732,6 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   </Text>
                 </View>
                 <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>USE_SIMULATED_REVENUECAT:</Text>
-                  <Text style={[
-                    styles.revenueCatStatusValue,
-                    {color: USE_SIMULATED_REVENUECAT ? '#D97706' : '#1E40AF'}
-                  ]}>
-                    {USE_SIMULATED_REVENUECAT ? 'TRUE' : 'FALSE'} (default)
-                  </Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
                   <Text style={styles.revenueCatStatusLabel}>User Preference:</Text>
                   <Text style={[
                     styles.revenueCatStatusValue,
@@ -776,12 +744,6 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={styles.revenueCatStatusLabel}>process.env.DEPLOY_ENV:</Text>
                   <Text style={styles.revenueCatStatusValue}>
                     {process.env.DEPLOY_ENV || 'not set'}
-                  </Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>Is Expo Go:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {isExpoGo() ? 'YES' : 'NO'}
                   </Text>
                 </View>
                 <View style={styles.revenueCatStatusItem}>
@@ -800,14 +762,14 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={[
                     styles.revenueCatStatusValue,
                     {
-                      color: USE_SIMULATED_REVENUECAT || debugOptions.simulateRevenueCat
+                      color: debugOptions.simulateRevenueCat
                         ? '#D97706'  // Amber for simulated
                         : __DEV__ 
                           ? '#059669'  // Green for sandbox
                           : '#1E40AF'  // Blue for production
                     }
                   ]}>
-                    {(USE_SIMULATED_REVENUECAT || debugOptions.simulateRevenueCat) ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
+                    {debugOptions.simulateRevenueCat ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
                   </Text>
                 </View>
                 <View style={styles.revenueCatStatusItem}>

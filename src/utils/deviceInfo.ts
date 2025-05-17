@@ -74,6 +74,13 @@ export const isExpoGo = (): boolean => {
       return true;
     }
     
+    // Check for development client (not Expo Go)
+    if (Constants.appOwnership === 'guest') {
+      _isExpoGoCache = false;
+      console.log('📱 Detected development client (not Expo Go)');
+      return false;
+    }
+    
     // If we have a deployment environment set by EAS, it's a reliable indicator
     if (deployEnv) {
       // If it's explicitly set to production or testflight, we're not in Expo Go

@@ -108,8 +108,6 @@ export const shouldUseSimulatedDataSync = (): boolean => {
 // Initialize RevenueCat
 export const initializeRevenueCat = async (userId?: string) => {
   const useSimulatedData = await shouldUseSimulatedData();
-  const { getDeploymentEnvironment } = require('../utils/deviceInfo');
-  const deployEnv = getDeploymentEnvironment();
   
   // Only log initialization details once
   if (!_hasLoggedRevenueCatInit) {
@@ -128,25 +126,13 @@ export const initializeRevenueCat = async (userId?: string) => {
     }
     
     console.log('[RevenueCat] User Preference:', userPref);
-    console.log('[RevenueCat] Fallback Config (USE_SIMULATED_REVENUECAT):', USE_SIMULATED_REVENUECAT);
     console.log('[RevenueCat] Final decision: Using simulated data =', useSimulatedData);
-    
-    try {
-      const Constants = require('expo-constants');
-      console.log('[RevenueCat] App ownership:', Constants.appOwnership);
-      console.log('[RevenueCat] Execution environment:', Constants.executionEnvironment);
-      console.log('[RevenueCat] Platform:', Platform.OS, Platform.Version);
-
-      const appVersion = Constants.manifest?.version || Constants.manifest2?.version || 'unknown';
-      console.log('[RevenueCat] App Version:', appVersion);
-    } catch (e) {
-      console.error('[RevenueCat] Error accessing expo-constants:', e);
-    }
+    console.log('[RevenueCat] Platform:', Platform.OS, Platform.Version);
     
     _hasLoggedRevenueCatInit = true;
   }
   
-  // Check if we should use simulated data (based on user preference)
+  // Check if we should use simulated data (based on user preference only)
   if (useSimulatedData) {
     console.log('📱 [RevenueCat] SIMULATED MODE - Using user preference');
     console.log('📱 [RevenueCat] All operations will use mock data');
@@ -196,7 +182,19 @@ export const initializeRevenueCat = async (userId?: string) => {
 };
 
 // Import utilities at the top level
-import { shouldUseMockData, logDataSource } from '../utils/dataMode';
+let shouldUseMockData: any;
+let logDataSource: any;
+
+try {
+  const dataMode = require('../utils/dataMode');
+  shouldUseMockData = dataMode.shouldUseMockData;
+  logDataSource = dataMode.logDataSource;
+} catch (error) {
+  console.error('[RevenueCat] Failed to import dataMode utilities:', error);
+  // Provide fallback implementations
+  shouldUseMockData = () => false;
+  logDataSource = () => {};
+}
 
 // Flag to track if we've logged the offerings info
 let _hasLoggedOfferingsInfo = false;
