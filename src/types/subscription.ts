@@ -30,10 +30,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     monthlyCredits: 1, // $1.00 worth of usage
     monthlyTokens: 100, // 1 credit * 100
     features: [
-      '100 Conversation Tokens per month',
-      'Basic language learning tools',
-      'Text-to-speech capabilities',
-      'Access to 5 languages'
+      '100 Conversation Tokens per month'
     ]
   },
   {
@@ -44,11 +41,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     monthlyCredits: 3, // $3 worth of usage
     monthlyTokens: 300, // 3 credits * 100
     features: [
-      'All Free features',
       '300 Conversation Tokens per month',
-      'Advanced grammar corrections',
-      'Access to 10 languages',
-      'Priority support'
+      'All Premium Features'
     ]
   },
   {
@@ -60,12 +54,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     monthlyTokens: 800, // 8 credits * 100
     isPopular: true,
     features: [
-      'All Basic features',
       '800 Conversation Tokens per month',
-      'Conversation mode options',
-      'Instant voice recognition',
-      'Personalized learning paths',
-      'Access to all languages'
+      'All Premium Features'
     ]
   },
   {
@@ -76,12 +66,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     monthlyCredits: 16, // $16 worth of usage
     monthlyTokens: 1600, // 16 credits * 100
     features: [
-      'All Premium features',
       '1,600 Conversation Tokens per month',
-      'Expert language tutoring',
-      'Custom vocabulary sets',
-      'Progress analytics',
-      'Priority customer support'
+      'All Premium Features'
     ]
   }
 ];

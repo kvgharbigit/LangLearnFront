@@ -571,9 +571,6 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.planPrice}>
               {plan.price > 0 ? `$${plan.price.toFixed(2)}/month` : 'Free'}
             </Text>
-            <Text style={styles.monthlyCredit}>
-              ${plan.monthlyCredits.toFixed(2)} in Confluency Credits
-            </Text>
           </View>
           
           <View style={styles.planFeatures}>
@@ -1400,11 +1397,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.primary,
     marginBottom: 4,
-  },
-  monthlyCredit: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: colors.gray600,
   },
   planFeatures: {
     marginBottom: 20,
