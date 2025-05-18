@@ -48,9 +48,9 @@ const ENTITLEMENTS = {
 const PRODUCT_IDS = Platform.select({
   // iOS product IDs (App Store)
   ios: {
-    BASIC: 'basic_tier',
-    PREMIUM: 'premium_tier',
-    GOLD: 'gold_tier'
+    BASIC: __DEV__ ? 'basic_tier_test' : 'basic_tier',
+    PREMIUM: __DEV__ ? 'premium_tier_test' : 'premium_tier',
+    GOLD: __DEV__ ? 'gold_tier_test' : 'gold_tier'
   },
   // Android product IDs (Play Store)
   android: {
@@ -65,6 +65,13 @@ const PRODUCT_IDS = Platform.select({
   GOLD: 'gold_tier'
 };
 
+// Log the product IDs being used
+console.log('[RevenueCat] Product IDs configuration:', {
+  platform: Platform.OS,
+  isDevelopment: __DEV__,
+  productIds: PRODUCT_IDS
+});
+
 // Map entitlement IDs to subscription tiers
 const TIER_MAPPING = {
   [ENTITLEMENTS.BASIC]: 'basic',
@@ -76,14 +83,26 @@ const TIER_MAPPING = {
 let _hasLoggedRevenueCatInit = false;
 
 // Function to determine if we should use simulated data
-// Only checks user preferences (ignores environment)
+// Checks both environment (Expo Go) and user preferences
 export const shouldUseSimulatedData = async (): Promise<boolean> => {
   try {
-    // Check user preference only
+    // FIRST: Check if we're running in Expo Go
+    const { isExpoGo } = await import('../utils/deviceInfo');
+    const isRunningInExpoGo = isExpoGo();
+    
+    console.log(`[RevenueCat] Expo Go check: ${isRunningInExpoGo ? 'POSITIVE' : 'NEGATIVE'} (running in ${isRunningInExpoGo ? 'Expo Go' : 'Development/Production build'})`);
+    
+    if (isRunningInExpoGo) {
+      console.log('[RevenueCat] Running in Expo Go - MUST use simulated mode');
+      return true;
+    }
+    
+    // SECOND: Check user preference
     const { getUseSimulatedRevenueCat } = await import('../utils/revenueCatConfig');
     const simulateFromPrefs = await getUseSimulatedRevenueCat();
     
-    console.log(`RevenueCat simulation mode: ${simulateFromPrefs ? 'SIMULATED' : 'REAL'} (user preference)`);
+    console.log(`[RevenueCat] User preference: ${simulateFromPrefs ? 'SIMULATED' : 'REAL'}`);
+    console.log(`[RevenueCat] Final simulation mode: ${simulateFromPrefs ? 'SIMULATED' : 'REAL'} (based on user preference)`);
     
     return simulateFromPrefs;
   } catch (error) {
@@ -100,14 +119,40 @@ export const shouldUseSimulatedData = async (): Promise<boolean> => {
 // Synchronous version for backward compatibility
 // This will eventually be deprecated in favor of the async version
 export const shouldUseSimulatedDataSync = (): boolean => {
-  // Since we can't check async preferences here, use the static config value
-  console.log(`RevenueCat simulation mode (sync): ${USE_SIMULATED_REVENUECAT ? 'SIMULATED' : 'REAL'} (legacy config)`);
+  try {
+    // Check if we're running in Expo Go
+    const { isExpoGo } = require('../utils/deviceInfo');
+    const isRunningInExpoGo = isExpoGo();
+    
+    console.log(`[RevenueCat sync] Expo Go check: ${isRunningInExpoGo ? 'POSITIVE' : 'NEGATIVE'} (running in ${isRunningInExpoGo ? 'Expo Go' : 'Development/Production build'})`);
+    
+    if (isRunningInExpoGo) {
+      console.log('[RevenueCat sync] Running in Expo Go - MUST use simulated mode');
+      return true;
+    }
+  } catch (error) {
+    console.error('[RevenueCat sync] Error checking Expo Go:', error);
+  }
+  
+  // Fall back to static config value
+  console.log(`[RevenueCat sync] Legacy config value: ${USE_SIMULATED_REVENUECAT ? 'SIMULATED' : 'REAL'}`);
+  console.log(`[RevenueCat sync] Final simulation mode (sync): ${USE_SIMULATED_REVENUECAT ? 'SIMULATED' : 'REAL'} (based on legacy config)`);
   return USE_SIMULATED_REVENUECAT;
 };
 
 // Initialize RevenueCat
 export const initializeRevenueCat = async (userId?: string) => {
   const useSimulatedData = await shouldUseSimulatedData();
+  
+  console.log(`[RevenueCat] === Initialization Decision ===`);
+  console.log(`[RevenueCat] Will use ${useSimulatedData ? 'SIMULATED' : 'REAL'} mode`);
+  
+  // Log product IDs during initialization
+  console.log('[RevenueCat] Product IDs at initialization:', {
+    platform: Platform.OS,
+    isDevelopment: __DEV__,
+    productIds: PRODUCT_IDS
+  });
   
   // Only log initialization details once
   if (!_hasLoggedRevenueCatInit) {
@@ -144,9 +189,10 @@ export const initializeRevenueCat = async (userId?: string) => {
   try {
     const apiKey = Platform.OS === 'ios' ? API_KEYS.ios : API_KEYS.android;
     console.log('[RevenueCat] Using API key for platform:', Platform.OS);
+    console.log('[RevenueCat] API key prefix:', apiKey.substring(0, 8) + '...');
     
     try {
-      const Purchases = require('react-native-purchases');
+      const Purchases = require('react-native-purchases').default;
       console.log('[RevenueCat] SDK loaded successfully');
       
       // Configure with proper API key and user ID
@@ -157,20 +203,70 @@ export const initializeRevenueCat = async (userId?: string) => {
       };
       console.log('[RevenueCat] Configuring with:', { ...config, apiKey: 'hidden' });
       
+      // Configure RevenueCat with StoreKit mode in development
+      if (__DEV__ && Platform.OS === 'ios') {
+        console.log('[RevenueCat] Development build detected, checking for StoreKit configuration');
+        // In development, we might need to use StoreKit testing mode
+        Purchases.setSimulatesAskToBuyInSandbox(false);
+      }
+      
       Purchases.configure(config);
       
       // Set debug logs only in development builds
       if (__DEV__) {
-        Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
-        console.log('[RevenueCat] Debug logging enabled');
+        Purchases.setLogLevel(Purchases.LOG_LEVEL.VERBOSE);
+        console.log('[RevenueCat] Verbose logging enabled');
       } else {
         Purchases.setLogLevel(Purchases.LOG_LEVEL.ERROR);
         console.log('[RevenueCat] Error-only logging enabled');
       }
       
+      // Log the current bundle identifier for debugging
+      let bundleId = null;
+      try {
+        // Try using expo-constants first
+        const Constants = require('expo-constants').default;
+        if (Constants.manifest2?.extra?.eas?.projectId) {
+          console.log('[RevenueCat] EAS Project ID:', Constants.manifest2.extra.eas.projectId);
+        }
+        
+        // Try to get bundle ID from app.json config
+        if (Platform.OS === 'ios') {
+          bundleId = Constants.expoConfig?.ios?.bundleIdentifier;
+          console.log('[RevenueCat] Bundle ID from expoConfig:', bundleId);
+        }
+        
+      } catch (e) {
+        console.log('[RevenueCat] Error getting bundle ID:', e.message);
+      }
+      
+      console.log('[RevenueCat] Bundle identifier detected:', bundleId || 'not found');
+      
+      // Since bundle ID detection is failing, let's manually set it for now
+      if (!bundleId && Platform.OS === 'ios') {
+        bundleId = 'io.github.kvgharbigit.langlearn';
+        console.log('[RevenueCat] Using hardcoded bundle ID:', bundleId);
+      }
+      
       console.log('[RevenueCat] ✅ Initialization complete');
     } catch (err) {
       console.error('[RevenueCat] ❌ Failed to load SDK:', err.message || err);
+      
+      // Check if this is a native module error (common in Expo Go)
+      if (err.message?.includes('native module') || err.message?.includes('doesn\'t exist')) {
+        console.error('[RevenueCat] Native module not found - are you running in Expo Go?');
+        console.error('[RevenueCat] RevenueCat requires native code and cannot run in Expo Go.');
+        console.error('[RevenueCat] Please either:');
+        console.error('[RevenueCat] 1. Create a development build with `eas build --platform ios --profile development`');
+        console.error('[RevenueCat] 2. Enable simulated mode in app settings');
+        
+        // Check if we should be in simulated mode
+        const { isExpoGo } = require('../utils/deviceInfo');
+        if (isExpoGo()) {
+          console.error('[RevenueCat] Detected Expo Go environment - simulated mode should have been enabled automatically');
+        }
+      }
+      
       console.error('[RevenueCat] SDK Error details:', JSON.stringify(err, null, 2));
       throw err;
     }
@@ -202,6 +298,11 @@ let _hasLoggedOfferingsInfo = false;
 // Get available packages
 export const getOfferings = async (): Promise<PurchasesPackage[]> => {
   console.log('[RevenueCat.getOfferings] Starting to fetch available packages...');
+  console.log('[RevenueCat.getOfferings] Current product IDs:', {
+    platform: Platform.OS,
+    isDevelopment: __DEV__,
+    productIds: PRODUCT_IDS
+  });
   
   try {
     // Use mock data based on user preference or environment
@@ -248,7 +349,7 @@ export const getOfferings = async (): Promise<PurchasesPackage[]> => {
     }
 
     // Use actual RevenueCat SDK for production builds
-    const Purchases = require('react-native-purchases');
+    const Purchases = require('react-native-purchases').default;
     console.log('[RevenueCat.getOfferings] Calling SDK getOfferings...');
     const offerings = await Purchases.getOfferings();
     
@@ -286,6 +387,18 @@ export const getOfferings = async (): Promise<PurchasesPackage[]> => {
     console.error('[RevenueCat.getOfferings] ❌ Fatal error:', error.message || error);
     console.error('[RevenueCat.getOfferings] Error type:', error.constructor.name);
     console.error('[RevenueCat.getOfferings] Full error:', JSON.stringify(error, null, 2));
+    
+    // Check if this is a configuration error (no products set up)
+    const isConfigurationError = 
+      error?.message?.includes('configuration') || 
+      error?.message?.includes('products registered') ||
+      error?.code === '23' ||
+      error?.code === 23;
+    
+    if (isConfigurationError) {
+      console.warn('[RevenueCat.getOfferings] Configuration error detected - no products configured in RevenueCat/App Store');
+      console.warn('[RevenueCat.getOfferings] This is expected in development or when products are not yet set up');
+    }
     
     // Only return empty array if we're in simulated mode
     // Otherwise, throw the error so it's properly handled upstream
@@ -365,7 +478,7 @@ export const purchasePackage = async (
 
     // Use actual RevenueCat SDK 
     try {
-      const Purchases = require('react-native-purchases');
+      const Purchases = require('react-native-purchases').default;
       // Log only the first time, plus the specific package ID
       if (!_hasLoggedPurchaseInfo) {
         console.log('📱 [RevenueCat.purchasePackage] REAL DATA - Using actual RevenueCat SDK');
@@ -479,7 +592,7 @@ export const getCurrentSubscription = async (): Promise<{
     }
 
     // Use the actual RevenueCat SDK
-    const Purchases = require('react-native-purchases');
+    const Purchases = require('react-native-purchases').default;
     console.log('[RevenueCat.getCurrentSubscription] Calling SDK getCustomerInfo...');
     const customerInfo = await Purchases.getCustomerInfo();
     
@@ -639,7 +752,7 @@ export const restorePurchases = async (): Promise<CustomerInfo> => {
 
     // Use the actual RevenueCat SDK
     try {
-      const Purchases = require('react-native-purchases');
+      const Purchases = require('react-native-purchases').default;
       // Log only the first time
       if (!_hasLoggedRestorePurchasesInfo) {
         console.log('📱 [RevenueCat.restorePurchases] REAL DATA - Using actual RevenueCat SDK');

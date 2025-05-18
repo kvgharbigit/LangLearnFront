@@ -267,7 +267,7 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
                                 <Text style={[
                                   styles.gridItemName,
                                   isSelected && styles.selectedGridItemName
-                                ]}>
+                                ]} numberOfLines={2}>
                                   {lang.name}
                                 </Text>
                                 {isSelected && (
@@ -350,6 +350,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 600,
     maxHeight: '80%',
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -393,6 +394,7 @@ const styles = StyleSheet.create({
   },
   languageListContainer: {
     maxHeight: 500,
+    paddingBottom: 16,
   },
   searchResults: {
     paddingHorizontal: 16,
@@ -409,7 +411,7 @@ const styles = StyleSheet.create({
     color: colors.gray600,
   },
   searchResultsList: {
-
+    paddingVertical: 8,
   },
   languageItem: {
     flexDirection: 'row',
@@ -453,7 +455,8 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   category: {
-    marginBottom: 20,
+    marginBottom: 24,
+    paddingHorizontal: 2,
   },
   categoryTitle: {
     fontSize: 18,
@@ -467,27 +470,37 @@ const styles = StyleSheet.create({
   languageGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-    marginHorizontal: -6,
+    marginHorizontal: -4,
+    paddingVertical: 8,
   },
   gridItem: {
     width: '33.33%',
-    paddingHorizontal: 6,
-    paddingVertical: 8,
+    minWidth: 110,
+    paddingHorizontal: 4,
+    paddingVertical: 12,
     position: 'relative',
+    alignItems: 'center',
+    minHeight: 80,
+    justifyContent: 'center',
   },
   selectedGridItem: {
-
+    backgroundColor: colors.primaryLight,
+    borderRadius: 8,
   },
   gridItemFlag: {
-    fontSize: 28,
+    fontSize: 24,
     textAlign: 'center',
     marginBottom: 4,
+    height: 32,
+    lineHeight: 32,
   },
   gridItemName: {
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
     color: colors.gray800,
+    numberOfLines: 2,
+    flexWrap: 'wrap',
+    maxWidth: '100%',
   },
   selectedGridItemName: {
     fontWeight: '600',

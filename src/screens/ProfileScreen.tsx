@@ -24,6 +24,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { logoutUser, deleteAccount } from '../services/supabaseAuthService';
 import { ProfileStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
+import { DEBUG_TOOLS_TOGGLE } from '../constants/debug';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileMain'>;
 
@@ -333,20 +334,8 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
             
             <TouchableOpacity
               style={styles.menuItem}
-              accessibilityLabel={translate('profile.helpCenter')}
-            >
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="help-circle-outline" size={22} color={colors.primary} />
-              </View>
-              <View style={styles.menuTextContainer}>
-                <Text style={styles.menuText}>{translate('profile.helpCenter')}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.menuItem}
               accessibilityLabel={translate('profile.contactUs')}
+              onPress={() => Linking.openURL('mailto:confluencyapp@gmail.com')}
             >
               <View style={styles.menuIconContainer}>
                 <Ionicons name="mail-outline" size={22} color={colors.primary} />
@@ -355,35 +344,6 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.menuText}>{translate('profile.contactUs')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
-            </TouchableOpacity>
-            
-            {/* RevenueCat Simulation Toggle - Available in all builds */}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => toggleDebugOption('simulateRevenueCat')}
-              accessibilityLabel="Toggle RevenueCat Simulation"
-            >
-              <View style={[
-                styles.menuIconContainer,
-                debugOptions.simulateRevenueCat ? { backgroundColor: colors.primaryLight } : { backgroundColor: colors.gray200 }
-              ]}>
-                <Ionicons name="card-outline" size={22} color={debugOptions.simulateRevenueCat ? colors.primary : colors.gray500} />
-              </View>
-              <View style={styles.menuTextContainer}>
-                <Text style={styles.menuText}>Simulate RevenueCat</Text>
-                <Text style={styles.menuSubtext}>
-                  {debugOptions.simulateRevenueCat ? 'Using simulated purchases' : 'Using real purchases'}
-                </Text>
-              </View>
-              <View style={[
-                styles.toggleContainer,
-                debugOptions.simulateRevenueCat ? styles.toggleActive : styles.toggleInactive
-              ]}>
-                <View style={[
-                  styles.toggleCircle,
-                  debugOptions.simulateRevenueCat ? styles.toggleCircleActive : styles.toggleCircleInactive
-                ]} />
-              </View>
             </TouchableOpacity>
           </View>
           
@@ -434,8 +394,8 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           
-          {/* Developer Section - Only visible in __DEV__ mode */}
-          {__DEV__ && (
+          {/* Developer Section - Only visible if DEBUG_TOOLS_TOGGLE is true */}
+          {DEBUG_TOOLS_TOGGLE && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Developer Options</Text>
               

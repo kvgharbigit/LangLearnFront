@@ -72,6 +72,8 @@ const LanguageSwitch: React.FC<LanguageSwitchProps> = ({
               data={availableLanguages}
               numColumns={numColumns}
               keyExtractor={(item) => item.code}
+              columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
+              contentContainerStyle={styles.languageList}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
@@ -204,6 +206,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  languageList: {
+    paddingHorizontal: 8,
+    paddingBottom: 20,
+  },
+  columnWrapper: {
+    justifyContent: 'space-evenly',
+    marginVertical: 4,
   },
 });
 

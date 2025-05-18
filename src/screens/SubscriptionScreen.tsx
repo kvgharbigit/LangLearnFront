@@ -204,7 +204,19 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     } catch (error) {
       console.error('Error loading subscription data:', error);
       setRevenueCatError(error); // Store the error for display
-      Alert.alert('Error', 'Failed to load subscription information.');
+      
+      // Check if it's a configuration error (products not set up)
+      if (error?.message?.includes('configuration') || error?.message?.includes('products registered')) {
+        Alert.alert(
+          'Configuration Notice', 
+          'RevenueCat products are not yet configured. Running in test mode. To use real subscriptions, please configure products in RevenueCat and App Store Connect.'
+        );
+        
+        // In development, we can continue with an empty packages array
+        setPackages([]);
+      } else {
+        Alert.alert('Error', 'Failed to load subscription information.');
+      }
     } finally {
       setLoading(false);
     }

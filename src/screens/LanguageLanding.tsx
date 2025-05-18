@@ -221,7 +221,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
           source={require('../../assets/transparent_background_icon.png')}
           style={styles.loadingLogo}
         />
-        <ActivityIndicator size="large" color={colors.primary} style={styles.loadingIndicator} />
+        <ActivityIndicator size="large" color={landingColors.primary} style={styles.loadingIndicator} />
         <Text style={styles.loadingText}>Loading your language settings...</Text>
       </SafeView>
     );
@@ -336,7 +336,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
 };
 
 // Enhanced color palette
-const colors = {
+const landingColors = {
   primary: '#2A9D8F',
   primaryGradientStart: '#40B4A7',
   primaryLight: '#E8F5F3',
@@ -366,7 +366,7 @@ const colors = {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: landingColors.background,
   },
   animatedContent: {
     flex: 1,
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     width: 350,
     height: 350,
     borderRadius: 175,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: landingColors.primaryLight,
     opacity: 0.3,
     top: -100,
     right: -100,
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderRadius: 125,
-    backgroundColor: colors.accent,
+    backgroundColor: landingColors.accent,
     opacity: 0.1,
     bottom: -50,
     left: -100,
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: landingColors.background,
   },
   loadingLogo: {
     width: 120,
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.gray700,
+    color: landingColors.gray700,
     textAlign: 'center',
   },
   scrollContent: {
@@ -435,18 +435,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.primary,
+    color: landingColors.primary,
     letterSpacing: 0.8,
     marginBottom: 6,
   },
   tagline: {
     fontSize: 14,
-    color: colors.gray600,
+    color: landingColors.gray600,
     letterSpacing: 1.2,
     fontWeight: '400',
   },
   card: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: landingColors.cardBackground,
     borderRadius: 24,
     padding: 24,
     shadowColor: 'rgba(0, 0, 0, 0.1)',
@@ -463,14 +463,14 @@ const styles = StyleSheet.create({
   cardDivider: {
     height: 3,
     width: 40,
-    backgroundColor: colors.primary,
+    backgroundColor: landingColors.primary,
     marginTop: 8,
     borderRadius: 2,
   },
   cardTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: colors.gray800,
+    color: landingColors.gray800,
     textAlign: 'center',
   },
   section: {
@@ -478,20 +478,20 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    color: colors.gray700,
+    color: landingColors.gray700,
     marginBottom: 16,
     fontWeight: '600',
     letterSpacing: 0.2,
   },
   startButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: landingColors.primary,
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 16,
     marginTop: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.primaryDark,
+    shadowColor: landingColors.primaryDark,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -504,12 +504,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   disabledButton: {
-    backgroundColor: colors.gray400,
+    backgroundColor: landingColors.gray400,
     shadowOpacity: 0,
     elevation: 0,
   },
   loadingButton: {
-    backgroundColor: colors.primaryGradientStart,
+    backgroundColor: landingColors.primaryGradientStart,
   },
   startButtonText: {
     color: 'white',
@@ -522,13 +522,13 @@ const styles = StyleSheet.create({
     top: Platform.OS === 'ios' ? 55 : 16, // Adjusted for iOS to be below status bar
     right: 16,
     zIndex: 10,
-    backgroundColor: colors.primary, // Added background color for visibility
+    backgroundColor: landingColors.primary, // Added background color for visibility
     width: 42,
     height: 42,
     borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.primaryDark,
+    shadowColor: landingColors.primaryDark,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.white,
+    color: landingColors.white,
   },
 });
 

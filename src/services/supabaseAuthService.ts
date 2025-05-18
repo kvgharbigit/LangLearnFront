@@ -317,7 +317,14 @@ export const initializeUser = async (): Promise<User | null> => {
     cachedUser = data.user;
     return cachedUser;
   } catch (error) {
-    console.error('Error initializing user:', error);
+    // Check if this is a session missing error (user not logged in)
+    if (error instanceof Error && (error.message.includes('session missing') || error.message.includes('Auth session missing'))) {
+      console.log('📝 No user logged in - authentication required');
+      return null;
+    }
+    
+    // For other errors, log them as actual errors
+    console.error('❌ Error initializing user:', error);
     
     // Only fall back to dev user if we're explicitly allowing mocks
     if (shouldUseMockData()) {

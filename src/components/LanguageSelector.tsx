@@ -36,6 +36,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   const [selectedLangInfo, setSelectedLangInfo] = useState<Language>({
     code: 'unknown',
     name: 'Select Language',
+    nativeName: 'Select Language',
     flag: '🌎'
   });
 
@@ -49,6 +50,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       setSelectedLangInfo({
         code: selectedLanguage,
         name: selectedLanguage.toUpperCase(),
+        nativeName: selectedLanguage.toUpperCase(),
         flag: '🌎'
       });
     }
@@ -77,7 +79,8 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   // Calculate the optimal number of columns based on screen width
   const screenWidth = Dimensions.get('window').width;
   // Adjust this calculation for better responsiveness
-  const numColumns = Math.max(2, Math.floor((screenWidth - 40) / 160));
+  const modalContentMaxWidth = Math.min(screenWidth - 40, 500);
+  const numColumns = Math.max(2, Math.floor((modalContentMaxWidth - 32) / 140));
 
   return (
     <View style={styles.container}>
@@ -143,7 +146,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               numColumns={numColumns}
               key={numColumns} // This forces re-render when numColumns changes
               contentContainerStyle={styles.languageList}
-              columnWrapperStyle={styles.columnWrapper}
+              columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
               renderItem={({ item }) => {
                 const isSelected = selectedLanguage === item.code;
                 const isExcluded = excludeLanguage === item.code;
@@ -287,7 +290,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 500,
     maxHeight: '90%',
-    overflow: 'hidden',
+    flex: 1,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -329,23 +332,27 @@ const styles = StyleSheet.create({
     color: colors.gray800,
   },
   languageList: {
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
     paddingBottom: 20,
   },
   columnWrapper: {
-    justifyContent: 'space-around',
+    justifyContent: 'space-evenly',
     marginVertical: 4,
+    paddingHorizontal: 8,
   },
   languageOption: {
-    margin: 8,
+    margin: 6,
     backgroundColor: colors.gray50,
     borderWidth: 1,
     borderColor: colors.gray300,
     borderRadius: 12,
-    padding: 12,
+    padding: 10,
     alignItems: 'center',
-    width: 130,
-    minHeight: 110,
+    flex: 1,
+    minWidth: 110,
+    maxWidth: 160,
+    minHeight: 100,
     justifyContent: 'center',
   },
   selectedOption: {
@@ -371,7 +378,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   selectedText: {
-    color: colors.gray900,
+    color: colors.gray800,
     fontWeight: '700',
   },
   excludedText: {

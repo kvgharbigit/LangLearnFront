@@ -4,6 +4,7 @@ import { User } from '@supabase/supabase-js';
 import { subscribeToAuthChanges, initializeUser } from '../services/supabaseAuthService';
 import { useUserInitialization } from './UserInitializationContext';
 import { captureDiagnostics, DiagnosticType } from '../utils/diagnostics';
+import { initializeRevenueCat } from '../services/revenueCatService';
 
 // Define the shape of our context
 interface AuthContextType {
@@ -54,6 +55,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // If we have a user, verify they exist in tables and initialize if needed
         if (initialUser) {
           console.log('AuthContext: User authenticated, verifying user data in tables...');
+          
+          // Initialize RevenueCat for the authenticated user
+          console.log('AuthContext: Initializing RevenueCat for user:', initialUser.id);
+          try {
+            await initializeRevenueCat(initialUser.id);
+            console.log('AuthContext: RevenueCat initialized successfully');
+          } catch (revenueCatError) {
+            console.error('AuthContext: Failed to initialize RevenueCat:', revenueCatError);
+            // Continue with user initialization even if RevenueCat fails
+          }
+          
           try {
             // Set verification in progress flag to true
             setVerificationInProgress(true);
@@ -119,10 +131,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         const errorType = error instanceof Error ? error.name : 'Unknown error type';
         
-        console.error('AuthContext: Error initializing user:', {
-          message: errorMessage,
-          type: errorType
-        });
+        // Handle auth session missing error gracefully
+        if (errorType === 'AuthSessionMissingError' || errorMessage.includes('session missing')) {
+          console.log('AuthContext: No active session - user needs to log in');
+        } else {
+          console.error('AuthContext: Error initializing user:', {
+            message: errorMessage,
+            type: errorType
+          });
+        }
         
         // Capture diagnostics for this auth error
         await captureDiagnostics(
@@ -173,6 +190,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // If this is a real sign-in after app is running (different user), verify the data
       if (user.id !== supabaseUser.id) {
         console.log('AuthContext: New user authenticated, verifying user data tables...');
+        
+        // Initialize RevenueCat for the new user
+        console.log('AuthContext: Re-initializing RevenueCat for new user:', supabaseUser.id);
+        (async () => {
+          try {
+            await initializeRevenueCat(supabaseUser.id);
+            console.log('AuthContext: RevenueCat re-initialized successfully');
+          } catch (revenueCatError) {
+            console.error('AuthContext: Failed to re-initialize RevenueCat:', revenueCatError);
+            // Continue with user verification even if RevenueCat fails
+          }
+        })();
+        
         // Set verification in progress flag to true
         setVerificationInProgress(true);
         
