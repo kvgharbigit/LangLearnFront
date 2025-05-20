@@ -585,52 +585,41 @@ export const verifySubscriptionWithServer = async (): Promise<boolean> => {
 };
 
 /**
- * Update the user's subscription tier and adjust token limits accordingly
+ * Update the user's subscription tier
  * Called when a user upgrades or downgrades their subscription
+ * Uses the normalized database schema
  */
 export const updateSubscriptionTier = async (newTier: string): Promise<void> => {
   try {
     const user = getCurrentUser();
     if (!user) return;
     
-    // Find the plan to get new credit limit
+    // Find the plan to validate the tier
     const plan = SUBSCRIPTION_PLANS.find(p => p.tier === newTier);
-    if (!plan) return;
+    if (!plan) {
+      console.warn(`Invalid subscription tier: ${newTier}`);
+      return;
+    }
     
-    const creditLimit = plan.monthlyCredits;
-    const tokenLimit = plan.monthlyTokens;
-    
-    // Get current usage to preserve existing usage data
-    const { data, error: fetchError } = await supabase
-      .from('usage')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-      
-    if (fetchError || !data) return;
-    
-    // Calculate new percentage based on existing usage with new limits
-    const totalCost = data.total_cost || 0;
-    const percentageUsed = creditLimit > 0 
-      ? Math.min((totalCost / creditLimit) * 100, 100)
-      : 100;
-    
-    // Update only the limits and tier without resetting usage
-    const { error } = await supabase
-      .from('usage')
+    // Update ONLY the users table according to normalized schema
+    // Fields: subscription_tier, updated_at (credit_limit is now derived)
+    const { error: userError } = await supabase
+      .from('users')
       .update({
-        credit_limit: creditLimit,
-        token_limit: tokenLimit,
-        percentage_used: percentageUsed,
-        subscription_tier: newTier
+        subscription_tier: newTier,
+        updated_at: new Date().toISOString()
       })
       .eq('user_id', user.id);
     
-    if (error) throw error;
+    if (userError) {
+      console.error('Error updating subscription tier in users table:', userError);
+      throw userError;
+    }
     
-    console.log(`Subscription updated to ${newTier} tier with ${tokenLimit} token limit`);
+    console.log(`Subscription updated to ${newTier} tier with ${plan.monthlyCredits} credit limit (derived value)`);
   } catch (error) {
     console.error('Error updating subscription tier:', error);
+    throw error;
   }
 };
 

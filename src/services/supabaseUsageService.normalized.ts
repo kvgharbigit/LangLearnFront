@@ -32,9 +32,8 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
     // Get user's subscription
     const { tier } = await getCurrentSubscription();
     
-    // Find the plan to get credit limit
-    const plan = SUBSCRIPTION_PLANS.find(p => p.tier === tier);
-    const creditLimit = plan?.monthlyCredits || 0;
+    // Use the helper function to get the credit limit (imported separately to avoid circular dependency)
+    const { getCreditLimitForTier } = await import('../types/subscription');
     
     // Get billing period
     const { start, end } = getMonthlyPeriod();
@@ -52,13 +51,16 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
     // Initial daily usage (empty object)
     const emptyDailyUsage = {};
     
+    // Get credit limit using helper
+    const creditLimit = getCreditLimitForTier(tier);
+    
     // Initial monthly usage object
     const monthlyUsage: MonthlyUsage = {
       currentPeriodStart: start,
       currentPeriodEnd: end,
       usageDetails: emptyUsage,
       calculatedCosts: costs,
-      creditLimit,
+      creditLimit, // Now derived from tier
       percentageUsed: 0,
       dailyUsage: emptyDailyUsage,
       subscriptionTier: tier
@@ -72,8 +74,8 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
         subscription_tier: tier,
         subscription_start: start,
         billing_cycle_start: start,
-        billing_cycle_end: end,
-        credit_limit: creditLimit
+        billing_cycle_end: end
+        // credit_limit is now derived from tier, not stored
       }]);
     
     if (userError) throw userError;
@@ -192,8 +194,9 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
     // Calculate costs on-the-fly
     const calculatedCosts = calculateCosts(usageDetails);
     
-    // Calculate percentage used
-    const creditLimit = userData.credit_limit || 1.5;
+    // Get credit limit based on subscription tier
+    const { getCreditLimitForTier } = await import('../types/subscription');
+    const creditLimit = getCreditLimitForTier(userData.subscription_tier || 'free');
     const percentageUsed = creditLimit > 0 
       ? Math.min((calculatedCosts.totalCost / creditLimit) * 100, 100)
       : 100;
@@ -231,9 +234,8 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
     // Get user's subscription
     const { tier } = await getCurrentSubscription();
     
-    // Find the plan to get credit limit
-    const plan = SUBSCRIPTION_PLANS.find(p => p.tier === tier);
-    const creditLimit = plan?.monthlyCredits || 0;
+    // Use helper to get credit limit
+    const { getCreditLimitForTier } = await import('../types/subscription');
     
     // Get new billing period
     const { start, end } = getMonthlyPeriod();
@@ -248,13 +250,16 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
     
     const costs = calculateCosts(emptyUsage);
     
+    // Get credit limit using helper
+    const creditLimit = getCreditLimitForTier(tier);
+    
     // Updated monthly usage
     const updatedUsage: MonthlyUsage = {
       currentPeriodStart: start,
       currentPeriodEnd: end,
       usageDetails: emptyUsage,
       calculatedCosts: costs,
-      creditLimit,
+      creditLimit, // Now derived from tier
       percentageUsed: 0,
       dailyUsage: {}, // Reset daily usage for new period
       subscriptionTier: tier
@@ -353,10 +358,13 @@ export const trackApiUsage = async (
     // Calculate costs for monthly usage (on-the-fly, not stored in DB)
     currentUsage.calculatedCosts = calculateCosts(monthlyUsage);
     
-    // Calculate percentage used
-    if (currentUsage.creditLimit > 0) {
+    // Calculate percentage used using helper function for tier-based credit limit
+    const { getCreditLimitForTier } = await import('../types/subscription');
+    const creditLimit = getCreditLimitForTier(currentUsage.subscriptionTier);
+    
+    if (creditLimit > 0) {
       currentUsage.percentageUsed = Math.min(
-        (currentUsage.calculatedCosts.totalCost / currentUsage.creditLimit) * 100, 
+        (currentUsage.calculatedCosts.totalCost / creditLimit) * 100, 
         100
       );
     } else {
@@ -514,9 +522,13 @@ export const getUserUsageInTokens = async (): Promise<{
     // Calculate used tokens (costs * 100)
     const usedTokens = creditsToTokens(usage.calculatedCosts.totalCost);
     
+    // Get token limit directly using helper function
+    const { getTokenLimitForTier } = await import('../types/subscription');
+    const tokenLimit = getTokenLimitForTier(usage.subscriptionTier);
+    
     return {
       usedTokens: Math.round(usedTokens),
-      tokenLimit: usage.creditLimit * 100, // Convert credits to tokens
+      tokenLimit, // Now derived directly from the tier
       percentageUsed: usage.percentageUsed
     };
   } catch (error) {
@@ -639,7 +651,8 @@ export const forceQuotaExceeded = async (): Promise<void> => {
     
     // Calculate how much usage to add to exceed quota
     const currentCost = usage.calculatedCosts.totalCost;
-    const creditLimit = usage.creditLimit;
+    const { getCreditLimitForTier } = await import('../types/subscription');
+    const creditLimit = getCreditLimitForTier(usage.subscriptionTier);
     
     // Add enough usage to exceed limit (add usage equivalent to 2x credit limit)
     const tokensToAdd = creditLimit * 1000000 * 2; // large number to ensure quota exceeded
@@ -672,33 +685,33 @@ export const verifySubscriptionWithServer = async (): Promise<boolean> => {
 };
 
 /**
- * Update the user's subscription tier and adjust credit limits accordingly
- * Called when a user upgrades or downgrades their subscription
+ * Update the user's subscription tier in the database
+ * Credit limit is now derived from the tier rather than stored
  */
 export const updateSubscriptionTier = async (newTier: string): Promise<void> => {
   try {
     const user = getCurrentUser();
     if (!user) return;
     
-    // Find the plan to get new credit limit
+    // Find the plan to validate the tier
     const plan = SUBSCRIPTION_PLANS.find(p => p.tier === newTier);
-    if (!plan) return;
+    if (!plan) {
+      console.warn(`Invalid subscription tier: ${newTier}`);
+      return;
+    }
     
-    const creditLimit = plan.monthlyCredits;
-    
-    // For normalized schema, only update the users table
+    // With normalized approach, we only need to update the tier
     const { error } = await supabase
       .from('users')
       .update({
         subscription_tier: newTier,
-        credit_limit: creditLimit,
         updated_at: new Date().toISOString()
       })
       .eq('user_id', user.id);
     
     if (error) throw error;
     
-    console.log(`Subscription updated to ${newTier} tier with ${creditLimit} credit limit`);
+    console.log(`Subscription updated to ${newTier} tier (with ${plan.monthlyCredits} credit limit)`);
   } catch (error) {
     console.error('Error updating subscription tier:', error);
   }

@@ -25,6 +25,8 @@ import { logoutUser, deleteAccount } from '../services/supabaseAuthService';
 import { ProfileStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
 import { DEBUG_TOOLS_TOGGLE } from '../constants/debug';
+import SubscriptionCancelledBanner from '../components/SubscriptionCancelledBanner';
+import useSubscriptionStatus from '../hooks/useSubscriptionStatus';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileMain'>;
 
@@ -44,6 +46,9 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [confirmationText, setConfirmationText] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  
+  // Get subscription status from hook
+  const subscription = useSubscriptionStatus();
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -258,6 +263,14 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.headerTitle}>{translate('profile.title')}</Text>
         <View style={styles.headerRight} />
       </View>
+      
+      {/* Subscription Cancelled Banner */}
+      {subscription.isCancelled && subscription.expirationDate && (
+        <SubscriptionCancelledBanner
+          expirationDate={subscription.expirationDate}
+          tier={subscription.tier}
+        />
+      )}
       
       <ScrollView
         contentContainerStyle={styles.scrollContent}

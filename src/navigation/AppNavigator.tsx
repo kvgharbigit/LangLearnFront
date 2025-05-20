@@ -1,10 +1,13 @@
 // src/navigation/AppNavigator.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { navigationRef } from './NavigationService';
+import SubscriptionCancelledBanner from '../components/SubscriptionCancelledBanner';
+import useSubscriptionStatus from '../hooks/useSubscriptionStatus';
 
 // Auth Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -118,18 +121,47 @@ const MainNavigator = () => {
 // Main App Navigator - Switches between Auth and Main based on login state
 const AppNavigator = () => {
   const { isAuthenticated, loading } = useAuth();
+  
+  // Only check subscription status when authenticated
+  // Check every 24 hours (86400000 ms)
+  const subscription = isAuthenticated ? 
+    useSubscriptionStatus(86400000) : 
+    { tier: 'free', expirationDate: null, isActive: false, isCancelled: false, loading: false, error: null };
 
   // You might want to show a splash screen here while loading
   if (loading) {
     return null; // Replace with a proper splash/loading screen
   }
+  
+  // Helper to render the global subscription banner
+  const renderNavigatorWithBanner = (navigator: React.ReactNode) => {
+    const showBanner = subscription.isCancelled && subscription.expirationDate;
+    
+    if (!showBanner) {
+      return navigator;
+    }
+    
+    return (
+      <View style={styles.container}>
+        {/* Only show banner if subscription is cancelled but not expired */}
+        <SubscriptionCancelledBanner
+          expirationDate={subscription.expirationDate!}
+          tier={subscription.tier}
+        />
+        {navigator}
+      </View>
+    );
+  };
 
   return (
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           // User is signed in
-          <Stack.Screen name="Main" component={MainNavigator} />
+          <Stack.Screen
+            name="Main"
+            component={MainNavigator}
+          />
         ) : (
           // User is not signed in
           <Stack.Screen name="Auth" component={AuthNavigator} />
@@ -138,5 +170,11 @@ const AppNavigator = () => {
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
 
 export default AppNavigator;

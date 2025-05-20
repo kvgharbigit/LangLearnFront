@@ -2,7 +2,11 @@
 import { initializeUser } from '../services/supabaseAuthService';
 import { supabase } from '../supabase/config';
 import { Platform } from 'react-native';
-import { initializeRevenueCat } from '../services/revenueCatService';
+import { 
+  initializeRevenueCat, 
+  syncSubscriptionWithDatabase,
+  syncCrossPlatformEntitlements
+} from '../services/revenueCatService';
 
 /**
  * Initializes the app with all required services and data
@@ -28,6 +32,30 @@ export const initializeApp = async (): Promise<void> => {
       try {
         await initializeRevenueCat(user.id);
         console.log('✅ RevenueCat initialized successfully');
+        
+        // Sync cross-platform entitlements
+        console.log('🔄 Syncing cross-platform entitlements...');
+        try {
+          await syncCrossPlatformEntitlements();
+          console.log('✅ Cross-platform entitlements synced successfully');
+        } catch (syncError) {
+          console.error('❌ Failed to sync cross-platform entitlements:', syncError);
+          // Continue with app initialization even if sync fails
+        }
+        
+        // Sync subscription data with database
+        console.log('🔄 Syncing subscription data with database...');
+        try {
+          const syncResult = await syncSubscriptionWithDatabase();
+          if (syncResult) {
+            console.log('✅ Subscription data synchronized with database (updates applied)');
+          } else {
+            console.log('✅ Subscription data already in sync (no updates needed)');
+          }
+        } catch (syncError) {
+          console.error('❌ Failed to sync subscription data:', syncError);
+          // Continue with app initialization even if sync fails
+        }
       } catch (revenueCatError) {
         console.error('❌ Failed to initialize RevenueCat:', revenueCatError);
         // Continue with app initialization even if RevenueCat fails
@@ -55,6 +83,22 @@ export const initializeApp = async (): Promise<void> => {
   }
 };
 
+/**
+ * Syncs subscription data with RevenueCat
+ * This can be called anytime to ensure database and RevenueCat are in sync
+ * Useful after restoring purchases or when app comes to foreground
+ */
+export const syncSubscriptionData = async (): Promise<boolean> => {
+  try {
+    console.log('🔄 Manual subscription sync requested');
+    return await syncSubscriptionWithDatabase();
+  } catch (error) {
+    console.error('❌ Error during manual subscription sync:', error);
+    return false;
+  }
+};
+
 export default {
-  initializeApp
+  initializeApp,
+  syncSubscriptionData
 };

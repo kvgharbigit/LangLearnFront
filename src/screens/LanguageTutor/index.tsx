@@ -24,6 +24,7 @@ import { hasAvailableQuota } from '../../services/usageService';
 import { getWelcomeTitle, getWelcomeSubtitle, getWelcomeMessage } from '../../utils/languageUtils';
 import { getOfflineMessageQueue, removeFromOfflineQueue } from '../../utils/api';
 import * as api from '../../utils/api';
+import useSubscriptionStatus from '../../hooks/useSubscriptionStatus';
 
 // Import hooks
 import { useAudioPlayer, useAudioSettings } from './hooks';
@@ -46,6 +47,7 @@ import OfflineWarning from '../../components/OfflineWarning';
 import QuotaExceededModal from '../../components/QuotaExceededModal';
 import MuteInfoModal from '../../components/MuteInfoModal';
 import ReplayButton from '../../components/ReplayButton';
+import SubscriptionCancelledBanner from '../../components/SubscriptionCancelledBanner';
 
 // Import styles and constants
 import colors from '../../styles/colors';
@@ -71,6 +73,9 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const [isLoadingResponse, setIsLoadingResponse] = useState<boolean>(false);
   const [showOfflineQueue, setShowOfflineQueue] = useState<boolean>(false);
   const [showQuotaExceededModal, setShowQuotaExceededModal] = useState<boolean>(false);
+  
+  // Get subscription status from hook
+  const subscription = useSubscriptionStatus();
   
   // Voice input state
   const [voiceInputEnabled, setVoiceInputEnabled] = useState<boolean>(true);
@@ -541,6 +546,13 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   return (
     <SafeView>
       <NetworkStatusBar />
+      {/* Subscription Cancelled Banner */}
+      {subscription.isCancelled && subscription.expirationDate && (
+        <SubscriptionCancelledBanner
+          expirationDate={subscription.expirationDate}
+          tier={subscription.tier}
+        />
+      )}
       <TutorHeader
         targetLanguage={getTargetLanguage()}
         nativeLanguage={getNativeLanguage()}

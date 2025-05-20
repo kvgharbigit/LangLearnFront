@@ -22,6 +22,8 @@ import colors from '../styles/colors';
 import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '../types/subscription';
 import { MonthlyUsage, creditsToTokens } from '../types/usage';
 import RevenueCatErrorDisplay from '../components/RevenueCatErrorDisplay';
+import SubscriptionCancelledBanner from '../components/SubscriptionCancelledBanner';
+import useSubscriptionStatus from '../hooks/useSubscriptionStatus';
 import { 
   getCurrentSubscription, 
   getOfferings, 
@@ -126,6 +128,9 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     simulateRevenueCat: boolean;
   }>({ debugMode: false, simulateRevenueCat: false });
   
+  // Get subscription status from hook
+  const subscriptionStatus = useSubscriptionStatus();
+  
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(15)).current;
@@ -177,8 +182,10 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       // Don't clear errors for debugging purposes
       // setRevenueCatError(null);
       
-      // Load current subscription
-      const { tier, expirationDate } = await getCurrentSubscription();
+      // Load current subscription for purchasing purposes
+      // (we'll get cancellation status from the hook)
+      const subscriptionData = await getCurrentSubscription();
+      const { tier, expirationDate } = subscriptionData;
       setCurrentTier(tier);
       setExpirationDate(expirationDate);
       
@@ -230,12 +237,32 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
       
-      // Let user know about mid-cycle upgrades
+      // Let user know about subscription changes
       if (currentTier !== 'free' && plan.tier !== 'free') {
-        // Only show for actual subscription changes, not free tier
+        // Check if this is an upgrade or downgrade
+        const isUpgrade = 
+          (currentTier === 'basic' && (plan.tier === 'premium' || plan.tier === 'gold')) ||
+          (currentTier === 'premium' && plan.tier === 'gold');
+          
+        const isDowngrade = 
+          (currentTier === 'gold' && (plan.tier === 'premium' || plan.tier === 'basic')) ||
+          (currentTier === 'premium' && plan.tier === 'basic');
+        
+        // Customize message based on upgrade or downgrade
+        let title = isUpgrade ? 'Subscription Upgrade' : 'Subscription Downgrade';
+        let message = '';
+        
+        if (isUpgrade) {
+          message = `You're about to upgrade from ${currentTier} to ${plan.tier}. Your billing will be adjusted immediately and your token limit will be increased to ${plan.monthlyTokens} right away. Continue?`;
+        } else if (isDowngrade) {
+          message = `You're about to downgrade from ${currentTier} to ${plan.tier}.\n\nIMPORTANT: You will continue to have access to your current tier until the end of your current billing cycle, then your subscription will switch to the ${plan.tier} tier with ${plan.monthlyTokens} tokens.\n\nYour renewal date is: ${formatDate(expirationDate)}\n\nContinue with downgrade?`;
+        } else {
+          message = `You're about to change your subscription from ${currentTier} to ${plan.tier}. Your billing will be adjusted and your token limit will be updated to ${plan.monthlyTokens}. Continue?`;
+        }
+        
         Alert.alert(
-          'Subscription Change',
-          `You're about to change your subscription from ${currentTier} to ${plan.tier}. Your billing will be adjusted immediately and your token limit will be updated to ${plan.monthlyTokens}. Continue?`,
+          title,
+          message,
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Continue', onPress: () => processPurchase(plan) }
@@ -399,15 +426,29 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         (currentTier === 'gold' && (plan.tier === 'premium' || plan.tier === 'basic')) ||
         (currentTier === 'premium' && plan.tier === 'basic');
       
-      let message = `You are now subscribed to the ${plan.name} plan!`;
+      let title = isUpgrade ? 'Subscription Upgraded' : isDowngrade ? 'Subscription Downgraded' : 'Subscription Updated';
+      let message = '';
       
       if (isUpgrade) {
-        message += ` Your token limit has been increased to ${plan.monthlyTokens} tokens for this billing cycle.`;
+        // Calculate the additional tokens they get (new - old)
+        const oldTokens = SUBSCRIPTION_PLANS.find(p => p.tier === currentTier)?.monthlyTokens || 0;
+        const additionalTokens = plan.monthlyTokens - oldTokens;
+        
+        message = `Your subscription has been upgraded to the ${plan.name} plan!\n\n` +
+                  `• Your token limit has been immediately increased to ${plan.monthlyTokens} tokens\n` +
+                  `• You've gained ${additionalTokens} additional tokens for this billing cycle\n` +
+                  `• Your available tokens have been updated now - no need to wait\n` +
+                  `• Your next billing date is ${formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000))}`;
       } else if (isDowngrade) {
-        message += ` Your new token limit of ${plan.monthlyTokens} will take effect at your next billing cycle.`;
+        message = `Your subscription has been changed to the ${plan.name} plan.\n\n` +
+                  `• You'll continue to have your current token limit until ${formatDate(expirationDate)}\n` +
+                  `• On your next billing date, your limit will change to ${plan.monthlyTokens} tokens\n` +
+                  `• You won't lose any tokens you've already used`;
+      } else {
+        message = `You are now subscribed to the ${plan.name} plan!`;
       }
       
-      Alert.alert('Subscription Updated', message);
+      Alert.alert(title, message);
     } catch (error: any) {
       // Check for user cancellation
       if (error.userCancelled) {
@@ -549,8 +590,39 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const renderSubscriptionPlans = () => {
+    // Helper function to determine if a plan is lower tier than current subscription
+    const isLowerTier = (planTier: string, currentTier: string): boolean => {
+      const tierOrder = ['free', 'basic', 'premium', 'gold'];
+      const planIndex = tierOrder.indexOf(planTier);
+      const currentIndex = tierOrder.indexOf(currentTier);
+      
+      return planIndex < currentIndex;
+    };
+    
+    // Helper to find the RevenueCat package matching a plan tier
+    const findPackageForTier = (tier: string) => {
+      // Skip for free tier
+      if (tier === 'free') return null;
+      
+      // Find package by matching tier name in the identifier
+      return packages.find(pkg => 
+        pkg.product.identifier.toLowerCase().includes(tier.toLowerCase())
+      );
+    };
+    
     return SUBSCRIPTION_PLANS.map((plan) => {
       const isCurrentPlan = currentTier === plan.tier;
+      const isLowerThanCurrent = isLowerTier(plan.tier, currentTier);
+      
+      // Try to find matching RevenueCat package to get dynamic price
+      const matchingPackage = findPackageForTier(plan.tier);
+      
+      // Use dynamic price if available, fall back to static price
+      const displayPrice = plan.price > 0 
+        ? (matchingPackage 
+            ? matchingPackage.product.priceString 
+            : `$${plan.price.toFixed(2)}`) + '/month' 
+        : 'Free';
       
       return (
         <View
@@ -569,7 +641,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.planHeader}>
             <Text style={styles.planName}>{plan.name}</Text>
             <Text style={styles.planPrice}>
-              {plan.price > 0 ? `$${plan.price.toFixed(2)}/month` : 'Free'}
+              {displayPrice}
             </Text>
           </View>
           
@@ -587,18 +659,24 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             style={[
               styles.planButton,
-              isCurrentPlan ? styles.currentPlanButton : styles.upgradePlanButton,
+              isCurrentPlan ? styles.currentPlanButton : 
+              isLowerThanCurrent ? styles.lowerTierButton : styles.upgradePlanButton,
               purchasing && styles.disabledButton
             ]}
             onPress={() => handlePurchase(plan)}
-            disabled={isCurrentPlan || purchasing}
-            accessibilityLabel={isCurrentPlan ? "Current Plan" : `Upgrade to ${plan.name}`}
+            disabled={isCurrentPlan || purchasing || isLowerThanCurrent}
+            accessibilityLabel={
+              isCurrentPlan ? "Current Plan" : 
+              isLowerThanCurrent ? "Lower Tier" : 
+              `Upgrade to ${plan.name}`
+            }
           >
             {purchasing ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
               <Text style={styles.planButtonText}>
-                {isCurrentPlan ? 'Current Plan' : 'Upgrade'}
+                {isCurrentPlan ? 'Current Plan' : 
+                 isLowerThanCurrent ? 'Lower Tier' : 'Upgrade'}
               </Text>
             )}
           </TouchableOpacity>
@@ -622,6 +700,14 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.headerTitle}>Conversation Tokens</Text>
         <View style={styles.placeholderButton} />
       </View>
+      
+      {/* Show subscription cancelled banner if applicable */}
+      {!loading && currentTier !== 'free' && subscriptionStatus.isCancelled && subscriptionStatus.expirationDate && (
+        <SubscriptionCancelledBanner
+          expirationDate={subscriptionStatus.expirationDate}
+          tier={subscriptionStatus.tier}
+        />
+      )}
       
       {loading ? (
         <View style={styles.loaderContainer}>
@@ -789,6 +875,17 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={styles.revenueCatStatusLabel}>Expiration:</Text>
                   <Text style={styles.revenueCatStatusValue}>{formatDate(expirationDate)}</Text>
                 </View>
+                {currentTier !== 'free' && (
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>Cancellation Status:</Text>
+                    <Text style={[
+                      styles.revenueCatStatusValue,
+                      {color: subscriptionStatus.isCancelled ? '#EF4444' : '#22C55E'}
+                    ]}>
+                      {subscriptionStatus.isCancelled ? 'CANCELLED' : 'ACTIVE'}
+                    </Text>
+                  </View>
+                )}
                 <View style={styles.revenueCatStatusItem}>
                   <Text style={styles.revenueCatStatusLabel}>Offerings:</Text>
                   <Text style={styles.revenueCatStatusValue}>
@@ -972,27 +1069,29 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.infoContainer}>
               <Text style={styles.infoSectionTitle}>Subscription Information</Text>
               
-              {/* Subscription Details */}
-              <View style={styles.subscriptionDetailsContainer}>
-                <Text style={styles.subscriptionDetailsTitle}>Basic Tier - $4.99/month</Text>
-                <Text style={styles.subscriptionDetail}>• Monthly subscription (30 days)</Text>
-                <Text style={styles.subscriptionDetail}>• 300 token limit per month</Text>
-                <Text style={styles.subscriptionDetail}>• Price: $4.99 USD per month</Text>
-              </View>
-              
-              <View style={styles.subscriptionDetailsContainer}>
-                <Text style={styles.subscriptionDetailsTitle}>Premium Tier - $11.99/month</Text>
-                <Text style={styles.subscriptionDetail}>• Monthly subscription (30 days)</Text>
-                <Text style={styles.subscriptionDetail}>• 800 token limit per month</Text>
-                <Text style={styles.subscriptionDetail}>• Price: $11.99 USD per month</Text>
-              </View>
-              
-              <View style={styles.subscriptionDetailsContainer}>
-                <Text style={styles.subscriptionDetailsTitle}>Gold Tier - $19.99/month</Text>
-                <Text style={styles.subscriptionDetail}>• Monthly subscription (30 days)</Text>
-                <Text style={styles.subscriptionDetail}>• 1600 token limit per month</Text>
-                <Text style={styles.subscriptionDetail}>• Price: $19.99 USD per month</Text>
-              </View>
+              {/* Subscription Details - Using dynamic pricing */}
+              {SUBSCRIPTION_PLANS.filter(plan => plan.tier !== 'free').map(plan => {
+                // Find matching package to get dynamic price
+                const matchingPackage = packages.find(pkg => 
+                  pkg.product.identifier.toLowerCase().includes(plan.tier.toLowerCase())
+                );
+                
+                // Use dynamic price if available, fall back to static price
+                const displayPrice = matchingPackage 
+                  ? matchingPackage.product.priceString 
+                  : `$${plan.price.toFixed(2)}`;
+                
+                return (
+                  <View key={plan.tier} style={styles.subscriptionDetailsContainer}>
+                    <Text style={styles.subscriptionDetailsTitle}>
+                      {plan.name} Tier - {displayPrice}/month
+                    </Text>
+                    <Text style={styles.subscriptionDetail}>• Monthly subscription (30 days)</Text>
+                    <Text style={styles.subscriptionDetail}>• {plan.monthlyTokens} token limit per month</Text>
+                    <Text style={styles.subscriptionDetail}>• Price: {displayPrice} per month</Text>
+                  </View>
+                );
+              })}
               
               {/* Renewal and Management Information */}
               <View style={styles.renewalInfoContainer}>
@@ -1431,6 +1530,9 @@ const styles = StyleSheet.create({
   },
   currentPlanButton: {
     backgroundColor: colors.gray300,
+  },
+  lowerTierButton: {
+    backgroundColor: colors.gray400,
   },
   disabledButton: {
     opacity: 0.7,

@@ -71,3 +71,20 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     ]
   }
 ];
+
+/**
+ * Gets the credit limit for a given subscription tier
+ * Centralizing this logic allows easier changes to subscription plans
+ */
+export const getCreditLimitForTier = (tier: SubscriptionTier): number => {
+  const plan = SUBSCRIPTION_PLANS.find(p => p.tier === tier);
+  return plan?.monthlyCredits || 1; // Default to free tier
+};
+
+/**
+ * Gets the token limit for a given subscription tier
+ */
+export const getTokenLimitForTier = (tier: SubscriptionTier): number => {
+  const plan = SUBSCRIPTION_PLANS.find(p => p.tier === tier);
+  return plan?.monthlyTokens || 100; // Default to free tier
+};
