@@ -20,6 +20,12 @@ export type RootStackParamList = {
   AppLanguage: undefined;
   PrivacyPolicy: undefined;
   TermsOfService: undefined;
+  // Modal screens
+  EmailVerification: {
+    email: string;
+    password?: string;
+    fromRegistration?: boolean;
+  };
   // Keep other screen types if you have any
 };
 

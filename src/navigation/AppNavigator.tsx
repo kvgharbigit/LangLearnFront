@@ -13,6 +13,9 @@ import useSubscriptionStatus from '../hooks/useSubscriptionStatus';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 
+// Modal Screens
+import EmailVerificationScreen from '../screens/EmailVerificationScreen';
+
 // Main App Screens
 import LanguageLanding from '../screens/LanguageLanding';
 import LanguageTutor from '../screens/LanguageTutorScreen'; // Updated to use the refactored component
@@ -165,25 +168,32 @@ const AppNavigator = () => {
         screenOptions={{ headerShown: false }}
         initialRouteName={isAuthenticated ? "Main" : "Auth"}
       >
-        {isAuthenticated ? (
-          // User is authenticated - show main app
-          <Stack.Screen 
-            name="Main" 
-            component={MainNavigator} 
-            options={{
-              animationEnabled: false
-            }}
-          />
-        ) : (
-          // User is not signed in
-          <Stack.Screen 
-            name="Auth" 
-            component={AuthNavigator} 
-            options={{
-              animationEnabled: false
-            }}
-          />
-        )}
+        {/* Always include both screens but control navigation via initialRouteName */}
+        <Stack.Screen 
+          name="Main" 
+          component={MainNavigator} 
+          options={{
+            animationEnabled: false
+          }}
+        />
+        <Stack.Screen 
+          name="Auth" 
+          component={AuthNavigator} 
+          options={{
+            animationEnabled: false
+          }}
+        />
+        
+        {/* Modal Screens */}
+        <Stack.Screen 
+          name="EmailVerification" 
+          component={EmailVerificationScreen} 
+          options={{
+            presentation: 'modal',
+            animationEnabled: true,
+            headerShown: false
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

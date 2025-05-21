@@ -16,7 +16,9 @@ import {
   deleteAccount,
   updateCachedUser,
   clearCachedUser,
-  initializeUser
+  initializeUser,
+  checkEmailVerification,
+  resendVerificationEmail
 } from './supabaseAuthService';
 
 // Export all core auth functions
@@ -35,7 +37,9 @@ export {
   deleteAccount,
   updateCachedUser,
   clearCachedUser,
-  initializeUser
+  initializeUser,
+  checkEmailVerification,
+  resendVerificationEmail
 };
 
 // Create and export the default auth service object
@@ -52,7 +56,9 @@ const authService = {
   deleteAccount,
   updateCachedUser,
   clearCachedUser,
-  initializeUser
+  initializeUser,
+  checkEmailVerification,
+  resendVerificationEmail
 };
 
 export default authService;

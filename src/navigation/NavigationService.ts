@@ -86,6 +86,55 @@ function navigateByAuthState(isAuthenticated: boolean) {
   }
 }
 
+// Track navigation attempts in progress to prevent multiple simultaneous navigations
+let navigationInProgress = false;
+
+/**
+ * Navigate to a modal screen in the root navigator
+ * This is especially useful for components deep in the navigation tree
+ */
+function navigateToModal(name: string, params?: any) {
+  console.log(`NavigationService: Attempting to navigate to modal screen ${name}`);
+  
+  // Prevent multiple simultaneous navigation attempts
+  if (navigationInProgress) {
+    console.warn('Navigation already in progress, ignoring new request');
+    return false;
+  }
+  
+  navigationInProgress = true;
+  
+  // Function to handle navigation with retry
+  const attemptNavigation = (retryCount = 0) => {
+    if (navigationRef.current) {
+      console.log(`NavigationService: Navigating to modal screen ${name}`);
+      // Direct navigation to the modal screen in the root navigator
+      navigationRef.current.navigate(name, params);
+      navigationInProgress = false;
+      return true;
+    } else {
+      console.warn(`Navigation ref not ready for modal navigation (attempt ${retryCount+1})`);
+      
+      // Retry with increasing delays if we haven't exceeded max retries
+      if (retryCount < 5) {
+        const delay = 300 * (retryCount + 1); // Progressively longer delays
+        console.log(`Will retry navigation in ${delay}ms`);
+        
+        setTimeout(() => {
+          attemptNavigation(retryCount + 1);
+        }, delay);
+      } else {
+        console.error('Failed to navigate after multiple attempts');
+        navigationInProgress = false;
+      }
+      return false;
+    }
+  };
+  
+  // Start the navigation attempt
+  return attemptNavigation();
+}
+
 /**
  * Services for navigation actions outside of React components
  */
@@ -94,7 +143,8 @@ export const NavigationService = {
   reset,
   goBack,
   getCurrentRoute,
-  navigateByAuthState
+  navigateByAuthState,
+  navigateToModal
 };
 
 export default NavigationService;

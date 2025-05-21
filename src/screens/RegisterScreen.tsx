@@ -28,6 +28,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserInitialization } from '../contexts/UserInitializationContext';
 import NetInfo from '@react-native-community/netinfo';
 import { standardizeAuthError } from '../utils/authErrors';
+import EmailVerificationModal from '../components/EmailVerificationModal';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -45,6 +46,11 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState<boolean>(false);
   const [isOffline, setIsOffline] = useState<boolean>(false);
+  
+  // Verification modal state
+  const [verificationModalVisible, setVerificationModalVisible] = useState<boolean>(false);
+  const [verificationEmail, setVerificationEmail] = useState<string>('');
+  const [verificationPassword, setVerificationPassword] = useState<string>('');
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -138,10 +144,31 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       
       // This function handles the registration process (no email verification needed)
       console.log('Starting registration process...');
-      const { user, error } = await registerUser(email, password, name);
+      const { user, error, emailConfirmationRequired } = await registerUser(email, password, name);
       
       if (error) {
-        // Handle registration errors with standardized error handling
+        // Check if the error is a "user already registered" error
+        if (error.code === 'user_already_exists' || 
+            error.message?.includes('User already registered') || 
+            error.message?.includes('already exists')) {
+          
+          console.log('User already exists, showing email verification modal');
+          
+          // First, show a clear message explaining the situation
+          setErrorMessage('An account with this email already exists but may not be verified. You will be directed to verify your email.');
+          
+          // Show the email verification modal instead of navigating
+          setVerificationEmail(email);
+          setVerificationPassword(password);
+          setTimeout(() => {
+            setVerificationModalVisible(true);
+          }, 1000);
+          
+          setIsLoading(false);
+          return;
+        }
+        
+        // Handle other registration errors with standardized error handling
         const standardError = standardizeAuthError(error);
         setErrorMessage(standardError.message);
         setIsLoading(false);
@@ -150,7 +177,18 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       
       console.log('Registration successful, user ID:', user?.id);
       
-      // Continue with usual flow - no email verification needed
+      // Check if email verification is required
+      if (emailConfirmationRequired) {
+        // Show email verification modal instead of navigating
+        setVerificationEmail(email);
+        setVerificationPassword(password);
+        setVerificationModalVisible(true);
+        
+        setIsLoading(false);
+        return;
+      }
+      
+      // Continue with usual flow if no email verification is needed
       // Initialize user data in the backend
       if (user) {
         console.log('Verifying user data tables after registration...');
@@ -291,9 +329,48 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     setConfirmPasswordVisible(prev => !prev);
   };
 
+  // Handle user verification success
+  const handleVerificationComplete = async () => {
+    console.log('Email verification completed, proceeding with registration flow');
+    setVerificationModalVisible(false);
+    // If we have both email and password, attempt login again
+    if (verificationEmail && verificationPassword) {
+      setIsLoading(true);
+      try {
+        const loginResult = await supabase.auth.signInWithPassword({
+          email: verificationEmail,
+          password: verificationPassword
+        });
+        
+        if (loginResult.data?.user) {
+          // Login successful, don't need to handle navigation as AuthContext will do this
+          console.log('Login successful after verification');
+          setSuccessMessage('Email verified and logged in successfully!');
+        } else if (loginResult.error) {
+          setErrorMessage(standardizeAuthError(loginResult.error).message);
+        }
+      } catch (error) {
+        console.error('Error logging in after verification:', error);
+        setErrorMessage('Failed to log in after verification');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
   return (
     <SafeView style={styles.container}>
       <StatusBar style="dark" />
+      
+      {/* Email Verification Modal */}
+      <EmailVerificationModal
+        visible={verificationModalVisible}
+        onClose={() => setVerificationModalVisible(false)}
+        email={verificationEmail}
+        password={verificationPassword}
+        fromRegistration={true}
+        onVerificationComplete={handleVerificationComplete}
+      />
       
       {/* Background decorations */}
       <View style={styles.backgroundContainer}>

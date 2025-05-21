@@ -9,6 +9,8 @@ export interface AuthResponse {
   user?: User;
   success?: boolean;
   error?: AuthError | Error;
+  emailConfirmationRequired?: boolean;
+  possiblyUnverifiedEmail?: boolean; // Indicates we're not certain but email might be unverified
 }
 
 // Type for the delete function response
@@ -21,7 +23,7 @@ export interface DeleteAccountResponse {
   };
 }
 
-// Register a new user (no email verification)
+// Register a new user (with email verification)
 export const registerUser = async (
   email: string,
   password: string,
@@ -89,8 +91,8 @@ export const registerUser = async (
         options: {
           data: {
             full_name: displayName
-          }
-          // No email confirmation required
+          },
+          emailRedirectTo: 'confluency://auth/callback' // For email verification
         }
       });
 
@@ -108,15 +110,17 @@ export const registerUser = async (
         // Update cached user
         updateCachedUser(data.user);
         
-        // Return the user
+        // Return the user with emailConfirmationRequired flag
         return { 
           user: data.user,
-          success: true
+          success: true,
+          emailConfirmationRequired: true
         };
       } else {
         console.warn('Registration succeeded but no user returned');
         return { 
-          success: true
+          success: true,
+          emailConfirmationRequired: true
         };
       }
     } catch (tempClientError) {
@@ -161,7 +165,45 @@ export const registerUser = async (
   }
 };
 
-// Email verification logic has been completely removed from the application
+// Email verification functions
+export const checkEmailVerification = async (userId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    
+    if (error) throw error;
+    
+    // User exists and has an email that is confirmed
+    if (data.user && data.user.email_confirmed_at) {
+      return true;
+    }
+    
+    // Email is not confirmed yet
+    return false;
+  } catch (error) {
+    console.error('Error checking email verification:', error);
+    return false;
+  }
+};
+
+// Resend verification email
+export const resendVerificationEmail = async (email: string): Promise<AuthResponse> => {
+  try {
+    const { data, error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: 'confluency://auth/callback'
+      }
+    });
+    
+    if (error) throw error;
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error resending verification email:', error);
+    return { error: error as AuthError };
+  }
+};
 
 // Sign in existing user
 export const loginUser = async (
@@ -174,15 +216,52 @@ export const loginUser = async (
       password
     });
 
-    if (error) throw error;
+    if (error) {
+      // First handle explicit email verification errors
+      if (error.message.includes('Email not confirmed') || 
+          error.message.includes('not confirmed') ||
+          error.message.includes('not verified') ||
+          error.message.includes('email confirmation') ||
+          error.message.includes('email verification')) {
+        console.log('Explicit email verification error detected');
+        // Clear error message and replace with a specific email verification message
+        const enhancedError = {
+          ...error,
+          message: 'Your email address has not been verified. Please check your inbox and verify your email.'
+        };
+        return { 
+          error: enhancedError,
+          emailConfirmationRequired: true 
+        };
+      }
+      
+      // For invalid credentials, just return the error
+      // We'll no longer try to determine if it's an unverified account
+      // This prevents showing the verification modal for non-existent accounts
+      if (error.message.includes('Invalid login credentials')) {
+        console.log('Invalid credentials - returning standard error message');
+        return { error };
+      }
+      
+      throw error;
+    }
     
     // Update cached user
     if (data.user) {
       updateCachedUser(data.user);
+      
+      // Check if email is verified
+      if (!data.user.email_confirmed_at) {
+        return {
+          user: data.user,
+          emailConfirmationRequired: true
+        };
+      }
     }
     
     return { user: data.user };
   } catch (error) {
+    // For uncaught errors, send back a response that can be handled
     return { error: error as AuthError };
   }
 };

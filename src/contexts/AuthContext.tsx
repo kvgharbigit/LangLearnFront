@@ -1,7 +1,7 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
-import { subscribeToAuthChanges, initializeUser } from '../services/authService';
+import { subscribeToAuthChanges, initializeUser, checkEmailVerification } from '../services/authService';
 import { supabase } from '../supabase/config';
 import NavigationService from '../navigation/NavigationService';
 import { useUserInitialization } from './UserInitializationContext';
@@ -15,6 +15,7 @@ interface AuthContextType {
   loading: boolean;
   authError: Error | null;
   isVerifyingUser: boolean; // Added to track user verification state
+  isEmailVerified: boolean; // Tracks if user's email is verified
 }
 
 // Create context with default values
@@ -23,7 +24,8 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   loading: true,
   authError: null,
-  isVerifyingUser: false
+  isVerifyingUser: false,
+  isEmailVerified: false
 });
 
 // Props for the AuthProvider component
@@ -37,6 +39,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<Error | null>(null);
   const [verificationInProgress, setVerificationInProgress] = useState<boolean>(false);
+  const [isEmailVerified, setIsEmailVerified] = useState<boolean>(false);
   
   // Access the user initialization context
   const { 
@@ -51,6 +54,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('AuthContext: Auth state changed - isAuthenticated:', !!user);
     if (user) {
       console.log('AuthContext: User authenticated with ID:', user.id);
+      
+      // Check if email is verified whenever user changes
+      const verifyEmail = async () => {
+        const verified = await checkEmailVerification(user.id);
+        setIsEmailVerified(verified);
+        
+        console.log('AuthContext: Email verification status:', verified);
+      };
+      
+      verifyEmail();
+    } else {
+      // Reset email verification status when user is null
+      setIsEmailVerified(false);
     }
     
     // Use NavigationService to update navigation based on auth state
@@ -289,7 +305,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: !!user,
     loading,
     authError,
-    isVerifyingUser: verificationInProgress
+    isVerifyingUser: verificationInProgress,
+    isEmailVerified
   };
 
   return (

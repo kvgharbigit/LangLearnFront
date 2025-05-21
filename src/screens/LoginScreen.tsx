@@ -1,5 +1,5 @@
 // Enhanced LoginScreen.tsx with improved initialization handling
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import { useUserInitialization } from '../contexts/UserInitializationContext';
 import { useAuth } from '../contexts/AuthContext';
 import NetInfo from '@react-native-community/netinfo';
 import { standardizeAuthError } from '../utils/authErrors';
+import EmailVerificationModal from '../components/EmailVerificationModal';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -39,6 +40,12 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
   const [isOffline, setIsOffline] = useState<boolean>(false);
+  
+  // Verification modal state
+  const [verificationModalVisible, setVerificationModalVisible] = useState<boolean>(false);
+  const [verificationEmail, setVerificationEmail] = useState<string>('');
+  const [verificationPassword, setVerificationPassword] = useState<string>('');
+  const [fromRegistration, setFromRegistration] = useState<boolean>(false);
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -82,6 +89,29 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     ]).start();
   }, []);
   
+  // Handle user verification success
+  const handleVerificationComplete = async () => {
+    console.log('Email verification completed, proceeding with login');
+    setVerificationModalVisible(false);
+    // If we have both email and password, attempt login again
+    if (verificationEmail && verificationPassword) {
+      setIsLoading(true);
+      try {
+        const loginResult = await loginUser(verificationEmail, verificationPassword);
+        if (loginResult.user) {
+          // Login successful, don't need to handle navigation as AuthContext will do this
+          console.log('Login successful after verification');
+        } else if (loginResult.error) {
+          setErrorMessage(standardizeAuthError(loginResult.error).message);
+        }
+      } catch (error) {
+        console.error('Error logging in after verification:', error);
+        setErrorMessage('Failed to log in after verification');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
 
   const handleLogin = async () => {
     // Clear previous errors
@@ -102,14 +132,75 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     setIsLoading(true);
 
     try {
-      const { user, error } = await loginUser(email, password);
+      const { user, error, emailConfirmationRequired, possiblyUnverifiedEmail } = await loginUser(email, password);
 
       // Handle login errors with standardized error handling
       if (error) {
         console.error('Login error:', error);
+        
+        // Handle definite email verification errors
+        if (emailConfirmationRequired) {
+          // Show the user the specific message about email verification
+          if (error.message) {
+            setErrorMessage(error.message);
+          } else {
+            setErrorMessage('Your email address has not been verified. Please verify your email to continue.');
+          }
+          
+          // Show email verification modal
+          setVerificationEmail(email);
+          setVerificationPassword(password);
+          setFromRegistration(false);
+          setVerificationModalVisible(true);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Handle possible unverified email (not certain, just a heuristic)
+        if (possiblyUnverifiedEmail) {
+          // Show a clearer error that includes verification as a possible solution
+          setErrorMessage('Login failed. If you have an account with this email, please make sure it has been verified. You can try to verify your email or check your password.');
+          
+          // Offer a button to go to verification
+          Alert.alert(
+            'Email Verification',
+            'If you think your email might not be verified, you can verify it now.',
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel'
+              },
+              {
+                text: 'Verify Email',
+                onPress: () => {
+                  // Show email verification modal
+                  setVerificationEmail(email);
+                  setVerificationPassword(password);
+                  setFromRegistration(false);
+                  setVerificationModalVisible(true);
+                }
+              }
+            ]
+          );
+          
+          setIsLoading(false);
+          return;
+        }
+        
         const standardError = standardizeAuthError(error);
         setErrorMessage(standardError.message);
         setIsLoading(false);
+        return;
+      }
+      
+      // Check if email confirmation is required even if there's no error
+      if (emailConfirmationRequired) {
+        setIsLoading(false);
+        // Show email verification modal
+        setVerificationEmail(email);
+        setVerificationPassword(password);
+        setFromRegistration(false);
+        setVerificationModalVisible(true);
         return;
       }
 
@@ -250,13 +341,20 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const togglePasswordVisibility = () => {
     setPasswordVisible(prev => !prev);
   };
-  
-  
-  // Google sign-in has been removed
 
   return (
     <SafeView style={styles.container}>
       <StatusBar style="dark" />
+
+      {/* Email Verification Modal */}
+      <EmailVerificationModal
+        visible={verificationModalVisible}
+        onClose={() => setVerificationModalVisible(false)}
+        email={verificationEmail}
+        password={verificationPassword}
+        fromRegistration={fromRegistration}
+        onVerificationComplete={handleVerificationComplete}
+      />
 
       {/* Background decorations */}
       <View style={styles.backgroundContainer}>
@@ -398,8 +496,6 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 )}
               </TouchableOpacity>
             </View>
-
-            {/* Social login buttons section removed */}
 
             {/* Sign up link */}
             <View style={styles.signupContainer}>
@@ -616,7 +712,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.3,
   },
-  // Social login styles removed
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
