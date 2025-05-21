@@ -45,9 +45,6 @@ const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 
 // Auth Navigator - Screens accessible before login
 const AuthNavigator = () => {
-  const { isAuthenticated, user } = useAuth();
-
-  // Simple auth navigator - no email verification needed
   return (
     <AuthStack.Navigator 
       screenOptions={{ headerShown: false }}
@@ -134,18 +131,11 @@ const AppNavigator = () => {
     useSubscriptionStatus(86400000) : 
     { tier: 'free', expirationDate: null, isActive: false, isCancelled: false, loading: false, error: null };
 
-  // You might want to show a splash screen here while loading
+  // Show a splash screen or loading indicator while auth state is being determined
   if (loading) {
-    console.log('AppNavigator: Still loading auth state, showing splash screen');
-    return null; // Replace with a proper splash/loading screen
+    // You should replace this with a proper splash/loading screen
+    return null;
   }
-  
-  // Log auth state for debugging
-  console.log('AppNavigator: Rendering with auth state:', { 
-    isAuthenticated, 
-    userId: user?.id, 
-    loading 
-  });
   
   // Helper to render the global subscription banner
   const renderNavigatorWithBanner = (navigator: React.ReactNode) => {
@@ -167,8 +157,7 @@ const AppNavigator = () => {
     );
   };
 
-  // Log navigation state for debugging
-  console.log(`Navigation state: isAuthenticated=${isAuthenticated}`);
+  // Navigation state is determined by isAuthenticated value
 
   return (
     <NavigationContainer ref={navigationRef}>

@@ -1,9 +1,9 @@
 // src/services/authService.ts
-// This file is now a compatibility layer that re-exports all auth functions
-// from the supabaseAuthService to maintain backward compatibility
+// Unified authentication service that centralizes all auth functionality
 
 import {
   AuthResponse,
+  DeleteAccountResponse,
   registerUser,
   loginUser,
   logoutUser,
@@ -13,12 +13,16 @@ import {
   getCurrentUser,
   getIdToken,
   subscribeToAuthChanges,
-  signInWithGoogle
+  deleteAccount,
+  updateCachedUser,
+  clearCachedUser,
+  initializeUser
 } from './supabaseAuthService';
 
-// Re-export all auth functions
+// Export all core auth functions
 export {
   AuthResponse,
+  DeleteAccountResponse,
   registerUser,
   loginUser,
   logoutUser,
@@ -28,9 +32,27 @@ export {
   getCurrentUser,
   getIdToken,
   subscribeToAuthChanges,
-  signInWithGoogle
+  deleteAccount,
+  updateCachedUser,
+  clearCachedUser,
+  initializeUser
 };
 
-// Export the default object as well
-import supabaseAuthService from './supabaseAuthService';
-export default supabaseAuthService;
+// Create and export the default auth service object
+const authService = {
+  registerUser,
+  loginUser,
+  logoutUser,
+  resetPassword,
+  updateUserProfile,
+  changePassword,
+  getCurrentUser,
+  getIdToken,
+  subscribeToAuthChanges,
+  deleteAccount,
+  updateCachedUser,
+  clearCachedUser,
+  initializeUser
+};
+
+export default authService;

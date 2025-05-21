@@ -18,13 +18,14 @@ import {
 import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { loginUser, resetPassword } from '../services/supabaseAuthService';
+import { loginUser, resetPassword } from '../services/authService';
 import { AuthStackParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
 import { useUserInitialization } from '../contexts/UserInitializationContext';
 import { useAuth } from '../contexts/AuthContext';
 import NetInfo from '@react-native-community/netinfo';
+import { standardizeAuthError } from '../utils/authErrors';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -45,47 +46,15 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   
   // Access user initialization context and auth context
   const { verifyAndInitUser } = useUserInitialization();
-  const { user, isEmailVerified } = useAuth();
+  const { user } = useAuth();
   
-  // Check if user needs email verification
+  // No email verification needed - direct login flow
   useEffect(() => {
-    // If user is logged in but email is not verified, redirect to verification screen
-    if (user && !isEmailVerified && user.email) {
-      console.log('User needs email verification, redirecting to verification screen');
-      
-      try {
-        // Try to navigate directly to the EmailVerification screen
-        navigation.navigate('EmailVerification', {
-          email: user.email,
-          password: '', // We don't have the password here
-          fromRegistration: false
-        });
-        
-        console.log('Navigating to EmailVerification from useEffect');
-      } catch (navError) {
-        console.error('Navigation error in useEffect:', navError);
-        
-        // Try to reset navigation and navigate to the root then EmailVerification
-        try {
-          navigation.reset({
-            index: 0,
-            routes: [
-              { 
-                name: 'EmailVerification',
-                params: { 
-                  email: user.email,
-                  password: ''
-                }
-              }
-            ],
-          });
-          console.log('Reset navigation to EmailVerification');
-        } catch (resetError) {
-          console.error('Reset navigation error:', resetError);
-        }
-      }
+    // If there's a user, AuthContext will automatically handle navigation to main app
+    if (user) {
+      console.log('User is logged in, AuthContext will handle navigation');
     }
-  }, [user, isEmailVerified, navigation]);
+  }, [user]);
   
   // Monitor network connectivity
   useEffect(() => {
@@ -135,16 +104,11 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     try {
       const { user, error } = await loginUser(email, password);
 
-      // Handle login errors
+      // Handle login errors with standardized error handling
       if (error) {
         console.error('Login error:', error);
-        if (error.message.includes('Invalid login credentials')) {
-          setErrorMessage('Invalid email or password');
-        } else if (error.message.includes('rate limit')) {
-          setErrorMessage('Too many attempts. Please try again later');
-        } else {
-          setErrorMessage(error.message || 'Failed to login');
-        }
+        const standardError = standardizeAuthError(error);
+        setErrorMessage(standardError.message);
         setIsLoading(false);
         return;
       }

@@ -1,8 +1,9 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
-import { subscribeToAuthChanges, initializeUser, checkEmailVerification } from '../services/supabaseAuthService';
+import { subscribeToAuthChanges, initializeUser } from '../services/authService';
 import { supabase } from '../supabase/config';
+import NavigationService from '../navigation/NavigationService';
 import { useUserInitialization } from './UserInitializationContext';
 import { captureDiagnostics, DiagnosticType } from '../utils/diagnostics';
 import { initializeRevenueCat } from '../services/revenueCatService';

@@ -1,7 +1,6 @@
 // src/services/supabaseAuthService.ts
 import { supabase } from '../supabase/config';
 import { Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { User, AuthError, createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -162,20 +161,7 @@ export const registerUser = async (
   }
 };
 
-// These functions are no longer needed since email verification is not required
-// Keeping them as stubs for backward compatibility
-
-// Resend verification email (stub - no longer needed)
-export const resendVerificationEmail = async (email: string): Promise<AuthResponse> => {
-  console.log('Email verification disabled, no need to resend');
-  return { success: true };
-};
-
-// Check if user's email is verified (stub - no longer needed)
-export const checkEmailVerification = async (userId: string): Promise<boolean> => {
-  console.log('Email verification disabled, assuming all emails are verified');
-  return true;
-};
+// Email verification logic has been completely removed from the application
 
 // Sign in existing user
 export const loginUser = async (
@@ -446,55 +432,9 @@ export const subscribeToAuthChanges = (callback: (user: User | null) => void) =>
   return () => subscription.unsubscribe();
 };
 
-// Google Auth configuration
-// Get from Constants.expoConfig.extra
+// Authentication configuration 
 import Constants from 'expo-constants';
 const extraConfig = Constants.expoConfig?.extra || {};
-
-// These are example values originally from Firebase, now from app.json
-const ANDROID_CLIENT_ID = extraConfig.googleAndroidClientId || '205296109732-9j0a2h3b3qjvmf6gddd1t41rjt8a62p3.apps.googleusercontent.com';
-const IOS_CLIENT_ID = extraConfig.googleIosClientId || '205296109732-p98kdu02d8jva57j5oef4m3hgv09ufv7.apps.googleusercontent.com';
-const EXPO_CLIENT_ID = extraConfig.googleExpoClientId || '205296109732-tiqvf6lkojlc2bj6gtp38h6p9v0a84rr.apps.googleusercontent.com';
-
-// Initialize WebBrowser for authentication
-WebBrowser.maybeCompleteAuthSession();
-
-// Sign in with Google using Supabase
-export const signInWithGoogle = async (): Promise<AuthResponse> => {
-  try {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: Platform.OS === 'web' ? window.location.origin : undefined,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
-      }
-    });
-
-    if (error) throw error;
-    
-    // For mobile, we need to open the URL in a browser
-    if (data?.url && Platform.OS !== 'web') {
-      const result = await WebBrowser.openAuthSessionAsync(
-        data.url,
-        'confluency://auth'
-      );
-      
-      if (result.type !== 'success') {
-        throw new Error('Google sign in was cancelled or failed');
-      }
-    }
-    
-    // Get the current user after OAuth flow completes
-    const { data: { user } } = await supabase.auth.getUser();
-    return { user: user || undefined };
-  } catch (error) {
-    console.error('Google sign in error:', error);
-    return { error: error as AuthError };
-  }
-};
 
 /**
  * Delete user account and all associated data
@@ -582,8 +522,5 @@ export default {
   getCurrentUser,
   getIdToken,
   subscribeToAuthChanges,
-  signInWithGoogle,
-  deleteAccount,
-  resendVerificationEmail,
-  checkEmailVerification
+  deleteAccount
 };

@@ -12,9 +12,17 @@ export const navigationRef = createRef<NavigationContainerRef<any>>();
  */
 function navigate(name: string, params?: any) {
   if (navigationRef.current) {
-    navigationRef.current.navigate(name, params);
+    // Check if we can navigate to the route
+    const state = navigationRef.current.getState();
+    const canNavigate = navigationRef.current.getRootState().routeNames.includes(name);
+    
+    if (canNavigate) {
+      navigationRef.current.navigate(name, params);
+    } else {
+      console.warn(`Cannot navigate to route "${name}" - it may not be in the current navigator`);
+    }
   } else {
-    // You might want to save the navigation request and execute it when possible
+    // Navigation ref not ready yet
     console.warn('Navigation attempted before navigationRef was ready');
   }
 }
@@ -59,6 +67,26 @@ function getCurrentRoute() {
 }
 
 /**
+ * Navigate after authentication state change
+ * This handles the tricky case of navigating between Auth and Main stacks
+ */
+function navigateByAuthState(isAuthenticated: boolean) {
+  if (navigationRef.current) {
+    const rootState = navigationRef.current.getRootState();
+    const currentRootRoute = rootState.routes[rootState.index].name;
+    
+    // If we're already on the correct stack, no need to navigate
+    if ((isAuthenticated && currentRootRoute === 'Main') || 
+        (!isAuthenticated && currentRootRoute === 'Auth')) {
+      return;
+    }
+    
+    // Reset to the appropriate stack
+    reset([{ name: isAuthenticated ? 'Main' : 'Auth' }]);
+  }
+}
+
+/**
  * Services for navigation actions outside of React components
  */
 export const NavigationService = {
@@ -66,6 +94,7 @@ export const NavigationService = {
   reset,
   goBack,
   getCurrentRoute,
+  navigateByAuthState
 };
 
 export default NavigationService;

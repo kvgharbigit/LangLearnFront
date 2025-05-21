@@ -17,7 +17,7 @@ import {
 import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { registerUser, logoutUser, clearCachedUser } from '../services/supabaseAuthService';
+import { registerUser, logoutUser, clearCachedUser } from '../services/authService';
 import { supabase } from '../supabase/config';
 import { AuthStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
@@ -27,6 +27,7 @@ import { clearLanguagePreferences } from '../utils/languageStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserInitialization } from '../contexts/UserInitializationContext';
 import NetInfo from '@react-native-community/netinfo';
+import { standardizeAuthError } from '../utils/authErrors';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -140,21 +141,9 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       const { user, error } = await registerUser(email, password, name);
       
       if (error) {
-        // Handle specific error cases
-        if (error.message.includes('email already in use')) {
-          setErrorMessage('This email is already registered');
-        } else if (error.message.includes('weak-password')) {
-          setErrorMessage('Password is too weak. Use at least 8 characters with a mix of letters, numbers, and symbols');
-        } else if (error.message.includes('Database error saving new user')) {
-          setErrorMessage('Account creation failed. Please try using a different email address.');
-        } else if (error.message.includes('different email')) {
-          setErrorMessage('Account creation failed. Please try using a different email address.');
-        } else if (error.message.includes('security purposes') || error.message.includes('rate limit')) {
-          // Handle rate limiting errors
-          setErrorMessage('Too many registration attempts. Please wait a moment before trying again or use a different email address.');
-        } else {
-          setErrorMessage(error.message || 'Registration failed');
-        }
+        // Handle registration errors with standardized error handling
+        const standardError = standardizeAuthError(error);
+        setErrorMessage(standardError.message);
         setIsLoading(false);
         return;
       }
