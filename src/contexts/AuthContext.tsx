@@ -46,13 +46,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     hasInitFailed
   } = useUserInitialization();
 
-  // Add a function to log state changes for debugging
+  // Handle auth state changes and update navigation
   useEffect(() => {
     console.log('AuthContext: Auth state changed - isAuthenticated:', !!user);
     if (user) {
       console.log('AuthContext: User authenticated with ID:', user.id);
     }
-  }, [user]);
+    
+    // Use NavigationService to update navigation based on auth state
+    // This ensures that navigation is updated when the auth state changes
+    // even if AppNavigator doesn't re-render
+    if (!loading) {
+      NavigationService.navigateByAuthState(!!user);
+    }
+  }, [user, loading]);
   
   // Enable more aggressive auth state checking when user is not set
   useEffect(() => {
