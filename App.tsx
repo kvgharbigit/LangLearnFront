@@ -94,12 +94,74 @@ const MainNavigator = () => {
 
 // Root Navigator with Authentication Flow
 const RootNavigator = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
+  const [manualAuthStatus, setManualAuthStatus] = React.useState(false);
+  const periodicCheckRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  if (loading) {
+  // Set up a periodic check to detect authentication status
+  React.useEffect(() => {
+    // Only run periodic check if not already authenticated
+    if (!isAuthenticated && !manualAuthStatus) {
+      console.log('RootNavigator: Setting up periodic auth check');
+      
+      // Define the check function
+      const checkAuth = async () => {
+        try {
+          const { supabase } = await import('./src/supabase/config');
+          const { data } = await supabase.auth.getSession();
+          const hasSession = !!data.session;
+          
+          if (hasSession) {
+            console.log('RootNavigator: Periodic check found active session');
+            setManualAuthStatus(true);
+            
+            // Clear interval once authenticated
+            if (periodicCheckRef.current) {
+              clearInterval(periodicCheckRef.current);
+              periodicCheckRef.current = null;
+            }
+          }
+        } catch (error) {
+          console.error('RootNavigator: Periodic auth check error:', error);
+        }
+      };
+      
+      // Run immediately
+      checkAuth();
+      
+      // Set up interval
+      periodicCheckRef.current = setInterval(checkAuth, 1000);
+      
+      // Clean up interval on unmount
+      return () => {
+        if (periodicCheckRef.current) {
+          clearInterval(periodicCheckRef.current);
+          periodicCheckRef.current = null;
+        }
+      };
+    } else if (isAuthenticated || manualAuthStatus) {
+      // If we're already authenticated, clear any existing interval
+      if (periodicCheckRef.current) {
+        clearInterval(periodicCheckRef.current);
+        periodicCheckRef.current = null;
+      }
+    }
+  }, [isAuthenticated, manualAuthStatus]);
+
+  if (loading && !manualAuthStatus) {
+    console.log('RootNavigator: Loading auth state');
     // You could add a splash screen here
     return null;
   }
+
+  // Use either the context auth state or our manual check
+  const shouldShowMain = isAuthenticated || manualAuthStatus;
+  console.log('RootNavigator: Navigation decision -', {
+    isAuthenticated,
+    manualAuthStatus,
+    shouldShowMain,
+    userId: user?.id
+  });
 
   return (
     <NavigationContainer>
@@ -107,7 +169,7 @@ const RootNavigator = () => {
       <NetworkStatusBar />
       
       {/* Main navigation based on authentication state */}
-      {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
+      {shouldShowMain ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
 };

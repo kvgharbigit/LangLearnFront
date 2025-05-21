@@ -9,6 +9,7 @@ export default {
 
   // Status colors
   success: '#4caf50',
+  successDark: '#2E7D32',
   warning: '#ff9800',
   danger: '#f44336',
 

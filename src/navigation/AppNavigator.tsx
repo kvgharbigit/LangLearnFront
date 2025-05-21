@@ -45,8 +45,14 @@ const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 
 // Auth Navigator - Screens accessible before login
 const AuthNavigator = () => {
+  const { isAuthenticated, user } = useAuth();
+
+  // Simple auth navigator - no email verification needed
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+    <AuthStack.Navigator 
+      screenOptions={{ headerShown: false }}
+      initialRouteName="Login"
+    >
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
     </AuthStack.Navigator>
@@ -120,7 +126,7 @@ const MainNavigator = () => {
 
 // Main App Navigator - Switches between Auth and Main based on login state
 const AppNavigator = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   
   // Only check subscription status when authenticated
   // Check every 24 hours (86400000 ms)
@@ -130,8 +136,16 @@ const AppNavigator = () => {
 
   // You might want to show a splash screen here while loading
   if (loading) {
+    console.log('AppNavigator: Still loading auth state, showing splash screen');
     return null; // Replace with a proper splash/loading screen
   }
+  
+  // Log auth state for debugging
+  console.log('AppNavigator: Rendering with auth state:', { 
+    isAuthenticated, 
+    userId: user?.id, 
+    loading 
+  });
   
   // Helper to render the global subscription banner
   const renderNavigatorWithBanner = (navigator: React.ReactNode) => {
@@ -153,18 +167,33 @@ const AppNavigator = () => {
     );
   };
 
+  // Log navigation state for debugging
+  console.log(`Navigation state: isAuthenticated=${isAuthenticated}`);
+
   return (
     <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator 
+        screenOptions={{ headerShown: false }}
+        initialRouteName={isAuthenticated ? "Main" : "Auth"}
+      >
         {isAuthenticated ? (
-          // User is signed in
-          <Stack.Screen
-            name="Main"
-            component={MainNavigator}
+          // User is authenticated - show main app
+          <Stack.Screen 
+            name="Main" 
+            component={MainNavigator} 
+            options={{
+              animationEnabled: false
+            }}
           />
         ) : (
           // User is not signed in
-          <Stack.Screen name="Auth" component={AuthNavigator} />
+          <Stack.Screen 
+            name="Auth" 
+            component={AuthNavigator} 
+            options={{
+              animationEnabled: false
+            }}
+          />
         )}
       </Stack.Navigator>
     </NavigationContainer>

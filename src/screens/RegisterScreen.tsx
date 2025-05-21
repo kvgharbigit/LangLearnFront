@@ -135,9 +135,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       await clearAllPreferences();
       await clearLanguagePreferences();
       
-      // This function handles the complete registration process
-      // including clearing previous sessions, creating the account,
-      // and establishing a new session
+      // This function handles the registration process (no email verification needed)
       console.log('Starting registration process...');
       const { user, error } = await registerUser(email, password, name);
       
@@ -163,7 +161,8 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       
       console.log('Registration successful, user ID:', user?.id);
       
-      // Initialize user data in the backend - keep loading state active during this process
+      // Continue with usual flow - no email verification needed
+      // Initialize user data in the backend
       if (user) {
         console.log('Verifying user data tables after registration...');
         try {
@@ -171,7 +170,6 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           setSuccessMessage('Account created! Setting up your profile...');
           
           // Verify user exists in tables and re-initialize if needed
-          // Keep loading state active during this entire process
           const verified = await verifyAndInitUser(user.id);
           console.log('User data verification result:', verified);
           
@@ -190,20 +188,78 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             
             setIsLoading(false);
             setSuccessMessage(null);
-            return; // Stop the registration flow
+            return;
           }
           
           // Successful verification - all tables exist or were re-initialized
           console.log('User data verification/initialization completed successfully after registration');
           
-          // Only hide loading indicator and show success after verification is complete
+          // Keep showing loading state and success message
+          // DO NOT set isLoading to false yet
           setSuccessMessage('Registration successful! Setting up your account...');
+          
+          // Force a manual auth check to ensure navigation happens
+          try {
+            // Get the current session to ensure auth state is up to date
+            const { data: sessionData } = await supabase.auth.getSession();
+            
+            console.log('Registration complete with verified user. User ID:', user.id);
+            console.log('Session exists:', !!sessionData.session);
+            
+            // Log that we'll keep loading while auth happens
+            console.log('Keeping loading screen active while finalizing registration...');
+            
+            // If no session already, try login with the registered credentials
+            if (!sessionData.session) {
+              console.log('No active session, logging in with new credentials...');
+              
+              // Attempt login with the newly registered credentials
+              const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password
+              });
+              
+              if (error) {
+                console.error('Error during post-registration login:', error);
+                // If login fails, we need to show error and stop loading
+                setErrorMessage('Registration successful, but login failed. Please try logging in manually.');
+                setIsLoading(false);
+                return;
+              } else if (data?.user) {
+                console.log('Post-registration login successful with user ID:', data.user.id);
+                // Success! The auth observer will handle navigation
+                
+                // Keep loading state active - loading will be hidden when navigating to main app
+                // This provides a smoother user experience
+              }
+            } else {
+              console.log('Session already active, waiting for auth observer to handle navigation...');
+              // Session exists, just wait for the auth observer to handle navigation
+              // Keep loading state active
+            }
+            
+            // Let the auth observer handle navigation
+            // The loading screen will naturally disappear when navigation occurs
+            
+            // Set a safety timeout in case navigation doesn't happen
+            setTimeout(() => {
+              // If we're still on this screen after 5 seconds, turn off loading
+              // This prevents the user from being stuck on a loading screen
+              if (setIsLoading) { // Check if component is still mounted
+                console.log('Safety timeout reached, turning off loading state');
+                setIsLoading(false);
+              }
+            }, 5000); // 5 second safety timeout
+          } catch (navError) {
+            console.error('Error during navigation after registration:', navError);
+          }
         } catch (err) {
           console.error('Error verifying user data after registration:', err);
           
           // Block registration completion if verification fails
           setErrorMessage('Unable to verify your account. Please try again or contact support.');
-          // Sign out the user to prevent them from proceeding with incomplete data
+          
+          // Sign out the user
           try {
             await supabase.auth.signOut();
             console.log('Signed out user due to verification failure');
@@ -213,15 +269,21 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           
           setIsLoading(false);
           setSuccessMessage(null);
-          return; // Stop the registration flow
+          return;
         }
+      } else {
+        // No user returned but no error - this shouldn't happen
+        console.error('Registration returned neither user nor error');
+        setErrorMessage('Registration failed. Please try again.');
+        setIsLoading(false);
+        return;
       }
       
       // Show success message to the user - only after verification completes
       setIsLoading(false);
       setErrorMessage(null);
       
-      // If we get here, everything worked - navigation will be handled by auth state observer
+      // Navigation should be handled by the auth state observer or the manual navigation above
       
     } catch (error) {
       setErrorMessage('An unexpected error occurred');
@@ -465,6 +527,31 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+      
+      {/* Fullscreen loading overlay shown after form is submitted successfully - matches InitializationGate */}
+      {isLoading && successMessage && (
+        <View style={styles.fullscreenLoading}>
+          <View style={styles.backgroundContainer}>
+            <View style={styles.bgGradient1} />
+            <View style={styles.bgGradient2} />
+            <View style={styles.bgCircle1} />
+            <View style={styles.bgCircle2} />
+          </View>
+          
+          <View style={styles.loadingContentContainer}>
+            <Image
+              source={require('../../assets/transparent_background_icon.png')}
+              style={styles.loadingLogo}
+            />
+            
+            <Text style={styles.loadingTitle}>Confluency</Text>
+            
+            <ActivityIndicator size="large" color={colors.primary} style={styles.loadingSpinner} />
+            <Text style={styles.loadingText}>Setting up your account...</Text>
+            <Text style={styles.loadingSubtext}>Please wait while we verify and prepare your data</Text>
+          </View>
+        </View>
+      )}
     </SafeView>
   );
 };
@@ -727,6 +814,51 @@ const styles = StyleSheet.create({
     color: '#2E7D32',
     fontSize: 14,
     flex: 1,
+  },
+  fullscreenLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContentContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingLogo: {
+    width: 100,
+    height: 100,
+    resizeMode: 'contain',
+    marginBottom: 20,
+  },
+  loadingTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: colors.primary,
+    marginBottom: 30,
+  },
+  loadingSpinner: {
+    marginBottom: 20,
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.gray800,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  loadingSubtext: {
+    fontSize: 16,
+    color: colors.gray600,
+    textAlign: 'center',
+    maxWidth: '80%',
   },
 });
 

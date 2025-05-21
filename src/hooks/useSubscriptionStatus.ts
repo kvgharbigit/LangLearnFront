@@ -6,6 +6,7 @@ export type SubscriptionStatus = {
   expirationDate: Date | null;
   isActive: boolean;
   isCancelled?: boolean;
+  isInGracePeriod?: boolean;
   loading: boolean;
   error: Error | null;
 };
@@ -15,6 +16,7 @@ const initialState: SubscriptionStatus = {
   expirationDate: null,
   isActive: false,
   isCancelled: false,
+  isInGracePeriod: false,
   loading: true,
   error: null
 };
@@ -34,13 +36,14 @@ export const useSubscriptionStatus = (refreshInterval: number | null = null): Su
       setStatus(prev => ({ ...prev, loading: true, error: null }));
       
       const subscriptionData = await getCurrentSubscription();
-      const { tier, expirationDate, isActive, isCancelled = false } = subscriptionData;
+      const { tier, expirationDate, isActive, isCancelled = false, isInGracePeriod = false } = subscriptionData;
       
       setStatus({
         tier,
         expirationDate,
         isActive,
         isCancelled,
+        isInGracePeriod,
         loading: false,
         error: null
       });

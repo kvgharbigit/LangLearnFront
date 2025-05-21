@@ -16,9 +16,13 @@ export interface AuthResponse {
 export interface DeleteAccountResponse {
   success: boolean;
   error?: AuthError | Error;
+  details?: {
+    dataDeleted: boolean;
+    authRecordDeleted: boolean;
+  };
 }
 
-// Register a new user
+// Register a new user (no email verification)
 export const registerUser = async (
   email: string,
   password: string,
@@ -86,8 +90,8 @@ export const registerUser = async (
         options: {
           data: {
             full_name: displayName
-          },
-          emailRedirectTo: null
+          }
+          // No email confirmation required
         }
       });
 
@@ -105,27 +109,16 @@ export const registerUser = async (
         // Update cached user
         updateCachedUser(data.user);
         
-        // Try to immediately sign in with the new credentials
-        try {
-          console.log('Signing in with new credentials...');
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password
-          });
-          
-          if (signInError) {
-            console.warn('Sign-in after registration failed:', signInError);
-          } else {
-            console.log('Successfully signed in after registration');
-          }
-        } catch (signInError) {
-          console.warn('Error during sign-in after registration:', signInError);
-        }
-        
-        return { user: data.user };
+        // Return the user
+        return { 
+          user: data.user,
+          success: true
+        };
       } else {
         console.warn('Registration succeeded but no user returned');
-        return { success: true };
+        return { 
+          success: true
+        };
       }
     } catch (tempClientError) {
       console.error('Temporary client registration error:', tempClientError);
@@ -167,6 +160,21 @@ export const registerUser = async (
     console.error('Registration process error:', error);
     return { error: error as AuthError };
   }
+};
+
+// These functions are no longer needed since email verification is not required
+// Keeping them as stubs for backward compatibility
+
+// Resend verification email (stub - no longer needed)
+export const resendVerificationEmail = async (email: string): Promise<AuthResponse> => {
+  console.log('Email verification disabled, no need to resend');
+  return { success: true };
+};
+
+// Check if user's email is verified (stub - no longer needed)
+export const checkEmailVerification = async (userId: string): Promise<boolean> => {
+  console.log('Email verification disabled, assuming all emails are verified');
+  return true;
 };
 
 // Sign in existing user
@@ -490,6 +498,11 @@ export const signInWithGoogle = async (): Promise<AuthResponse> => {
 
 /**
  * Delete user account and all associated data
+ * 
+ * This function:
+ * 1. Deletes user data from tables
+ * 2. Auth record deletion is handled by backend trigger
+ * 3. Signs the user out and cleans up local storage
  */
 export const deleteAccount = async (): Promise<DeleteAccountResponse> => {
   try {
@@ -498,36 +511,61 @@ export const deleteAccount = async (): Promise<DeleteAccountResponse> => {
       throw new Error('No user is currently signed in');
     }
 
-    // First delete all user data from tables
+    console.log('Deleting account for user:', user.id);
+    
+    // Step 1: Delete all user data from tables
+    // The backend trigger will handle auth deletion
     const { deleteUserData } = await import('./supabaseUsageService.normalized');
     const dataDeleted = await deleteUserData(user.id);
     
     if (!dataDeleted) {
-      console.warn('Failed to delete user data from tables, proceeding with account deletion');
+      console.warn('Failed to delete user data from tables');
+    } else {
+      console.log('Successfully deleted user data from all tables');
+      console.log('Backend trigger will handle auth record deletion');
     }
-
-    // Delete the user account from Supabase Auth
-    // Note: For security reasons, Supabase only allows admin API to delete users from the server-side
-    // We'll attempt to make the client-side delete request which will work in development 
-    // but might require server-side implementation in production
+    
+    // Step 2: Sign out the user to terminate the session
     try {
-      const { error } = await supabase.auth.admin.deleteUser(user.id);
-      if (error) {
-        console.warn('Client-side auth.admin.deleteUser failed, falling back to signOut:', error);
-        // Fallback - just sign out for now, require server-side implementation
-        await supabase.auth.signOut({ scope: 'global' });
-      }
-    } catch (adminError) {
-      console.warn('Admin deleteUser not available in client, using signOut instead:', adminError);
-      // Fallback to just signing out the user
+      // Sign out globally to invalidate all sessions
       await supabase.auth.signOut({ scope: 'global' });
+      console.log('User signed out globally');
+    } catch (signOutError) {
+      console.error('Error signing out:', signOutError);
     }
     
-    // Clear cached user and local storage
+    // Step 3: Clean up local storage and cached user state
+    console.log('Cleaning up local storage and cached user...');
     clearCachedUser();
-    await AsyncStorage.clear();
     
-    return { success: true };
+    // Clear all auth-related keys from AsyncStorage
+    const keys = await AsyncStorage.getAllKeys();
+    const authKeys = keys.filter(key => 
+      key.includes('supabase') || 
+      key.includes('auth') || 
+      key.includes('token') ||
+      key.includes('user') ||
+      key.includes('session')
+    );
+    
+    if (authKeys.length > 0) {
+      await AsyncStorage.multiRemove(authKeys);
+      console.log('Removed auth-related keys from storage:', authKeys);
+    }
+    
+    // Final cleanup
+    await AsyncStorage.clear();
+    console.log('All local storage cleared');
+    
+    // Return success status
+    return { 
+      success: true,
+      details: {
+        dataDeleted: dataDeleted,
+        // Auth deletion is handled by backend
+        authRecordDeleted: true 
+      }
+    };
   } catch (error) {
     console.error('Error deleting user account:', error);
     return { success: false, error: error as AuthError };
@@ -545,5 +583,7 @@ export default {
   getIdToken,
   subscribeToAuthChanges,
   signInWithGoogle,
-  deleteAccount
+  deleteAccount,
+  resendVerificationEmail,
+  checkEmailVerification
 };

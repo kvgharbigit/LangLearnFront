@@ -48,9 +48,9 @@ const ENTITLEMENTS = {
 const PRODUCT_IDS = Platform.select({
   // iOS product IDs (App Store)
   ios: {
-    BASIC: __DEV__ ? 'basic_tier_test' : 'basic_tier',
-    PREMIUM: __DEV__ ? 'premium_tier_test' : 'premium_tier',
-    GOLD: __DEV__ ? 'gold_tier_test' : 'gold_tier'
+    BASIC: 'basic_tier3',
+    PREMIUM: 'premium_tier3',
+    GOLD: 'gold_tier3'
   },
   // Android product IDs (Play Store)
   android: {
@@ -60,9 +60,9 @@ const PRODUCT_IDS = Platform.select({
   }
 }) || {
   // Default fallback if platform not detected
-  BASIC: 'basic_tier',
-  PREMIUM: 'premium_tier',
-  GOLD: 'gold_tier'
+  BASIC: 'basic_tier3',
+  PREMIUM: 'premium_tier3',
+  GOLD: 'gold_tier3'
 };
 
 // Log the product IDs being used
@@ -620,6 +620,7 @@ const getCachedSubscriptionData = async (): Promise<{
   expirationDate: Date | null;
   isActive: boolean;
   isCancelled?: boolean;
+  isInGracePeriod?: boolean;
 } | null> => {
   try {
     // Import AsyncStorage correctly
@@ -646,7 +647,8 @@ const getCachedSubscriptionData = async (): Promise<{
       return {
         tier: 'free',
         expirationDate: null,
-        isActive: false
+        isActive: false,
+        isInGracePeriod: false
       };
     }
     
@@ -682,6 +684,7 @@ export const getCurrentSubscription = async (): Promise<{
   expirationDate: Date | null;
   isActive: boolean;
   isCancelled?: boolean; // Flag to indicate cancelled but not yet expired subscription
+  isInGracePeriod?: boolean; // Flag to indicate subscription is in billing grace period
 }> => {
   console.log('[RevenueCat.getCurrentSubscription] Fetching subscription status...');
   
@@ -799,19 +802,23 @@ export const getCurrentSubscription = async (): Promise<{
       
       // Check if subscription is cancelled but not yet expired
       const isCancelled = activeEntitlement.willRenew === false;
+      // Check if the subscription is in a billing grace period
+      const isInGracePeriod = activeEntitlement.inGracePeriod === true;
       
       console.log('[RevenueCat.getCurrentSubscription] Found GOLD tier:', {
         productId: activeEntitlement.productIdentifier,
         expires: activeEntitlement.expirationDate,
         willRenew: activeEntitlement.willRenew,
-        isCancelled
+        isCancelled,
+        isInGracePeriod
       });
       
       const subscription = {
         tier: 'gold' as SubscriptionTier,
         expirationDate: activeEntitlement.expirationDate ? new Date(activeEntitlement.expirationDate) : null,
         isActive: true,
-        isCancelled
+        isCancelled,
+        isInGracePeriod
       };
       
       // Cache the subscription data for offline access
@@ -823,19 +830,23 @@ export const getCurrentSubscription = async (): Promise<{
       
       // Check if subscription is cancelled but not yet expired
       const isCancelled = activeEntitlement.willRenew === false;
+      // Check if the subscription is in a billing grace period
+      const isInGracePeriod = activeEntitlement.inGracePeriod === true;
       
       console.log('[RevenueCat.getCurrentSubscription] Found PREMIUM tier:', {
         productId: activeEntitlement.productIdentifier,
         expires: activeEntitlement.expirationDate,
         willRenew: activeEntitlement.willRenew,
-        isCancelled
+        isCancelled,
+        isInGracePeriod
       });
       
       const subscription = {
         tier: 'premium' as SubscriptionTier,
         expirationDate: activeEntitlement.expirationDate ? new Date(activeEntitlement.expirationDate) : null,
         isActive: true,
-        isCancelled
+        isCancelled,
+        isInGracePeriod
       };
       
       // Cache the subscription data for offline access
@@ -847,19 +858,23 @@ export const getCurrentSubscription = async (): Promise<{
       
       // Check if subscription is cancelled but not yet expired
       const isCancelled = activeEntitlement.willRenew === false;
+      // Check if the subscription is in a billing grace period
+      const isInGracePeriod = activeEntitlement.inGracePeriod === true;
       
       console.log('[RevenueCat.getCurrentSubscription] Found BASIC tier:', {
         productId: activeEntitlement.productIdentifier,
         expires: activeEntitlement.expirationDate,
         willRenew: activeEntitlement.willRenew,
-        isCancelled
+        isCancelled,
+        isInGracePeriod
       });
       
       const subscription = {
         tier: 'basic' as SubscriptionTier,
         expirationDate: activeEntitlement.expirationDate ? new Date(activeEntitlement.expirationDate) : null,
         isActive: true,
-        isCancelled
+        isCancelled,
+        isInGracePeriod
       };
       
       // Cache the subscription data for offline access
@@ -1051,11 +1066,14 @@ const getTierFromProductIdentifier = (productId: string): SubscriptionTier => {
   }
   
   // Check if productId contains one of our known tier IDs
-  const tierIds = ['basic_tier', 'premium_tier', 'gold_tier'];
+  const tierIds = ['basic_tier', 'premium_tier', 'gold_tier', 'basic_tier3', 'premium_tier3', 'gold_tier3'];
   for (const tierId of tierIds) {
     if (productId.toLowerCase().includes(tierId.toLowerCase())) {
-      // Extract the tier name from the ID
-      const tier = tierId.split('_')[0] as SubscriptionTier;
+      // Extract the tier name from the ID - handle both formats
+      const tier = tierId.startsWith('basic') ? 'basic' : 
+                   tierId.startsWith('premium') ? 'premium' : 
+                   tierId.startsWith('gold') ? 'gold' : 
+                   tierId.split('_')[0] as SubscriptionTier;
       console.log(`Found tier ID "${tierId}" in product identifier, mapping to tier "${tier}"`);
       return tier;
     }

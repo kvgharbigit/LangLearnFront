@@ -1,5 +1,5 @@
 // Enhanced LoginScreen.tsx with improved initialization handling
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import { AuthStackParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
 import { useUserInitialization } from '../contexts/UserInitializationContext';
+import { useAuth } from '../contexts/AuthContext';
 import NetInfo from '@react-native-community/netinfo';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
@@ -43,8 +44,49 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(30)).current;
   
-  // Access user initialization context
+  // Access user initialization context and auth context
   const { verifyAndInitUser } = useUserInitialization();
+  const { user, isEmailVerified } = useAuth();
+  
+  // Check if user needs email verification
+  useEffect(() => {
+    // If user is logged in but email is not verified, redirect to verification screen
+    if (user && !isEmailVerified && user.email) {
+      console.log('User needs email verification, redirecting to verification screen');
+      
+      try {
+        // Try to navigate directly to the EmailVerification screen
+        navigation.navigate('EmailVerification', {
+          email: user.email,
+          password: '', // We don't have the password here
+          fromRegistration: false
+        });
+        
+        console.log('Navigating to EmailVerification from useEffect');
+      } catch (navError) {
+        console.error('Navigation error in useEffect:', navError);
+        
+        // Try to reset navigation and navigate to the root then EmailVerification
+        try {
+          navigation.reset({
+            index: 0,
+            routes: [
+              { 
+                name: 'EmailVerification',
+                params: { 
+                  email: user.email,
+                  password: ''
+                }
+              }
+            ],
+          });
+          console.log('Reset navigation to EmailVerification');
+        } catch (resetError) {
+          console.error('Reset navigation error:', resetError);
+        }
+      }
+    }
+  }, [user, isEmailVerified, navigation]);
   
   // Monitor network connectivity
   useEffect(() => {
@@ -71,6 +113,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
       })
     ]).start();
   }, []);
+  
 
   const handleLogin = async () => {
     // Clear previous errors
@@ -93,8 +136,9 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     try {
       const { user, error } = await loginUser(email, password);
 
+      // Handle login errors
       if (error) {
-        // Handle Supabase error messages
+        console.error('Login error:', error);
         if (error.message.includes('Invalid login credentials')) {
           setErrorMessage('Invalid email or password');
         } else if (error.message.includes('rate limit')) {
@@ -134,6 +178,47 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           
           // Successful verification - all tables exist or were re-initialized
           console.log('User data verification/initialization completed successfully after login');
+          
+          // Login successful, set loading to false
+          setIsLoading(false);
+          console.log('Login successful - navigation will be handled by auth state observer');
+          
+          // Force a manual navigation to ensure we get to the main screen
+          try {
+            // Get the current session to ensure auth state is up to date
+            const { supabase } = await import('../supabase/config');
+            const { data: sessionData } = await supabase.auth.getSession();
+            
+            console.log('Login complete with verified user. User ID:', user.id);
+            console.log('Session exists:', !!sessionData.session);
+            
+            // Wait a moment for any state updates to propagate
+            setTimeout(() => {
+              // Create a simple async function to reload the auth state
+              // This will update the UI and ensure proper navigation
+              const forceAuthReload = async () => {
+                try {
+                  // Force a new session data fetch
+                  await supabase.auth.getSession();
+                  console.log('Auth session reloaded, navigation should update via AuthContext');
+                  
+                  // Force auth change event by getting the user again
+                  const { data } = await supabase.auth.getUser();
+                  if (data?.user) {
+                    console.log('User authenticated with ID:', data.user.id);
+                    console.log('Waiting for AuthContext to update and handle navigation');
+                  }
+                } catch (error) {
+                  console.error('Error forcing auth reload:', error);
+                }
+              };
+              
+              // Execute the reload
+              forceAuthReload();
+            }, 500);
+          } catch (navError) {
+            console.error('Error during navigation after login:', navError);
+          }
         } catch (err) {
           console.error('Error verifying user data after login:', err);
           
@@ -151,6 +236,12 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           setIsLoading(false);
           return; // Stop the login flow
         }
+      } else {
+        // No user but no error - this shouldn't happen
+        console.error('Login returned neither user nor error');
+        setErrorMessage('Login failed. Please try again.');
+        setIsLoading(false);
+        return;
       }
 
       // Navigation will be handled by the auth state observer
@@ -196,6 +287,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const togglePasswordVisibility = () => {
     setPasswordVisible(prev => !prev);
   };
+  
   
   // Handle Google Sign-In using Supabase
   const handleGoogleSignIn = async () => {

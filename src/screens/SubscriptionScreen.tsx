@@ -23,6 +23,7 @@ import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '../types/subscription';
 import { MonthlyUsage, creditsToTokens } from '../types/usage';
 import RevenueCatErrorDisplay from '../components/RevenueCatErrorDisplay';
 import SubscriptionCancelledBanner from '../components/SubscriptionCancelledBanner';
+import GracePeriodBanner from '../components/GracePeriodBanner';
 import useSubscriptionStatus from '../hooks/useSubscriptionStatus';
 import { 
   getCurrentSubscription, 
@@ -38,6 +39,7 @@ import {
   getDetailedDeviceInfo
 } from '../utils/deviceInfo';
 import { shouldUseSimulatedData } from '../services/revenueCatService';
+import { DEBUG_TOOLS_TOGGLE } from '../constants/debug';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 const { width } = Dimensions.get('window');
@@ -708,6 +710,14 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
           tier={subscriptionStatus.tier}
         />
       )}
+
+      {/* Show grace period banner if applicable */}
+      {!loading && currentTier !== 'free' && subscriptionStatus.isInGracePeriod && subscriptionStatus.expirationDate && (
+        <GracePeriodBanner
+          expirationDate={subscriptionStatus.expirationDate}
+          tier={subscriptionStatus.tier}
+        />
+      )}
       
       {loading ? (
         <View style={styles.loaderContainer}>
@@ -810,261 +820,275 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             )}
             
-            {/* Enhanced RevenueCat & Environment Diagnostic Information */}
-            <View style={styles.revenueCatStatusContainer}>
-              <Text style={styles.revenueCatStatusTitle}>Diagnostic Information</Text>
-              
-              {/* Core Environment Variables - Critical section */}
-              <View style={styles.diagnosticSection}>
-                <Text style={styles.diagnosticSectionTitle}>Core Environment</Text>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>__DEV__:</Text>
-                  <Text style={[
-                    styles.revenueCatStatusValue, 
-                    {color: __DEV__ ? '#059669' : '#1E40AF'}
-                  ]}>
-                    {__DEV__ ? 'TRUE' : 'FALSE'}
-                  </Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>User Preference:</Text>
-                  <Text style={[
-                    styles.revenueCatStatusValue,
-                    {color: debugOptions.simulateRevenueCat ? '#D97706' : '#1E40AF'}
-                  ]}>
-                    {debugOptions.simulateRevenueCat ? 'TRUE' : 'FALSE'} (active)
-                  </Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>process.env.DEPLOY_ENV:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {process.env.DEPLOY_ENV || 'not set'}
-                  </Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>Is Production Build:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {isProductionBuild() ? 'YES' : 'NO'}
-                  </Text>
-                </View>
+            {/* Debug toggle notice - only shown in DEBUG mode */}
+            {DEBUG_TOOLS_TOGGLE && (
+              <View style={[styles.expoGoNotice, {backgroundColor: '#DBEAFE', borderColor: '#3B82F6'}]}>
+                <Ionicons name="bug" size={22} color="#3B82F6" style={{ marginRight: 8 }} />
+                <Text style={[styles.expoGoText, {color: '#1E3A8A'}]}>
+                  Debug mode enabled. Additional diagnostic information is visible.
+                </Text>
               </View>
-              
-              {/* RevenueCat Status - Enhanced */}
-              <View style={styles.diagnosticSection}>
-                <Text style={styles.diagnosticSectionTitle}>RevenueCat Status</Text>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>Mode:</Text>
-                  <Text style={[
-                    styles.revenueCatStatusValue,
-                    {
-                      color: debugOptions.simulateRevenueCat
-                        ? '#D97706'  // Amber for simulated
-                        : __DEV__ 
-                          ? '#059669'  // Green for sandbox
-                          : '#1E40AF'  // Blue for production
-                    }
-                  ]}>
-                    {debugOptions.simulateRevenueCat ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
-                  </Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>Current Tier:</Text>
-                  <Text style={styles.revenueCatStatusValue}>{currentTier.toUpperCase()}</Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>Expiration:</Text>
-                  <Text style={styles.revenueCatStatusValue}>{formatDate(expirationDate)}</Text>
-                </View>
-                {currentTier !== 'free' && (
+            )}
+            
+            {/* Enhanced RevenueCat & Environment Diagnostic Information - Only shown when DEBUG_TOOLS_TOGGLE is true */}
+            {DEBUG_TOOLS_TOGGLE && (
+              <View style={styles.revenueCatStatusContainer}>
+                <Text style={styles.revenueCatStatusTitle}>Diagnostic Information</Text>
+                
+                {/* Core Environment Variables - Critical section */}
+                <View style={styles.diagnosticSection}>
+                  <Text style={styles.diagnosticSectionTitle}>Core Environment</Text>
                   <View style={styles.revenueCatStatusItem}>
-                    <Text style={styles.revenueCatStatusLabel}>Cancellation Status:</Text>
+                    <Text style={styles.revenueCatStatusLabel}>__DEV__:</Text>
                     <Text style={[
-                      styles.revenueCatStatusValue,
-                      {color: subscriptionStatus.isCancelled ? '#EF4444' : '#22C55E'}
+                      styles.revenueCatStatusValue, 
+                      {color: __DEV__ ? '#059669' : '#1E40AF'}
                     ]}>
-                      {subscriptionStatus.isCancelled ? 'CANCELLED' : 'ACTIVE'}
+                      {__DEV__ ? 'TRUE' : 'FALSE'}
                     </Text>
                   </View>
-                )}
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>Offerings:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {packages.length > 0 ? `${packages.length} available` : 'None loaded'}
-                  </Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>Platform:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {Platform.OS.toUpperCase()} {Platform.Version}
-                  </Text>
-                </View>
-                
-                {/* Expected Product IDs (based on config) */}
-                <Text style={[styles.diagnosticSectionSubtitle, {marginTop: 12}]}>Expected Product IDs</Text>
-                <View style={styles.jsonPreviewBox}>
-                  <Text style={styles.jsonText}>
-                    {Platform.OS === 'ios' ? 
-                      'basic_tier, premium_tier, gold_tier' : 
-                      'basic_tier:monthly, premium_tier:monthly, gold_tier:monthly'}
-                  </Text>
-                </View>
-                
-                {/* Available Products */}
-                <Text style={[styles.diagnosticSectionSubtitle, {marginTop: 12}]}>Available Products</Text>
-                <View style={styles.jsonPreviewBox}>
-                  <ScrollView style={{maxHeight: 120}} nestedScrollEnabled={true}>
-                    {packages.length > 0 ? (
-                      packages.map((pkg, idx) => (
-                        <Text key={idx} style={styles.jsonText}>
-                          {idx+1}. {pkg.product.identifier} ({pkg.product.priceString})
-                        </Text>
-                      ))
-                    ) : (
-                      <Text style={styles.jsonText}>No packages available</Text>
-                    )}
-                  </ScrollView>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>User Preference:</Text>
+                    <Text style={[
+                      styles.revenueCatStatusValue,
+                      {color: debugOptions.simulateRevenueCat ? '#D97706' : '#1E40AF'}
+                    ]}>
+                      {debugOptions.simulateRevenueCat ? 'TRUE' : 'FALSE'} (active)
+                    </Text>
+                  </View>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>process.env.DEPLOY_ENV:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {process.env.DEPLOY_ENV || 'not set'}
+                    </Text>
+                  </View>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>Is Production Build:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {isProductionBuild() ? 'YES' : 'NO'}
+                    </Text>
+                  </View>
                 </View>
                 
-                {/* Purchase Flow Status */}
-                <Text style={[styles.diagnosticSectionSubtitle, {marginTop: 12}]}>Purchase Flow Status</Text>
-                <View style={styles.revenueCatStatusItemFlex}>
-                  <View style={[
-                    styles.statusIndicator, 
-                    {backgroundColor: currentTier !== 'free' ? '#22C55E' : '#9CA3AF'}
-                  ]} />
-                  <Text style={styles.revenueCatStatusLabel}>Active Subscription:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {currentTier !== 'free' ? `YES (${currentTier})` : 'NO'}
-                  </Text>
-                </View>
-                
-                <View style={styles.revenueCatStatusItemFlex}>
-                  <View style={[
-                    styles.statusIndicator, 
-                    {backgroundColor: packages.length > 0 ? '#22C55E' : '#EF4444'}
-                  ]} />
-                  <Text style={styles.revenueCatStatusLabel}>Products Available:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {packages.length > 0 ? 'YES' : 'NO'}
-                  </Text>
-                </View>
-                
-                <View style={styles.revenueCatStatusItemFlex}>
-                  <View style={[
-                    styles.statusIndicator, 
-                    {backgroundColor: (tokenUsage && !isNaN(tokenUsage.usedTokens)) ? '#22C55E' : '#EF4444'}
-                  ]} />
-                  <Text style={styles.revenueCatStatusLabel}>Usage Tracking:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {(tokenUsage && !isNaN(tokenUsage.usedTokens)) ? 'WORKING' : 'NOT WORKING'}
-                  </Text>
-                </View>
-                
-                <View style={styles.revenueCatStatusItemFlex}>
-                  <View style={[
-                    styles.statusIndicator, 
-                    {backgroundColor: purchasing ? '#F59E0B' : '#22C55E'}
-                  ]} />
-                  <Text style={styles.revenueCatStatusLabel}>Purchase State:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {purchasing ? 'IN PROGRESS' : 'READY'}
-                  </Text>
-                </View>
-              </View>
-              
-              {/* Platform & Device Info */}
-              <View style={styles.diagnosticSection}>
-                <Text style={styles.diagnosticSectionTitle}>Platform Info</Text>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>Platform:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {Platform.OS.toUpperCase()} {Platform.Version}
-                  </Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>Deployment Env:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {getDeploymentEnvironment().toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>App Version:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {require('expo-constants').manifest?.version || 
-                     require('expo-constants').manifest2?.version || 'unknown'}
-                  </Text>
-                </View>
-                <View style={styles.revenueCatStatusItem}>
-                  <Text style={styles.revenueCatStatusLabel}>Device:</Text>
-                  <Text style={styles.revenueCatStatusValue}>
-                    {require('expo-constants').deviceName || 'unknown'}
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity 
-                  style={styles.refreshButton}
-                  onPress={loadData}
-                  disabled={loading}
-                >
-                  <Ionicons name="refresh" size={16} color="#FFF" />
-                  <Text style={styles.refreshButtonText}>Refresh Info</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.copyButton}
-                  onPress={() => {
-                    // Collect diagnostic info and display it
-                    const envInfo = logEnvironmentInfo();
-                    const diagInfo = {
-                      environment: {
-                        __DEV__,
-                        USE_SIMULATED_REVENUECAT,
-                        DEPLOY_ENV: process.env.DEPLOY_ENV || 'not set',
-                        isExpoGo: isExpoGo(),
-                        isProductionBuild: isProductionBuild(),
-                        deploymentEnvironment: getDeploymentEnvironment()
-                      },
-                      revenueCat: {
-                        currentTier,
-                        expirationDate: expirationDate ? formatDate(expirationDate) : 'N/A',
-                        packages: packages.length,
-                        tokenUsage: tokenUsage ? {
-                          usedTokens: tokenUsage.usedTokens,
-                          tokenLimit: tokenUsage.tokenLimit,
-                          percentageUsed: tokenUsage.percentageUsed
-                        } : 'Not available'
-                      },
-                      platform: {
-                        OS: Platform.OS,
-                        version: Platform.Version,
-                        constants: Platform.constants,
-                        timestamp: new Date().toISOString()
+                {/* RevenueCat Status - Enhanced */}
+                <View style={styles.diagnosticSection}>
+                  <Text style={styles.diagnosticSectionTitle}>RevenueCat Status</Text>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>Mode:</Text>
+                    <Text style={[
+                      styles.revenueCatStatusValue,
+                      {
+                        color: debugOptions.simulateRevenueCat
+                          ? '#D97706'  // Amber for simulated
+                          : __DEV__ 
+                            ? '#059669'  // Green for sandbox
+                            : '#1E40AF'  // Blue for production
                       }
-                    };
-                    
-                    // Show the diagnostic information in an alert instead of copying
-                    Alert.alert(
-                      'Diagnostic Information',
-                      JSON.stringify(diagInfo, null, 2),
-                      [{ text: 'OK' }],
-                      { cancelable: true }
-                    );
-                  }}
-                >
-                  <Ionicons name="information-circle-outline" size={16} color="#FFF" />
-                  <Text style={styles.refreshButtonText}>Show Diagnostics</Text>
-                </TouchableOpacity>
+                    ]}>
+                      {debugOptions.simulateRevenueCat ? 'SIMULATED' : __DEV__ ? 'SANDBOX' : 'PRODUCTION'}
+                    </Text>
+                  </View>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>Current Tier:</Text>
+                    <Text style={styles.revenueCatStatusValue}>{currentTier.toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>Expiration:</Text>
+                    <Text style={styles.revenueCatStatusValue}>{formatDate(expirationDate)}</Text>
+                  </View>
+                  {currentTier !== 'free' && (
+                    <View style={styles.revenueCatStatusItem}>
+                      <Text style={styles.revenueCatStatusLabel}>Cancellation Status:</Text>
+                      <Text style={[
+                        styles.revenueCatStatusValue,
+                        {color: subscriptionStatus.isCancelled ? '#EF4444' : '#22C55E'}
+                      ]}>
+                        {subscriptionStatus.isCancelled ? 'CANCELLED' : 'ACTIVE'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>Offerings:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {packages.length > 0 ? `${packages.length} available` : 'None loaded'}
+                    </Text>
+                  </View>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>Platform:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {Platform.OS.toUpperCase()} {Platform.Version}
+                    </Text>
+                  </View>
+                  
+                  {/* Expected Product IDs (based on config) */}
+                  <Text style={[styles.diagnosticSectionSubtitle, {marginTop: 12}]}>Expected Product IDs</Text>
+                  <View style={styles.jsonPreviewBox}>
+                    <Text style={styles.jsonText}>
+                      {Platform.OS === 'ios' ? 
+                        'basic_tier3, premium_tier3, gold_tier3' : 
+                        'basic_tier:monthly, premium_tier:monthly, gold_tier:monthly'}
+                    </Text>
+                  </View>
+                  
+                  {/* Available Products */}
+                  <Text style={[styles.diagnosticSectionSubtitle, {marginTop: 12}]}>Available Products</Text>
+                  <View style={styles.jsonPreviewBox}>
+                    <ScrollView style={{maxHeight: 120}} nestedScrollEnabled={true}>
+                      {packages.length > 0 ? (
+                        packages.map((pkg, idx) => (
+                          <Text key={idx} style={styles.jsonText}>
+                            {idx+1}. {pkg.product.identifier} ({pkg.product.priceString})
+                          </Text>
+                        ))
+                      ) : (
+                        <Text style={styles.jsonText}>No packages available</Text>
+                      )}
+                    </ScrollView>
+                  </View>
+                  
+                  {/* Purchase Flow Status */}
+                  <Text style={[styles.diagnosticSectionSubtitle, {marginTop: 12}]}>Purchase Flow Status</Text>
+                  <View style={styles.revenueCatStatusItemFlex}>
+                    <View style={[
+                      styles.statusIndicator, 
+                      {backgroundColor: currentTier !== 'free' ? '#22C55E' : '#9CA3AF'}
+                    ]} />
+                    <Text style={styles.revenueCatStatusLabel}>Active Subscription:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {currentTier !== 'free' ? `YES (${currentTier})` : 'NO'}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.revenueCatStatusItemFlex}>
+                    <View style={[
+                      styles.statusIndicator, 
+                      {backgroundColor: packages.length > 0 ? '#22C55E' : '#EF4444'}
+                    ]} />
+                    <Text style={styles.revenueCatStatusLabel}>Products Available:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {packages.length > 0 ? 'YES' : 'NO'}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.revenueCatStatusItemFlex}>
+                    <View style={[
+                      styles.statusIndicator, 
+                      {backgroundColor: (tokenUsage && !isNaN(tokenUsage.usedTokens)) ? '#22C55E' : '#EF4444'}
+                    ]} />
+                    <Text style={styles.revenueCatStatusLabel}>Usage Tracking:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {(tokenUsage && !isNaN(tokenUsage.usedTokens)) ? 'WORKING' : 'NOT WORKING'}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.revenueCatStatusItemFlex}>
+                    <View style={[
+                      styles.statusIndicator, 
+                      {backgroundColor: purchasing ? '#F59E0B' : '#22C55E'}
+                    ]} />
+                    <Text style={styles.revenueCatStatusLabel}>Purchase State:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {purchasing ? 'IN PROGRESS' : 'READY'}
+                    </Text>
+                  </View>
+                </View>
+                
+                {/* Platform & Device Info */}
+                <View style={styles.diagnosticSection}>
+                  <Text style={styles.diagnosticSectionTitle}>Platform Info</Text>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>Platform:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {Platform.OS.toUpperCase()} {Platform.Version}
+                    </Text>
+                  </View>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>Deployment Env:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {getDeploymentEnvironment().toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>App Version:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {require('expo-constants').manifest?.version || 
+                      require('expo-constants').manifest2?.version || 'unknown'}
+                    </Text>
+                  </View>
+                  <View style={styles.revenueCatStatusItem}>
+                    <Text style={styles.revenueCatStatusLabel}>Device:</Text>
+                    <Text style={styles.revenueCatStatusValue}>
+                      {require('expo-constants').deviceName || 'unknown'}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity 
+                    style={styles.refreshButton}
+                    onPress={loadData}
+                    disabled={loading}
+                  >
+                    <Ionicons name="refresh" size={16} color="#FFF" />
+                    <Text style={styles.refreshButtonText}>Refresh Info</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.copyButton}
+                    onPress={() => {
+                      // Collect diagnostic info and display it
+                      const envInfo = logEnvironmentInfo();
+                      const diagInfo = {
+                        environment: {
+                          __DEV__,
+                          USE_SIMULATED_REVENUECAT,
+                          DEPLOY_ENV: process.env.DEPLOY_ENV || 'not set',
+                          isExpoGo: isExpoGo(),
+                          isProductionBuild: isProductionBuild(),
+                          deploymentEnvironment: getDeploymentEnvironment()
+                        },
+                        revenueCat: {
+                          currentTier,
+                          expirationDate: expirationDate ? formatDate(expirationDate) : 'N/A',
+                          packages: packages.length,
+                          tokenUsage: tokenUsage ? {
+                            usedTokens: tokenUsage.usedTokens,
+                            tokenLimit: tokenUsage.tokenLimit,
+                            percentageUsed: tokenUsage.percentageUsed
+                          } : 'Not available'
+                        },
+                        platform: {
+                          OS: Platform.OS,
+                          version: Platform.Version,
+                          constants: Platform.constants,
+                          timestamp: new Date().toISOString()
+                        }
+                      };
+                      
+                      // Show the diagnostic information in an alert instead of copying
+                      Alert.alert(
+                        'Diagnostic Information',
+                        JSON.stringify(diagInfo, null, 2),
+                        [{ text: 'OK' }],
+                        { cancelable: true }
+                      );
+                    }}
+                  >
+                    <Ionicons name="information-circle-outline" size={16} color="#FFF" />
+                    <Text style={styles.refreshButtonText}>Show Diagnostics</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            )}
             
-            {/* Always display RevenueCat error details for debugging - force visible in all builds */}
-            <RevenueCatErrorDisplay 
-              error={revenueCatError}
-              title="RevenueCat Error Details (Debug Mode)" 
-              onClear={() => setRevenueCatError(null)}
-            />
+            {/* Show RevenueCat error details for debugging only when DEBUG_TOOLS_TOGGLE is true */}
+            {DEBUG_TOOLS_TOGGLE && revenueCatError && (
+              <RevenueCatErrorDisplay 
+                error={revenueCatError}
+                title="RevenueCat Error Details (Debug Mode)" 
+                onClear={() => setRevenueCatError(null)}
+              />
+            )}
 
             <View style={styles.infoContainer}>
               <Text style={styles.infoSectionTitle}>Subscription Information</Text>
@@ -1109,7 +1133,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   • You can manage your subscriptions in your {getStoreText()} account settings after purchase
                 </Text>
                 <Text style={styles.infoText}>
-                  • No cancellation of the current subscription is allowed during active subscription period
+                  • You can cancel your subscription at any time through your {getStoreText()} settings, which will prevent automatic renewal for the next billing cycle while maintaining access until the end of your current period
                 </Text>
                 <Text style={styles.infoText}>
                   • Any unused portion of a free trial period, if offered, will be forfeited when the user purchases a subscription

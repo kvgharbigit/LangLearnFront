@@ -2,6 +2,8 @@
 import { ConversationMode } from '../components/ConversationModeSelector';
 
 export type RootStackParamList = {
+  Auth: { screen?: string; params?: any } | undefined;
+  Main: undefined;
   Home: undefined;
   LanguageLanding: undefined;
   LanguageTutor: {

@@ -1,7 +1,8 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
-import { subscribeToAuthChanges, initializeUser } from '../services/supabaseAuthService';
+import { subscribeToAuthChanges, initializeUser, checkEmailVerification } from '../services/supabaseAuthService';
+import { supabase } from '../supabase/config';
 import { useUserInitialization } from './UserInitializationContext';
 import { captureDiagnostics, DiagnosticType } from '../utils/diagnostics';
 import { initializeRevenueCat } from '../services/revenueCatService';
@@ -44,6 +45,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     hasInitFailed
   } = useUserInitialization();
 
+  // Add a function to log state changes for debugging
+  useEffect(() => {
+    console.log('AuthContext: Auth state changed - isAuthenticated:', !!user);
+    if (user) {
+      console.log('AuthContext: User authenticated with ID:', user.id);
+    }
+  }, [user]);
+  
+  // Enable more aggressive auth state checking when user is not set
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    
+    if (!user) {
+      console.log('AuthContext: No user detected, setting up periodic checks');
+      
+      const checkAuthState = async () => {
+        try {
+          // Check Supabase session directly
+          const { data } = await supabase.auth.getSession();
+          
+          if (data?.session) {
+            console.log('AuthContext: Session found in periodic check');
+            
+            // Get user data and update state
+            const { data: userData } = await supabase.auth.getUser();
+            if (userData?.user) {
+              console.log('AuthContext: User found in periodic check, updating state:', userData.user.id);
+              setUser(userData.user);
+              
+              // Clear interval once we find a user
+              if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('AuthContext: Error in periodic auth check:', error);
+        }
+      };
+      
+      // Run check immediately
+      checkAuthState();
+      
+      // Set up interval
+      intervalId = setInterval(checkAuthState, 1500);
+      
+      // Clean up on unmount
+      return () => {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      };
+    }
+  }, [user]);
+  
   useEffect(() => {
     // First initialize the user (important for initial load)
     const init = async () => {
@@ -52,7 +109,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const initialUser = await initializeUser();
         setUser(initialUser);
         
-        // If we have a user, verify they exist in tables and initialize if needed
+        // If we have a user, verify they exist in tables
         if (initialUser) {
           console.log('AuthContext: User authenticated, verifying user data in tables...');
           
@@ -66,6 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Continue with user initialization even if RevenueCat fails
           }
           
+          // Perform user data verification
           try {
             // Set verification in progress flag to true
             setVerificationInProgress(true);
@@ -123,8 +181,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             
             // Clear verification flag even on error
             setVerificationInProgress(false);
-            
-            // Consider signing out user here too if critical
           }
         }
       } catch (error) {
@@ -176,19 +232,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return; // No further verification needed
       }
       
-      // Update user state
+      // Update user state which should trigger navigation due to isAuthenticated change
+      console.log('AuthContext: Updating user state to authenticated user:', supabaseUser.id);
       setUser(supabaseUser);
       
-      // Skip verification during app startup - only verify for actual sign-in events
-      // If this is the initial session (when user was null and now is populated), skip verification
-      // since init() already handled it
-      if (!user || !supabaseUser) {
-        console.log('AuthContext: Skipping verification during initial session or sign-out');
-        return;
-      }
+      // Log that navigation should now happen due to isAuthenticated becoming true
+      console.log('AuthContext: isAuthenticated is now true, navigation should update');
       
-      // If this is a real sign-in after app is running (different user), verify the data
-      if (user.id !== supabaseUser.id) {
+      // Only verify if we already have a different user (user switching case)
+      // This means we've already gone through startup initialization
+      // and are switching users
+      if (user && user.id !== supabaseUser.id) {
         console.log('AuthContext: New user authenticated, verifying user data tables...');
         
         // Initialize RevenueCat for the new user
