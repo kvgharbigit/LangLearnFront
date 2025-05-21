@@ -18,7 +18,7 @@ import {
 import SafeView from '../components/SafeView';
 import { StatusBar } from 'expo-status-bar';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { loginUser, resetPassword, signInWithGoogle } from '../services/supabaseAuthService';
+import { loginUser, resetPassword } from '../services/supabaseAuthService';
 import { AuthStackParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
@@ -35,7 +35,6 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [googleLoading, setGoogleLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
   const [isOffline, setIsOffline] = useState<boolean>(false);
@@ -289,35 +288,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   };
   
   
-  // Handle Google Sign-In using Supabase
-  const handleGoogleSignIn = async () => {
-    // Check network connectivity first
-    if (isOffline) {
-      setErrorMessage('No internet connection. Please check your network settings and try again.');
-      return;
-    }
-    
-    try {
-      setGoogleLoading(true);
-      setErrorMessage(null);
-      
-      // Use Supabase Google Sign-In
-      const { user, error } = await signInWithGoogle();
-      
-      if (error) {
-        console.error('Google sign in error:', error);
-        setErrorMessage('Failed to sign in with Google. Please try again.');
-        setGoogleLoading(false);
-      }
-      
-      // For Google Sign-In, user verification will be handled by the AuthContext
-      // This is because the sign-in flow returns before the auth state is fully updated
-    } catch (error) {
-      console.error('Google sign in error:', error);
-      setErrorMessage('An unexpected error occurred during Google sign in');
-      setGoogleLoading(false);
-    }
-  };
+  // Google sign-in has been removed
 
   return (
     <SafeView style={styles.container}>
@@ -464,50 +435,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Divider */}
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider}></View>
-              <Text style={styles.dividerText}>or continue with</Text>
-              <View style={styles.divider}></View>
-            </View>
-
-            {/* Social login buttons */}
-            <View style={styles.socialLoginContainer}>
-              <TouchableOpacity 
-                style={[
-                  styles.socialButton, 
-                  googleLoading && styles.socialButtonLoading,
-                  isOffline && styles.disabledSocialButton
-                ]}
-                onPress={handleGoogleSignIn}
-                disabled={googleLoading || isOffline}
-                accessibilityLabel="Continue with Google"
-              >
-                {googleLoading ? (
-                  <>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={styles.socialButtonText}>Signing in...</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons name="logo-google" size={20} color={colors.gray800} />
-                    <Text style={styles.socialButtonText}>Google</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[
-                  styles.socialButton,
-                  isOffline && styles.disabledSocialButton
-                ]}
-                disabled={isOffline}
-                accessibilityLabel="Continue with Apple"
-              >
-                <Ionicons name="logo-apple" size={20} color={colors.gray800} />
-                <Text style={styles.socialButtonText}>Apple</Text>
-              </TouchableOpacity>
-            </View>
+            {/* Social login buttons section removed */}
 
             {/* Sign up link */}
             <View style={styles.signupContainer}>
@@ -724,62 +652,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.3,
   },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 12,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.gray300,
-  },
-  dividerText: {
-    paddingHorizontal: 16,
-    color: colors.gray600,
-    fontSize: 14,
-  },
-  socialLoginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 30,
-    gap: 16,
-  },
-  socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.white,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    gap: 12,
-    flex: 1,
-    maxWidth: 150,
-    shadowColor: colors.gray800,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  disabledSocialButton: {
-    backgroundColor: colors.gray100,
-    borderColor: colors.gray300,
-    opacity: 0.7,
-  },
-  socialButtonText: {
-    color: colors.gray800,
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  socialButtonLoading: {
-    backgroundColor: colors.gray100,
-    borderColor: colors.primary,
-  },
+  // Social login styles removed
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',

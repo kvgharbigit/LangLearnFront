@@ -27,10 +27,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Free',
     tier: 'free',
     price: 0,
-    monthlyCredits: 1, // $1.00 worth of usage
-    monthlyTokens: 100, // 1 credit * 100
+    monthlyCredits: 0.75, // $0.75 worth of usage
+    monthlyTokens: 75, // 0.75 credit * 100
     features: [
-      '100 Conversation Tokens per month'
+      '75 Conversation Tokens per month'
     ]
   },
   {
@@ -78,7 +78,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
  */
 export const getCreditLimitForTier = (tier: SubscriptionTier): number => {
   const plan = SUBSCRIPTION_PLANS.find(p => p.tier === tier);
-  return plan?.monthlyCredits || 1; // Default to free tier
+  return plan?.monthlyCredits || 0.75; // Default to free tier
 };
 
 /**
@@ -86,5 +86,5 @@ export const getCreditLimitForTier = (tier: SubscriptionTier): number => {
  */
 export const getTokenLimitForTier = (tier: SubscriptionTier): number => {
   const plan = SUBSCRIPTION_PLANS.find(p => p.tier === tier);
-  return plan?.monthlyTokens || 100; // Default to free tier
+  return plan?.monthlyTokens || 75; // Default to free tier
 };

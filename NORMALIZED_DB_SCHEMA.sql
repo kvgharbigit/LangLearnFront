@@ -73,7 +73,7 @@ SELECT
         WHEN usr.subscription_tier = 'premium' THEN 8.0
         WHEN usr.subscription_tier = 'basic' THEN 3.0
         WHEN usr.subscription_tier = 'gold' THEN 16.0
-        ELSE 1.0 -- free tier
+        ELSE 0.75 -- free tier
     END AS credit_limit,
     -- Calculate percentage used
     CASE 
@@ -106,7 +106,7 @@ SELECT
                 ((u.whisper_minutes * 0.006) + 
                 (u.claude_input_tokens / 1000000 * 2.5) + 
                 (u.claude_output_tokens / 1000000 * 7.5) + 
-                (u.tts_characters / 1000000 * 4.0)) / 1.0 * 100,
+                (u.tts_characters / 1000000 * 4.0)) / 0.75 * 100,
                 100
             )
     END AS percentage_used
