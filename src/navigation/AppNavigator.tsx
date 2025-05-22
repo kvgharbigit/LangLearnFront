@@ -13,8 +13,7 @@ import useSubscriptionStatus from '../hooks/useSubscriptionStatus';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 
-// Modal Screens
-import EmailVerificationScreen from '../screens/EmailVerificationScreen';
+// Modal Screens are now handled via component modals, not navigation
 
 // Main App Screens
 import LanguageLanding from '../screens/LanguageLanding';
@@ -184,16 +183,7 @@ const AppNavigator = () => {
           }}
         />
         
-        {/* Modal Screens */}
-        <Stack.Screen 
-          name="EmailVerification" 
-          component={EmailVerificationScreen} 
-          options={{
-            presentation: 'modal',
-            animationEnabled: true,
-            headerShown: false
-          }}
-        />
+        {/* Modal screens are now handled via component modals rather than navigation */}
       </Stack.Navigator>
     </NavigationContainer>
   );
