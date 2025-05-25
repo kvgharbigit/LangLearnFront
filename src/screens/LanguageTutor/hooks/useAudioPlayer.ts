@@ -7,7 +7,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Audio } from 'expo-av';
-import { API_CONFIG } from '../../../constants/settings';
+import { API_URL } from '../../../utils/api';
 import * as api from '../../../utils/api';
 
 interface UseAudioPlayerProps {
@@ -165,9 +165,8 @@ export default function useAudioPlayer({
       setStatusMessage('Loading audio...');
       
       // Construct the audio URL
-      const apiUrl = API_CONFIG.BACKEND_API_URL;
       const tempoParam = tempo ? `&tempo=${tempo}` : '';
-      const audioUrl = `${apiUrl}/stream-audio/${conversationId}?message_index=${messageIndex}${tempoParam}`;
+      const audioUrl = `${API_URL}/stream-audio/${conversationId}?message_index=${messageIndex}${tempoParam}`;
       
       console.log(`🎵 Loading audio from: ${audioUrl}`);
       
