@@ -11,9 +11,9 @@ import { estimateTokens } from '../types/usage.normalized';
 import userPreferences from './userPreferences';
 
 // Update this to your actual API URL
-export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
+//export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
 //const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
-//export const API_URL = 'http://192.168.86.246:8004'; // Desktop WiFi IP address - CORRECTED
+export const API_URL = 'http://192.168.86.246:8004'; // Desktop WiFi IP address - CORRECTED
 
 
 // Helper to get user auth headers for API requests
@@ -298,7 +298,9 @@ export const sendTextMessage = async (
       }
     }
 
-    // Use fetchWithRetry instead of fetch
+    console.log(`🚀 Starting unified conversation request (includes parallel grammar analysis)...`);
+    
+    // First: Start conversation request
     const response = await fetchWithRetry(`${API_URL}/chat`, {
       method: 'POST',
       headers: { 
@@ -329,6 +331,15 @@ export const sendTextMessage = async (
       const lastAssistantIndex = data.history.length - 1;
       data.message_index = lastAssistantIndex;
     }
+
+    // Backend now handles both conversation and grammar requests in parallel
+    // The response already includes corrected and natural fields
+    console.log(`🎯 Request completed - Response includes both conversation and grammar data:`, {
+      conversation_id: data.conversation_id,
+      corrected: data.corrected,
+      natural: data.natural,
+      reply: data.reply?.substring(0, 50) + '...'
+    });
     
     // Cache audio response if available
     if (data.has_audio && data.audio_url && conversationId) {
@@ -362,18 +373,10 @@ export const sendTextMessage = async (
             let outputTokens = 0;
             
             if (data.token_usage) {
-              // Use accurate token counts from API
+              // Backend now provides total token usage for both requests combined
               inputTokens = data.token_usage.input_tokens || 0;
               outputTokens = data.token_usage.output_tokens || 0;
-              
-              // Check if we have combined token usage (for multi-request flows)
-              if (data.token_usage.combined_input_tokens && data.token_usage.combined_output_tokens) {
-                inputTokens = data.token_usage.combined_input_tokens;
-                outputTokens = data.token_usage.combined_output_tokens;
-                console.log(`Using combined token counts from API: ${inputTokens} input, ${outputTokens} output`);
-              } else {
-                console.log(`Using primary request token counts from API: ${inputTokens} input, ${outputTokens} output`);
-              }
+              console.log(`Using total token counts from parallel backend requests: ${inputTokens} input, ${outputTokens} output`);
             } else {
               // Fall back to estimation (this will undercount system prompt tokens)
               inputTokens = estimateTokens(message);
@@ -675,6 +678,17 @@ export const sendVoiceRecording = async ({
 
     const data = await response.json();
     
+    // Backend now handles both voice transcription/conversation and grammar requests in parallel
+    // The response already includes corrected and natural fields (unless no speech was detected)
+    if (!data.no_speech_detected && data.conversation_id) {
+      console.log(`🎯 Voice request completed - Response includes both conversation and grammar data:`, {
+        conversation_id: data.conversation_id,
+        corrected: data.corrected,
+        natural: data.natural,
+        transcribed_text: data.transcribed_text
+      });
+    }
+    
     // Cache audio response if available
     if (data.has_audio && data.audio_url && conversationId) {
       try {
@@ -728,18 +742,10 @@ export const sendVoiceRecording = async ({
             let outputTokens = 0;
             
             if (data.token_usage) {
-              // Use accurate token counts from API
+              // Backend now provides total token usage for both requests combined
               inputTokens = data.token_usage.input_tokens || 0;
               outputTokens = data.token_usage.output_tokens || 0;
-              
-              // Check if we have combined token usage (for multi-request flows)
-              if (data.token_usage.combined_input_tokens && data.token_usage.combined_output_tokens) {
-                inputTokens = data.token_usage.combined_input_tokens;
-                outputTokens = data.token_usage.combined_output_tokens;
-                console.log(`Using combined token counts from API (voice): ${inputTokens} input, ${outputTokens} output`);
-              } else {
-                console.log(`Using primary request token counts from API (voice): ${inputTokens} input, ${outputTokens} output`);
-              }
+              console.log(`Using total token counts from parallel backend requests (voice): ${inputTokens} input, ${outputTokens} output`);
             } else {
               // Fall back to estimation (this will undercount system prompt tokens)
               inputTokens = estimateTokens(transcription);
@@ -1127,18 +1133,10 @@ export const createConversation = async ({
             let outputTokens = 0;
             
             if (data.token_usage) {
-              // Use accurate token counts from API
+              // Backend now provides total token usage for both requests combined  
               inputTokens = data.token_usage.input_tokens || 0;
               outputTokens = data.token_usage.output_tokens || 0;
-              
-              // Check if we have combined token usage (for multi-request flows)
-              if (data.token_usage.combined_input_tokens && data.token_usage.combined_output_tokens) {
-                inputTokens = data.token_usage.combined_input_tokens;
-                outputTokens = data.token_usage.combined_output_tokens;
-                console.log(`Using combined token counts from API (conversation): ${inputTokens} input, ${outputTokens} output`);
-              } else {
-                console.log(`Using primary request token counts from API (conversation): ${inputTokens} input, ${outputTokens} output`);
-              }
+              console.log(`Using total token counts from parallel backend requests (conversation): ${inputTokens} input, ${outputTokens} output`);
             } else {
               // Fall back to estimation (this will undercount system prompt tokens)
               inputTokens = estimateTokens(contextInput);
