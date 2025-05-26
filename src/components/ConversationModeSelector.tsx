@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Modal, FlatList, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
+import { getRandomTopicForMode } from '../utils/randomTopics';
 
 // Define conversation mode types
 export type ConversationMode = 'grammar_lesson' | 'topic_lesson' | 'free_conversation' | 'interview' | 'verb_challenge' | 'noun_challenge' | 'situation_simulation';
@@ -24,6 +25,7 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
 }) => {
   // State for the dropdown modal
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const [isGeneratingTopic, setIsGeneratingTopic] = useState(false);
 
   // Categorized options for conversation modes
   const conversationCategories = [
@@ -75,14 +77,16 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
           label: 'Verb Challenge',
           icon: 'flash-outline',
           description: 'Practice constructing sentences with essential verbs in different tenses and moods.',
-          placeholder: '• Specific verb tenses to practice\n• Difficulty level preferences\n• Types of verbs'
+          placeholder: '• Specific verb tenses to practice\n• Difficulty level preferences\n• Types of verbs',
+          comingSoon: true
         },
         {
           id: 'noun_challenge' as ConversationMode,
           label: 'Noun Challenge',
           icon: 'cube-outline',
           description: 'Build vocabulary and sentence skills using important nouns from your areas of interest.',
-          placeholder: '• Categories of nouns\n• Specific topics\n• Difficulty preferences'
+          placeholder: '• Categories of nouns\n• Specific topics\n• Difficulty preferences',
+          comingSoon: true
         }
       ]
     }
@@ -102,7 +106,30 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
   // Handle mode selection from dropdown
   const handleSelectMode = (mode: ConversationMode) => {
     onSelectMode(mode);
+    onChangePromptText(''); // Clear the topic/theme text box
     setIsDropdownVisible(false);
+  };
+
+  // Generate random topic based on conversation mode
+  const generateRandomTopic = () => {
+    if (isGeneratingTopic) return;
+    
+    setIsGeneratingTopic(true);
+    
+    // Small delay to show loading state
+    setTimeout(() => {
+      const randomTopic = getRandomTopicForMode(selectedMode);
+      onChangePromptText(randomTopic);
+      setIsGeneratingTopic(false);
+    }, 200);
+  };
+
+  // Check if the Generate Random Topic button should be shown
+  const shouldShowRandomTopicButton = () => {
+    return selectedMode === 'free_conversation' || 
+           selectedMode === 'interview' || 
+           selectedMode === 'topic_lesson' ||
+           selectedMode === 'situation_simulation';
   };
 
   // Render each option in the dropdown
@@ -110,28 +137,41 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
     <TouchableOpacity
       style={[
         styles.dropdownItem,
-        selectedMode === item.id && styles.selectedDropdownItem
+        selectedMode === item.id && styles.selectedDropdownItem,
+        item.comingSoon && styles.dropdownItemDisabled
       ]}
-      onPress={() => handleSelectMode(item.id)}
+      onPress={() => item.comingSoon ? null : handleSelectMode(item.id)}
+      disabled={item.comingSoon}
     >
       <Ionicons
         name={item.icon as any}
         size={24}
-        color={selectedMode === item.id ? colors.primary : colors.gray600}
+        color={item.comingSoon ? colors.gray400 : (selectedMode === item.id ? colors.primary : colors.gray600)}
         style={styles.dropdownItemIcon}
       />
       <View style={styles.dropdownItemTextContainer}>
+        <View style={styles.dropdownItemLabelContainer}>
+          <Text style={[
+            styles.dropdownItemLabel,
+            selectedMode === item.id && styles.selectedDropdownItemText,
+            item.comingSoon && styles.dropdownItemLabelDisabled
+          ]}>
+            {item.label}
+          </Text>
+          {item.comingSoon && (
+            <View style={styles.comingSoonBadge}>
+              <Text style={styles.comingSoonText}>Coming Soon</Text>
+            </View>
+          )}
+        </View>
         <Text style={[
-          styles.dropdownItemLabel,
-          selectedMode === item.id && styles.selectedDropdownItemText
+          styles.dropdownItemDescription,
+          item.comingSoon && styles.dropdownItemDescriptionDisabled
         ]}>
-          {item.label}
-        </Text>
-        <Text style={styles.dropdownItemDescription}>
           {item.description}
         </Text>
       </View>
-      {selectedMode === item.id && (
+      {selectedMode === item.id && !item.comingSoon && (
         <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
       )}
     </TouchableOpacity>
@@ -176,12 +216,16 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
         <Text style={styles.promptLabel}>Topic/Theme (Optional)</Text>
         <View style={styles.textAreaContainer}>
           <TextInput
-            style={styles.textArea}
+            style={[
+              styles.textArea,
+              // Dynamically adjust height if content is longer
+              promptText.length > 100 && { minHeight: 140, maxHeight: 180 }
+            ]}
             value={promptText}
             onChangeText={onChangePromptText}
             placeholder={currentMode.placeholder}
             multiline
-            scrollEnabled={false}
+            scrollEnabled={promptText.length > 200}
             numberOfLines={4}
             textAlignVertical="top"
             placeholderTextColor={colors.gray500}
@@ -201,6 +245,28 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
             }}
           />
         </View>
+        
+        {/* Random Topic Button - Better positioned below text area */}
+        {shouldShowRandomTopicButton() && (
+          <TouchableOpacity
+            style={styles.randomTopicButton}
+            onPress={generateRandomTopic}
+            disabled={isGeneratingTopic}
+          >
+            <Ionicons 
+              name="shuffle-outline" 
+              size={18} 
+              color={isGeneratingTopic ? colors.gray400 : colors.primary} 
+            />
+            <Text style={[
+              styles.randomTopicButtonText,
+              isGeneratingTopic && styles.randomTopicButtonTextDisabled
+            ]}>
+              {isGeneratingTopic ? 'Generating...' : 'Generate Random Topic'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.promptInfoContainer}>
           <Text style={styles.promptInfoText}>
             Choose ANY topic - from verbs to vermouth, from dating to dancing - Confluency can talk about anything!
@@ -317,8 +383,35 @@ const styles = StyleSheet.create({
   promptLabel: {
     fontSize: 15,
     color: colors.gray700,
-    marginBottom: 8,
     fontWeight: '500',
+    marginBottom: 8,
+  },
+  randomTopicButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 12,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  randomTopicButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.primary,
+    marginLeft: 8,
+  },
+  randomTopicButtonTextDisabled: {
+    color: colors.gray400,
   },
   textAreaContainer: {
     width: '100%',
@@ -346,6 +439,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.gray600,
     flex: 1,
+    textAlign: 'center',
   },
   // Modal styles
   modalOverlay: {
@@ -390,6 +484,9 @@ const styles = StyleSheet.create({
   selectedDropdownItem: {
     backgroundColor: colors.gray200, // Lighter background for better contrast 
   },
+  dropdownItemDisabled: {
+    opacity: 0.6,
+  },
   dropdownItemIcon: {
     marginRight: 12,
     width: 24,
@@ -399,11 +496,18 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  dropdownItemLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   dropdownItemLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.gray800,
-    marginBottom: 4,
+  },
+  dropdownItemLabelDisabled: {
+    color: colors.gray500,
   },
   selectedDropdownItemText: {
     color: colors.primary,
@@ -413,6 +517,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.gray600,
     lineHeight: 18,
+  },
+  dropdownItemDescriptionDisabled: {
+    color: colors.gray400,
+  },
+  comingSoonBadge: {
+    backgroundColor: colors.gray300,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  comingSoonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.gray600,
   },
   separator: {
     height: 1,
