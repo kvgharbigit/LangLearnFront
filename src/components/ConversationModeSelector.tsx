@@ -70,7 +70,8 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
           label: 'Grammar Lesson',
           icon: 'book-outline',
           description: 'Master specific grammar rules, verb forms, and language structures with focused guidance.',
-          placeholder: '• The Subjunctive Mood\n• Conjugating the Preterite \n• Common Verbs'
+          placeholder: '• The Subjunctive Mood\n• Conjugating the Preterite \n• Common Verbs',
+          comingSoon: true
         },
         {
           id: 'verb_challenge' as ConversationMode,
