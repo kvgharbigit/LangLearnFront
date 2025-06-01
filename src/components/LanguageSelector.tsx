@@ -15,8 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LANGUAGES, Language } from '../constants/languages';
 import colors from '../styles/colors';
 
-// Define available languages - only English available for now
-const AVAILABLE_LANGUAGES = ['en'];
+// Define available languages - Spanish is now available, others coming soon
+const AVAILABLE_LANGUAGES = ['es'];
 
 interface LanguageSelectorProps {
   selectedLanguage: string;

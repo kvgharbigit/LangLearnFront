@@ -219,14 +219,17 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
           <TextInput
             style={[
               styles.textArea,
-              // Dynamically adjust height if content is longer
-              promptText.length > 100 && { minHeight: 140, maxHeight: 180 }
+              // Dynamically adjust height based on content length
+              promptText.length > 50 && { minHeight: 140 },
+              promptText.length > 100 && { minHeight: 160 },
+              promptText.length > 150 && { minHeight: 180 },
+              promptText.length > 200 && { minHeight: 200, maxHeight: 300 }
             ]}
             value={promptText}
             onChangeText={onChangePromptText}
             placeholder={currentMode.placeholder}
             multiline
-            scrollEnabled={promptText.length > 200}
+            scrollEnabled={promptText.length > 300}
             numberOfLines={4}
             textAlignVertical="top"
             placeholderTextColor={colors.gray500}
@@ -420,7 +423,6 @@ const styles = StyleSheet.create({
   textArea: {
     width: '100%',
     minHeight: 120,
-    maxHeight: 120,
     borderWidth: 1.5,
     borderColor: colors.gray300,
     borderRadius: 16,

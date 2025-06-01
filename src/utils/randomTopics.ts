@@ -10629,21 +10629,24 @@ export const situationTopics: string[] = [
  * Get a random conversation starter
  */
 export const getRandomConversationStarter = (): string => {
-  return conversationStarters[Math.floor(Math.random() * conversationStarters.length)];
+  const topic = conversationStarters[Math.floor(Math.random() * conversationStarters.length)];
+  return topic.charAt(0).toUpperCase() + topic.slice(1);
 };
 
 /**
  * Get a random situation topic
  */
 export const getRandomSituationTopic = (): string => {
-  return situationTopics[Math.floor(Math.random() * situationTopics.length)];
+  const topic = situationTopics[Math.floor(Math.random() * situationTopics.length)];
+  return topic.charAt(0).toUpperCase() + topic.slice(1);
 };
 
 /**
  * Get a random topic lesson
  */
 export const getRandomTopicLesson = (): string => {
-  return topicLessons[Math.floor(Math.random() * topicLessons.length)];
+  const topic = topicLessons[Math.floor(Math.random() * topicLessons.length)];
+  return topic.charAt(0).toUpperCase() + topic.slice(1);
 };
 
 /**
@@ -10890,5 +10893,6 @@ export const deepQuestions: string[] = [
  * Get a random deep question
  */
 export const getRandomDeepQuestion = (): string => {
-  return deepQuestions[Math.floor(Math.random() * deepQuestions.length)];
+  const topic = deepQuestions[Math.floor(Math.random() * deepQuestions.length)];
+  return topic.charAt(0).toUpperCase() + topic.slice(1);
 };
