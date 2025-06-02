@@ -6,7 +6,7 @@ import colors from '../styles/colors';
 import { getRandomTopicForMode } from '../utils/randomTopics';
 
 // Define conversation mode types
-export type ConversationMode = 'grammar_lesson' | 'topic_lesson' | 'free_conversation' | 'interview' | 'verb_challenge' | 'noun_challenge' | 'situation_simulation';
+export type ConversationMode = 'topic_lesson' | 'free_conversation' | 'interview' | 'verb_challenge' | 'situation_simulation';
 
 interface ConversationModeSelectorProps {
   selectedMode: ConversationMode;
@@ -66,14 +66,6 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
       title: 'Language Lessons',
       modes: [
         {
-          id: 'grammar_lesson' as ConversationMode,
-          label: 'Grammar Lesson',
-          icon: 'book-outline',
-          description: 'Master specific grammar rules, verb forms, and language structures with focused guidance.',
-          placeholder: '• The Subjunctive Mood\n• Conjugating the Preterite \n• Common Verbs',
-          comingSoon: true
-        },
-        {
           id: 'verb_challenge' as ConversationMode,
           label: 'Verb Challenge',
           icon: 'flash-outline',
@@ -81,14 +73,6 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
           placeholder: '• Specific verb tenses to practice\n• Difficulty level preferences\n• Types of verbs',
           comingSoon: true
         },
-        {
-          id: 'noun_challenge' as ConversationMode,
-          label: 'Noun Challenge',
-          icon: 'cube-outline',
-          description: 'Build vocabulary and sentence skills using important nouns from your areas of interest.',
-          placeholder: '• Categories of nouns\n• Specific topics\n• Difficulty preferences',
-          comingSoon: true
-        }
       ]
     }
   ];
