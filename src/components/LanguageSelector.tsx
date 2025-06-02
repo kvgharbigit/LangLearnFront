@@ -15,21 +15,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { LANGUAGES, Language } from '../constants/languages';
 import colors from '../styles/colors';
 
-// Define available languages - Spanish is now available, others coming soon
-const AVAILABLE_LANGUAGES = ['es'];
+// Define available languages by context
+const NATIVE_LANGUAGES = ['en']; // Only English for native language
+const TARGET_LANGUAGES = ['es', 'fr']; // Spanish and French for target language
 
 interface LanguageSelectorProps {
   selectedLanguage: string;
   onSelectLanguage: (languageCode: string) => void;
   excludeLanguage?: string;
   title: string;
+  availableLanguages?: string[]; // Optional override for available languages
 }
 
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   selectedLanguage,
   onSelectLanguage,
   excludeLanguage,
-  title
+  title,
+  availableLanguages
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,8 +59,15 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     }
   }, [selectedLanguage]);
 
+  // Determine which languages are available for this selector
+  const getAvailableLanguages = () => {
+    return availableLanguages || TARGET_LANGUAGES; // Default to target languages if not specified
+  };
+
   // Filter languages based on search query and excluded language
   const getFilteredLanguages = () => {
+    const currentAvailableLanguages = getAvailableLanguages();
+    
     const filtered = LANGUAGES.filter(lang => {
       const matchesSearch = lang.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            lang.code.toLowerCase().includes(searchQuery.toLowerCase());
@@ -67,8 +77,8 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     
     // Sort available languages to top
     return filtered.sort((a, b) => {
-      const aAvailable = AVAILABLE_LANGUAGES.includes(a.code);
-      const bAvailable = AVAILABLE_LANGUAGES.includes(b.code);
+      const aAvailable = currentAvailableLanguages.includes(a.code);
+      const bAvailable = currentAvailableLanguages.includes(b.code);
       
       if (aAvailable && !bAvailable) return -1;
       if (!aAvailable && bAvailable) return 1;
@@ -148,8 +158,10 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               contentContainerStyle={styles.languageList}
               columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
               renderItem={({ item }) => {
+                const currentAvailableLanguages = getAvailableLanguages();
                 const isSelected = selectedLanguage === item.code;
                 const isExcluded = excludeLanguage === item.code;
+                const isAvailable = currentAvailableLanguages.includes(item.code);
 
                 return (
                   <TouchableOpacity
@@ -157,23 +169,23 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                       styles.languageOption,
                       isSelected && styles.selectedOption,
                       isExcluded && styles.excludedOption,
-                      !AVAILABLE_LANGUAGES.includes(item.code) && styles.comingSoonOption
+                      !isAvailable && styles.comingSoonOption
                     ]}
                     onPress={() => {
-                      if (!isExcluded && AVAILABLE_LANGUAGES.includes(item.code)) {
+                      if (!isExcluded && isAvailable) {
                         onSelectLanguage(item.code);
                         setModalVisible(false);
                         setSearchQuery('');
                       }
                     }}
-                    disabled={isExcluded || !AVAILABLE_LANGUAGES.includes(item.code)}
+                    disabled={isExcluded || !isAvailable}
                   >
                     <Text style={styles.optionFlag}>{item.flag}</Text>
                     <Text style={[
                       styles.optionName,
                       isSelected && styles.selectedText,
                       isExcluded && styles.excludedText,
-                      !AVAILABLE_LANGUAGES.includes(item.code) && styles.comingSoonText
+                      !isAvailable && styles.comingSoonText
                     ]}>
                       {item.name}
                     </Text>
@@ -190,7 +202,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                       </View>
                     )}
                     
-                    {!AVAILABLE_LANGUAGES.includes(item.code) && (
+                    {!isAvailable && (
                       <View style={styles.comingSoonBadge}>
                         <Text style={styles.comingSoonBadgeText}>Coming Soon</Text>
                       </View>
@@ -467,4 +479,5 @@ const styles = StyleSheet.create({
   },
 });
 
+export { NATIVE_LANGUAGES, TARGET_LANGUAGES };
 export default LanguageSelector;

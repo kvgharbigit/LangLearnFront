@@ -20,7 +20,7 @@ import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import { Ionicons } from '@expo/vector-icons';
-import LanguageSelector from '../components/LanguageSelector';
+import LanguageSelector, { NATIVE_LANGUAGES, TARGET_LANGUAGES } from '../components/LanguageSelector';
 import ConversationModeSelector, { ConversationMode } from '../components/ConversationModeSelector';
 import DifficultyLevelSelector from '../components/DifficultyLevelSelector';
 import { DIFFICULTY_LEVELS, DifficultyLevel } from '../constants/languages';
@@ -37,7 +37,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   // Auth state
   const { user } = useAuth();
 
-  // State
+  // State - Initialize native language to English since it's the only option
   const [nativeLanguage, setNativeLanguage] = useState<string>('en');
   const [targetLanguage, setTargetLanguage] = useState<string>('');
   const [difficulty, setDifficulty] = useState<DifficultyLevel>('beginner');
@@ -284,6 +284,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
                 title="I speak:"
                 selectedLanguage={nativeLanguage}
                 onSelectLanguage={handleNativeLanguageSelect}
+                availableLanguages={NATIVE_LANGUAGES} // Only English
               />
 
               {/* Target Language Selection - Using LanguageSelector */}
@@ -292,6 +293,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
                 selectedLanguage={targetLanguage}
                 onSelectLanguage={handleTargetLanguageSelect}
                 excludeLanguage={nativeLanguage} // Don't show the native language
+                availableLanguages={TARGET_LANGUAGES} // Spanish and French
               />
 
               {/* Difficulty Level Selector - Using DifficultyLevelSelector */}
