@@ -190,7 +190,7 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   // Handle start learning button press
   const handleStartLearning = (): void => {
     // Basic validation
-    if (!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage || isSaving) {
+    if (!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage || !learningObjective.trim() || isSaving) {
       return;
     }
 
@@ -312,11 +312,11 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
               <TouchableOpacity
                 style={[
                   styles.startButton,
-                  (!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage) && styles.disabledButton,
+                  (!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage || !learningObjective.trim()) && styles.disabledButton,
                   isSaving && styles.loadingButton
                 ]}
                 onPress={handleStartLearning}
-                disabled={!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage || isSaving}
+                disabled={!nativeLanguage || !targetLanguage || nativeLanguage === targetLanguage || !learningObjective.trim() || isSaving}
               >
                 {isSaving ? (
                   <ActivityIndicator color="#fff" size="small" />

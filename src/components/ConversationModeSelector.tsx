@@ -214,7 +214,7 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
 
       {/* Topic/Theme input */}
       <View style={styles.promptContainer}>
-        <Text style={styles.promptLabel}>Topic/Theme (Optional)</Text>
+        <Text style={styles.promptLabel}>Topic/Theme</Text>
         <View style={styles.textAreaContainer}>
           <TextInput
             style={[
