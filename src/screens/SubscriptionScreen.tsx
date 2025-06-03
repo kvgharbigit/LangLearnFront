@@ -118,6 +118,11 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [purchasing, setPurchasing] = useState<boolean>(false);
   const [currentTier, setCurrentTier] = useState<string>('free');
+  
+  // Add debug logging for currentTier changes
+  useEffect(() => {
+    console.log('[SubscriptionScreen] currentTier changed to:', currentTier);
+  }, [currentTier]);
   const [expirationDate, setExpirationDate] = useState<Date | null>(null);
   const [usage, setUsage] = useState<MonthlyUsage | null>(null);
   const [tokenUsage, setTokenUsage] = useState<{usedTokens: number, tokenLimit: number, percentageUsed: number} | null>(null);
@@ -188,6 +193,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       // (we'll get cancellation status from the hook)
       const subscriptionData = await getCurrentSubscription();
       const { tier, expirationDate } = subscriptionData;
+      console.log('[SubscriptionScreen] loadData - setting tier to:', tier);
       setCurrentTier(tier);
       setExpirationDate(expirationDate);
       
@@ -415,7 +421,16 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       // Purchase the package
       await purchasePackage(packageToPurchase);
       
-      // Reload data after purchase
+      // Clear cached subscription data to force fresh fetch
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        await AsyncStorage.removeItem('cached_subscription');
+        console.log('Cleared subscription cache after purchase');
+      } catch (e) {
+        console.warn('Error clearing subscription cache:', e);
+      }
+      
+      // Reload data after purchase with fresh data
       await loadData();
       
       // Show appropriate message based on whether it was an upgrade or downgrade

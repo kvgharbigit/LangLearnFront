@@ -26,14 +26,25 @@ const initialState: SubscriptionStatus = {
  * including cancellation status
  * 
  * @param refreshInterval Optional: time in milliseconds to periodically refresh status (default: null = don't refresh)
- * @returns SubscriptionStatus object with current subscription information
+ * @returns SubscriptionStatus object with current subscription information and refresh function
  */
-export const useSubscriptionStatus = (refreshInterval: number | null = null): SubscriptionStatus => {
+export const useSubscriptionStatus = (refreshInterval: number | null = null): SubscriptionStatus & { refresh: (forceFresh?: boolean) => Promise<void> } => {
   const [status, setStatus] = useState<SubscriptionStatus>(initialState);
   
-  const checkStatus = async () => {
+  const checkStatus = async (forceFresh = false) => {
     try {
       setStatus(prev => ({ ...prev, loading: true, error: null }));
+      
+      // Clear cache if forceFresh is requested
+      if (forceFresh) {
+        try {
+          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+          await AsyncStorage.removeItem('cached_subscription');
+          console.log('Cleared subscription cache in useSubscriptionStatus');
+        } catch (e) {
+          console.warn('Error clearing subscription cache in hook:', e);
+        }
+      }
       
       const subscriptionData = await getCurrentSubscription();
       const { tier, expirationDate, isActive, isCancelled = false, isInGracePeriod = false } = subscriptionData;
@@ -63,12 +74,16 @@ export const useSubscriptionStatus = (refreshInterval: number | null = null): Su
     
     // Set up interval for periodic checks if requested
     if (refreshInterval && refreshInterval > 0) {
-      const intervalId = setInterval(checkStatus, refreshInterval);
+      const intervalId = setInterval(() => checkStatus(), refreshInterval);
       return () => clearInterval(intervalId);
     }
   }, [refreshInterval]);
   
-  return status;
+  // Return status with refresh function
+  return {
+    ...status,
+    refresh: checkStatus
+  };
 };
 
 export default useSubscriptionStatus;
