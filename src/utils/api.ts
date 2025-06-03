@@ -15,7 +15,7 @@ import userPreferences from './userPreferences';
 //const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
 //export const API_URL = 'http://192.168.86.246:8004'; // Desktop WiFi IP address - CORRECTED
 //export const API_URL =  "http://172.20.10.2:8004" //macbook pro
-export const API_URL = "http://10.0.0.171:8004"
+export const API_URL = "http://192.168.86.31:8004"
 
 
 
