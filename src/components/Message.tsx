@@ -39,6 +39,7 @@ export interface MessageData {
   timestamp: string;
   isTemporary?: boolean;
   hasAudio?: boolean; // Property to indicate if message has audio
+  tts_status?: 'completed' | 'running' | 'failed' | 'skipped'; // TTS generation status
 }
 
 // Props interface with replay-related props
@@ -212,13 +213,15 @@ const Message: React.FC<MessageProps> = ({
   };
 
   // Check if this message should show a replay button
-  // Only show replay button on the latest assistant message
+  // Only show replay button on the latest assistant message when TTS is completed
   const showReplayButton = isAssistant &&
                            isLatestAssistantMessage && // Only show on latest assistant message
                            onRequestReplay &&
                            !isUser &&
                            message.hasAudio === true &&
+                           message.tts_status === 'completed' && // Only show when TTS is ready
                            !isMuted;
+
 
   return (
     <View style={[
@@ -443,26 +446,41 @@ const Message: React.FC<MessageProps> = ({
           </View>
         )}
 
-        {/* Add replay button for assistant messages if this is the latest one */}
-        {showReplayButton && (
+        {/* Add audio controls for assistant messages if this is the latest one */}
+        {isAssistant && isLatestAssistantMessage && message.hasAudio && !isMuted && (
           <View style={styles.replayButtonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.replayButton,
-                isPlaying === true && styles.replayButtonPlaying // Explicit check
-              ]}
-              onPress={onRequestReplay}
-              disabled={isPlaying === true} // Explicit check
-            >
-              {isPlaying === true ? ( // Explicit check
-                <Ionicons name="volume-high" size={16} color="#ffffff" />
-              ) : (
-                <Ionicons name="play" size={16} color="#ffffff" />
-              )}
-              <Text style={styles.replayButtonText}>
-                {isPlaying === true ? 'Playing...' : 'Replay'} {/* Explicit check */}
-              </Text>
-            </TouchableOpacity>
+            {message.tts_status === 'running' ? (
+              // Show loading indicator when TTS is generating
+              <View style={styles.audioStatusContainer}>
+                <Ionicons name="musical-notes" size={16} color="#666" />
+                <Text style={styles.audioStatusText}>Generating audio...</Text>
+              </View>
+            ) : message.tts_status === 'failed' ? (
+              // Show error message if TTS failed
+              <View style={styles.audioStatusContainer}>
+                <Ionicons name="alert-circle" size={16} color="#ff6b6b" />
+                <Text style={[styles.audioStatusText, { color: '#ff6b6b' }]}>Audio failed</Text>
+              </View>
+            ) : message.tts_status === 'completed' && onRequestReplay ? (
+              // Show replay button when TTS is ready
+              <TouchableOpacity
+                style={[
+                  styles.replayButton,
+                  isPlaying === true && styles.replayButtonPlaying // Explicit check
+                ]}
+                onPress={onRequestReplay}
+                disabled={isPlaying === true} // Explicit check
+              >
+                {isPlaying === true ? ( // Explicit check
+                  <Ionicons name="volume-high" size={16} color="#ffffff" />
+                ) : (
+                  <Ionicons name="play" size={16} color="#ffffff" />
+                )}
+                <Text style={styles.replayButtonText}>
+                  {isPlaying === true ? 'Playing...' : 'Replay'} {/* Explicit check */}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         )}
       </View>
@@ -659,6 +677,21 @@ const styles = StyleSheet.create({
   },
   replayButtonPlaying: {
     backgroundColor: '#4CAF50', // Green when playing
+  },
+  audioStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  audioStatusText: {
+    marginLeft: 6,
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
   replayButtonText: {
     color: 'white',

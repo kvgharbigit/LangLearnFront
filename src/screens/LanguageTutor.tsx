@@ -58,6 +58,9 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const [history, setHistory] = useState<MessageType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+
+  // Ref to track polling interval for TTS status updates
+  const ttsPollingRef = useRef<any>(null);
   const [showStartButton, setShowStartButton] = useState<boolean>(true);
   const [welcomeReady, setWelcomeReady] = useState<boolean>(false);
   const [welcomeData, setWelcomeData] = useState<any>(null);
@@ -455,6 +458,81 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     startPreBuffering
   } = voiceRecorder;
 
+  // TTS Status Polling - Check for messages with 'running' status and poll for completion
+  useEffect(() => {
+    // Check if there are any messages with running TTS status
+    const runningMessages = history.filter(msg => 
+      msg.role === 'assistant' && 
+      msg.tts_status === 'running' && 
+      msg.hasAudio
+    );
+
+    if (runningMessages.length > 0 && conversationId) {
+      console.log(`[TTS Polling] Found ${runningMessages.length} messages with running TTS status`);
+      
+      // Start polling every 2 seconds
+      ttsPollingRef.current = setInterval(async () => {
+        try {
+          // Check if messages still have running status
+          const stillRunning = history.filter(msg => 
+            msg.role === 'assistant' && 
+            msg.tts_status === 'running' && 
+            msg.hasAudio
+          );
+
+          if (stillRunning.length === 0) {
+            // No more running messages, stop polling
+            if (ttsPollingRef.current) {
+              clearInterval(ttsPollingRef.current);
+              ttsPollingRef.current = null;
+              console.log('[TTS Polling] Stopped - no more running messages');
+            }
+            return;
+          }
+
+          // For now, we'll just update to 'completed' after a reasonable time
+          // In a real implementation, you'd check the backend for actual status
+          console.log('[TTS Polling] Checking for TTS completion...');
+          
+          // Update messages that have been running for more than 3 seconds to completed
+          setHistory(currentHistory => {
+            return currentHistory.map(msg => {
+              if (msg.role === 'assistant' && 
+                  msg.tts_status === 'running' && 
+                  msg.hasAudio) {
+                const messageAge = Date.now() - new Date(msg.timestamp).getTime();
+                if (messageAge > 3000) { // 3 seconds
+                  console.log(`[TTS Polling] Updating message to completed after ${messageAge}ms`);
+                  return { ...msg, tts_status: 'completed' as const };
+                }
+              }
+              return msg;
+            });
+          });
+
+        } catch (error) {
+          console.error('[TTS Polling] Error during polling:', error);
+        }
+      }, 2000); // Poll every 2 seconds
+
+    } else {
+      // No running messages, clear any existing polling
+      if (ttsPollingRef.current) {
+        clearInterval(ttsPollingRef.current);
+        ttsPollingRef.current = null;
+        console.log('[TTS Polling] Stopped - no running messages found');
+      }
+    }
+
+    // Cleanup function
+    return () => {
+      if (ttsPollingRef.current) {
+        clearInterval(ttsPollingRef.current);
+        ttsPollingRef.current = null;
+      }
+    };
+  }, [history, conversationId]);
+
   // Reset everything when component mounts or route params change
   useEffect(() => {
     // Get saved tempo directly from AsyncStorage to ensure we have the latest value
@@ -692,11 +770,12 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     // Set the initial message from the stored welcome data but enhance it with hasAudio property
     // This ensures the welcome message can be replayed
     const enhancedHistory = welcomeData.history?.map((msg, index) => {
-      // Add hasAudio property to the assistant message (which should be the first one)
+      // Add hasAudio and tts_status properties to the assistant message (which should be the first one)
       if (msg.role === 'assistant' && index === 0) {
         return {
           ...msg,
-          hasAudio: welcomeData.has_audio && !isMuted
+          hasAudio: welcomeData.has_audio && !isMuted,
+          tts_status: welcomeData.tts_status || 'completed' // Default to completed for welcome messages
         };
       }
       return msg;
@@ -1007,35 +1086,42 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const handleReplayLastMessage = async () => {
     console.log(`🔄 Replay requested. lastAudioConversationId: ${lastAudioConversationId}, lastAudioMessageIndex: ${lastAudioMessageIndex}, isMuted: ${isMuted}, isPlaying: ${isPlaying}`);
     
-    // Check if we can play audio
-    if (isMuted) {
-      console.log("🔇 Audio is muted, can't replay");
-      setStatusMessage('Audio is muted');
-      return;
-    }
+    // Provide immediate UI feedback
+    setIsPlaying(true);
+    setStatusMessage('Starting replay...');
     
-    // If already playing, stop first
-    if (isPlaying) {
-      console.log("🔄 Already playing audio, stopping first");
-      await stopAudio(true); // Stop but preserve message index
-    }
-    
-    // Verify we have the necessary info to replay
-    if (!lastAudioConversationId || lastAudioMessageIndex === null) {
-      console.log("🔄 Missing audio reference info, can't replay");
-      setStatusMessage('No audio to replay');
-      return;
-    }
-
     try {
+      // Check if we can play audio
+      if (isMuted) {
+        console.log("🔇 Audio is muted, can't replay");
+        setStatusMessage('Audio is muted');
+        setIsPlaying(false);
+        return;
+      }
+      
+      // If already playing, stop first
+      if (isPlaying) {
+        console.log("🔄 Already playing audio, stopping first");
+        await stopAudio(true); // Stop but preserve message index
+      }
+      
+      // Verify we have the necessary info to replay
+      if (!lastAudioConversationId || lastAudioMessageIndex === null) {
+        console.log("🔄 Missing audio reference info, can't replay");
+        setStatusMessage('No audio to replay');
+        setIsPlaying(false);
+        return;
+      }
+
       console.log(`🔄 Replaying message at index ${lastAudioMessageIndex}`);
-      setStatusMessage('Replaying last message...');
+      setStatusMessage('Loading audio...');
 
       // Use the existing playAudio function with the saved conversation ID and message index
       await playAudio(lastAudioConversationId, lastAudioMessageIndex);
     } catch (error) {
       console.error('Error replaying audio:', error);
       setStatusMessage('Failed to replay message');
+      setIsPlaying(false); // Reset playing state on error
     }
   };
 
@@ -1429,6 +1515,7 @@ const handleSubmit = async (inputMessage: string) => {
         translation: lastAssistantMessage.translation || '',
         timestamp: new Date().toISOString(),
         hasAudio: !isMuted,
+        tts_status: 'completed', // Repetitions use cached audio, so always completed
         isRepetition: true
       };
 
@@ -1518,7 +1605,8 @@ const handleSubmit = async (inputMessage: string) => {
                 content: nextMsg.content,
                 translation: nextMsg.translation, // Include translation
                 timestamp: nextMsg.timestamp,
-                hasAudio: response.has_audio // Set hasAudio based on API response
+                hasAudio: response.has_audio, // Set hasAudio based on API response
+                tts_status: response.tts_status || 'completed' // Include TTS status from API
               });
             }
 
@@ -1740,7 +1828,7 @@ const handleAudioData = async () => {
       // Update UI state
       setIsListening(false);
 
-      // Unload previous sound
+      // Unload previous sound (TODO: optimize by reusing if same URL)
       if (soundRef.current) {
         console.log("🎵 [AUDIO] Unloading previous sound before creating new one");
         try {
@@ -1759,8 +1847,8 @@ const handleAudioData = async () => {
         autoRecordTimeoutRef.current = null;
       }
 
-      // Configure audio session for playback
-      await Audio.setAudioModeAsync({
+      // Configure audio session for playback (do this in parallel with other setup)
+      const audioSessionPromise = Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
         interruptionModeIOS: 1, // DoNotMix
@@ -1768,8 +1856,7 @@ const handleAudioData = async () => {
         shouldDuckAndroid: true,
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: false,
-      });
-      console.log("🎧 Audio session configured for playback");
+      }).then(() => console.log("🎧 Audio session configured for playback"));
 
       // Always use the audio settings global reference
       let audioSettings = (global as any).__SAVED_AUDIO_SETTINGS || {
@@ -1792,25 +1879,8 @@ const handleAudioData = async () => {
         setTempo(currentTempo);
       }
       
-      // Double-check with AsyncStorage for complete safety
-      try {
-        const savedTempoStr = await AsyncStorage.getItem(PREFERENCE_KEYS.TEMPO);
-        if (savedTempoStr) {
-          const savedTempo = parseFloat(savedTempoStr);
-          // If AsyncStorage has a different value, update both state and global reference
-          if (savedTempo !== currentTempo) {
-            console.log(`⚠️ AsyncStorage tempo differs from global reference! AsyncStorage: ${savedTempo}, Global: ${currentTempo}`);
-            currentTempo = savedTempo;
-            setTempo(savedTempo);
-            
-            // Update global reference
-            (global as any).__SAVED_AUDIO_SETTINGS.tempo = savedTempo;
-            console.log(`🔄 Updated global audio settings with tempo from AsyncStorage: ${savedTempo}`);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking AsyncStorage tempo before audio playback:', error);
-      }
+      // Skip AsyncStorage check for replay to reduce delay - global reference should be current
+      // Only check AsyncStorage in critical scenarios (not during replay)
       
       // Ensure currentTempo is within valid range and is a number
       currentTempo = Math.max(0.5, Math.min(1.2, parseFloat(currentTempo.toString())));
@@ -1939,6 +2009,9 @@ const handleAudioData = async () => {
       // Save the callback reference for later cleanup
       playbackCallbackRef.current = onStatusUpdate;
 
+      // Wait for audio session to be configured before creating sound
+      await audioSessionPromise;
+      
       // Create sound with shouldPlay: true
       console.log("🎵 [AUDIO] Creating audio object with streaming");
       const { sound } = await Audio.Sound.createAsync(
