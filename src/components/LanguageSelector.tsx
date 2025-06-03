@@ -17,7 +17,7 @@ import colors from '../styles/colors';
 
 // Define available languages by context
 const NATIVE_LANGUAGES = ['en']; // Only English for native language
-const TARGET_LANGUAGES = ['es', 'fr']; // Spanish and French for target language
+const TARGET_LANGUAGES = ['es', 'fr', 'it']; // Spanish, French, and Italian for target language
 
 interface LanguageSelectorProps {
   selectedLanguage: string;
