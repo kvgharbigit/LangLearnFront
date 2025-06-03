@@ -12,6 +12,7 @@ import useSubscriptionStatus from '../hooks/useSubscriptionStatus';
 // Auth Screens
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 
 // Modal Screens are now handled via component modals, not navigation
 
@@ -54,6 +55,7 @@ const AuthNavigator = () => {
     >
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
+      <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     </AuthStack.Navigator>
   );
 };

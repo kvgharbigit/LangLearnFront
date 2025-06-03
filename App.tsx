@@ -3,6 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
+import * as Linking from 'expo-linking';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { useAuth } from './src/contexts/AuthContext';
 import { LanguageProvider } from './src/contexts/LanguageContext';
@@ -16,6 +17,7 @@ import 'react-native-url-polyfill/auto'; // Required for Supabase
 // Import auth screens
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import SubscriptionScreen from './src/screens/SubscriptionScreen';
@@ -44,6 +46,7 @@ const AuthNavigator = () => {
     >
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
+      <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     </AuthStack.Navigator>
   );
 };
@@ -96,12 +99,68 @@ const MainNavigator = () => {
 const RootNavigator = () => {
   const { isAuthenticated, loading, user } = useAuth();
   const [manualAuthStatus, setManualAuthStatus] = React.useState(false);
+  const [shouldShowResetPassword, setShouldShowResetPassword] = React.useState(false);
+  const [resetTokenHash, setResetTokenHash] = React.useState<string>('');
   const periodicCheckRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Handle deep links
+  React.useEffect(() => {
+    const handleDeepLink = (event: { url: string }) => {
+      console.log('Deep link received in RootNavigator:', event.url);
+      
+      if (event.url.includes('auth/reset-password')) {
+        console.log('Reset password deep link detected');
+        
+        // Extract the hash from the URL
+        const urlParts = event.url.split('#');
+        if (urlParts.length > 1) {
+          const hash = '#' + urlParts[1];
+          console.log('Extracted hash for reset:', hash);
+          
+          // Store the hash in a ref or state to pass to the screen
+          setResetTokenHash(hash);
+        }
+        
+        setShouldShowResetPassword(true);
+      }
+    };
+
+    // Listen for deep links
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    
+    // Check if app was opened with a deep link
+    Linking.getInitialURL().then((url) => {
+      if (url && url.includes('auth/reset-password')) {
+        console.log('App opened with reset password link:', url);
+        
+        // Extract the hash from the URL
+        const urlParts = url.split('#');
+        if (urlParts.length > 1) {
+          const hash = '#' + urlParts[1];
+          console.log('Extracted initial hash for reset:', hash);
+          setResetTokenHash(hash);
+        }
+        
+        setShouldShowResetPassword(true);
+      }
+    });
+
+    return () => subscription?.remove();
+  }, []);
+
+  // Clear reset password flag when user becomes authenticated
+  React.useEffect(() => {
+    if (isAuthenticated && shouldShowResetPassword) {
+      console.log('User authenticated after password reset - clearing reset flag');
+      setShouldShowResetPassword(false);
+      setResetTokenHash('');
+    }
+  }, [isAuthenticated, shouldShowResetPassword]);
 
   // Set up a periodic check to detect authentication status
   React.useEffect(() => {
     // Only run periodic check if not already authenticated
-    if (!isAuthenticated && !manualAuthStatus) {
+    if (!isAuthenticated && !manualAuthStatus && !shouldShowResetPassword) {
       console.log('RootNavigator: Setting up periodic auth check');
       
       // Define the check function
@@ -146,12 +205,34 @@ const RootNavigator = () => {
         periodicCheckRef.current = null;
       }
     }
-  }, [isAuthenticated, manualAuthStatus]);
+  }, [isAuthenticated, manualAuthStatus, shouldShowResetPassword]);
 
-  if (loading && !manualAuthStatus) {
+  if (loading && !manualAuthStatus && !shouldShowResetPassword) {
     console.log('RootNavigator: Loading auth state');
     // You could add a splash screen here
     return null;
+  }
+
+  // Special case: if reset password was triggered, always show auth navigator
+  if (shouldShowResetPassword) {
+    console.log('RootNavigator: Showing reset password screen with hash:', resetTokenHash);
+    return (
+      <NavigationContainer linking={linking}>
+        <NetworkStatusBar />
+        <AuthStack.Navigator 
+          screenOptions={{ headerShown: false }}
+          initialRouteName="ResetPassword"
+        >
+          <AuthStack.Screen name="Login" component={LoginScreen} />
+          <AuthStack.Screen name="Register" component={RegisterScreen} />
+          <AuthStack.Screen 
+            name="ResetPassword" 
+            component={ResetPasswordScreen}
+            initialParams={{ hash: resetTokenHash }}
+          />
+        </AuthStack.Navigator>
+      </NavigationContainer>
+    );
   }
 
   // Use either the context auth state or our manual check
@@ -160,11 +241,31 @@ const RootNavigator = () => {
     isAuthenticated,
     manualAuthStatus,
     shouldShowMain,
+    shouldShowResetPassword,
     userId: user?.id
   });
 
+  // Deep linking configuration
+  const linking = {
+    prefixes: [Linking.createURL('/'), 'confluency://'],
+    config: {
+      screens: {
+        Login: 'auth/login',
+        Register: 'auth/register', 
+        ResetPassword: 'auth/reset-password',
+        LanguageLanding: 'main/landing',
+        LanguageTutor: 'main/tutor',
+        AudioTest: 'main/audio-test',
+        Profile: 'main/profile',
+        EditProfile: 'main/edit-profile',
+        Subscription: 'main/subscription',
+        AppLanguage: 'main/app-language',
+      },
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       {/* Always show network status */}
       <NetworkStatusBar />
       

@@ -284,7 +284,9 @@ export const logoutUser = async (): Promise<AuthResponse> => {
 // Reset password
 export const resetPassword = async (email: string): Promise<AuthResponse> => {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://confluency.org/reset-password.html'
+    });
     if (error) throw error;
     
     return { success: true };
