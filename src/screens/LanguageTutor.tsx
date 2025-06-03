@@ -1059,7 +1059,15 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
           console.log("🔇 Audio stopped successfully");
         } catch (audioError) {
           console.log("🔇 Error stopping audio object:", audioError);
-          // Continue with cleanup even if the audio object errors out
+          // For "Seeking interrupted" errors, try to unload the sound completely
+          if (audioError.message && audioError.message.includes('Seeking interrupted')) {
+            try {
+              await soundRef.current.unloadAsync();
+              console.log("🔇 Sound unloaded after seeking interruption");
+            } catch (unloadError) {
+              console.log("🔇 Error unloading after seeking interruption:", unloadError);
+            }
+          }
         }
         
         // Clear the sound reference, but don't set to null since we might need it for replay
@@ -1099,10 +1107,24 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         return;
       }
       
-      // If already playing, stop first
+      // If already playing, stop first and wait for it to complete
       if (isPlaying) {
         console.log("🔄 Already playing audio, stopping first");
         await stopAudio(true); // Stop but preserve message index
+        
+        // Give a brief moment for the audio to fully stop
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Verify audio actually stopped
+        if (isPlaying) {
+          console.log("🔄 Audio didn't stop properly, forcing state reset");
+          setIsPlaying(false);
+        }
+        
+        // If user tapped the green button while playing the same message, they want to STOP, not replay
+        console.log("🔄 Audio stopped. User tapped to stop, not replay.");
+        setStatusMessage('Audio stopped');
+        return; // Exit without replaying
       }
       
       // Verify we have the necessary info to replay
@@ -1622,7 +1644,8 @@ const handleSubmit = async (inputMessage: string) => {
             newHistory.push({
               ...currentMsg,
               translation: currentMsg.translation, // Include translation if present
-              hasAudio: response.has_audio // Set hasAudio based on API response
+              hasAudio: response.has_audio, // Set hasAudio based on API response
+              tts_status: response.tts_status || 'completed' // Include TTS status from API
             });
           } else {
             newHistory.push(currentMsg);
@@ -1763,7 +1786,8 @@ const handleAudioData = async () => {
             content: response.reply,
             translation: response.translation, // Include translation
             timestamp: new Date().toISOString(),
-            hasAudio: response.has_audio // Set hasAudio based on API response
+            hasAudio: response.has_audio, // Set hasAudio based on API response
+            tts_status: response.tts_status || 'completed' // Include TTS status from API
           }
         ];
       }

@@ -449,8 +449,20 @@ const Message: React.FC<MessageProps> = ({
         {/* Add audio controls for assistant messages if this is the latest one */}
         {isAssistant && isLatestAssistantMessage && message.hasAudio && !isMuted && (
           <View style={styles.replayButtonContainer}>
-            {message.tts_status === 'running' ? (
-              // Show loading indicator when TTS is generating
+            {isPlaying === true ? (
+              // Show green playing button when audio is actually playing (highest priority)
+              <TouchableOpacity
+                style={[
+                  styles.replayButton,
+                  styles.replayButtonPlaying
+                ]}
+                onPress={onRequestReplay}
+              >
+                <Ionicons name="volume-high" size={16} color="#ffffff" />
+                <Text style={styles.replayButtonText}>Playing...</Text>
+              </TouchableOpacity>
+            ) : message.tts_status === 'running' ? (
+              // Show loading indicator when TTS is generating and not playing
               <View style={styles.audioStatusContainer}>
                 <Ionicons name="musical-notes" size={16} color="#666" />
                 <Text style={styles.audioStatusText}>Generating audio...</Text>
@@ -462,23 +474,13 @@ const Message: React.FC<MessageProps> = ({
                 <Text style={[styles.audioStatusText, { color: '#ff6b6b' }]}>Audio failed</Text>
               </View>
             ) : message.tts_status === 'completed' && onRequestReplay ? (
-              // Show replay button when TTS is ready
+              // Show grey replay button when TTS is ready but not playing
               <TouchableOpacity
-                style={[
-                  styles.replayButton,
-                  isPlaying === true && styles.replayButtonPlaying // Explicit check
-                ]}
+                style={styles.replayButton}
                 onPress={onRequestReplay}
-                disabled={isPlaying === true} // Explicit check
               >
-                {isPlaying === true ? ( // Explicit check
-                  <Ionicons name="volume-high" size={16} color="#ffffff" />
-                ) : (
-                  <Ionicons name="play" size={16} color="#ffffff" />
-                )}
-                <Text style={styles.replayButtonText}>
-                  {isPlaying === true ? 'Playing...' : 'Replay'} {/* Explicit check */}
-                </Text>
+                <Ionicons name="play" size={16} color="#ffffff" />
+                <Text style={styles.replayButtonText}>Replay</Text>
               </TouchableOpacity>
             ) : null}
           </View>
