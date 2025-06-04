@@ -117,7 +117,7 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
         email,
         options: {
           // For Supabase JS v2, use redirectTo
-          redirectTo: 'https://persistent-lychee-e09.notion.site/Email-Verified-1fa282c115ae8070a6dcd5c2c108a17b?pvs=4'
+          redirectTo: 'https://confluency.org/email-verified.html'
         }
       });
       

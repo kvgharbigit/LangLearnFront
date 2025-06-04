@@ -92,7 +92,7 @@ export const registerUser = async (
           data: {
             full_name: displayName
           },
-          emailRedirectTo: 'confluency://auth/callback' // For email verification
+          emailRedirectTo: 'https://confluency.org/email-verified' // For email verification
         }
       });
 
@@ -192,7 +192,7 @@ export const resendVerificationEmail = async (email: string): Promise<AuthRespon
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: 'confluency://auth/callback'
+        emailRedirectTo: 'https://confluency.org/email-verified'
       }
     });
     
@@ -285,7 +285,7 @@ export const logoutUser = async (): Promise<AuthResponse> => {
 export const resetPassword = async (email: string): Promise<AuthResponse> => {
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://confluency.org/reset-password.html'
+      redirectTo: 'https://confluency.org/reset-password'
     });
     if (error) throw error;
     
