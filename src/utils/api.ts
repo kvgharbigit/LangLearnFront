@@ -11,11 +11,11 @@ import { estimateTokens } from '../types/usage.normalized';
 import userPreferences from './userPreferences';
 
 // Update this to your actual API URL
-export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
+//export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
 //const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
 //export const API_URL = 'http://192.168.86.246:8004'; // Desktop WiFi IP address - CORRECTED
 //export const API_URL =  "http://172.20.10.2:8004" //macbook pro
-//export const API_URL = "http://192.168.86.31:8004"
+export const API_URL = "http://192.168.86.31:8004"
 
 
 

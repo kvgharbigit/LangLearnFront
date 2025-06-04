@@ -563,6 +563,13 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       progressColor = '#FFC107';
     }
     
+    // Calculate usage breakdown percentages
+    const totalCost = usage.calculatedCosts?.totalCost || 0;
+    const whisperPercentage = totalCost > 0 ? (usage.calculatedCosts.whisperCost / totalCost) * 100 : 0;
+    const claudePercentage = totalCost > 0 ? 
+      ((usage.calculatedCosts.claudeInputCost + usage.calculatedCosts.claudeOutputCost) / totalCost) * 100 : 0;
+    const ttsPercentage = totalCost > 0 ? (usage.calculatedCosts.ttsCost / totalCost) * 100 : 0;
+    
     return (
       <View style={styles.usageContainer}>
         <View style={styles.usageHeader}>
@@ -598,6 +605,38 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.tokenCount}>
           {isNaN(tokenUsage.usedTokens) ? '0' : Math.round(tokenUsage.usedTokens)} of {isNaN(tokenUsage.tokenLimit) ? '150000' : tokenUsage.tokenLimit} tokens used
         </Text>
+        
+        {/* Usage Breakdown */}
+        {totalCost > 0 && (
+          <View style={styles.usageBreakdown}>
+            <Text style={styles.breakdownTitle}>Usage Breakdown</Text>
+            
+            <View style={styles.breakdownItem}>
+              <View style={styles.breakdownLabelContainer}>
+                <Ionicons name="mic-outline" size={16} color={colors.textSecondary} />
+                <Text style={styles.breakdownLabel}>Voice Transcription</Text>
+              </View>
+              <Text style={styles.breakdownValue}>{whisperPercentage.toFixed(1)}%</Text>
+            </View>
+            
+            <View style={styles.breakdownItem}>
+              <View style={styles.breakdownLabelContainer}>
+                <Ionicons name="chatbubbles-outline" size={16} color={colors.textSecondary} />
+                <Text style={styles.breakdownLabel}>Conversational Replies</Text>
+              </View>
+              <Text style={styles.breakdownValue}>{claudePercentage.toFixed(1)}%</Text>
+            </View>
+            
+            <View style={styles.breakdownItem}>
+              <View style={styles.breakdownLabelContainer}>
+                <Ionicons name="volume-high-outline" size={16} color={colors.textSecondary} />
+                <Text style={styles.breakdownLabel}>AI Audio Generation</Text>
+              </View>
+              <Text style={styles.breakdownValue}>{ttsPercentage.toFixed(1)}%</Text>
+            </View>
+          </View>
+        )}
+        
         
         <Text style={styles.usageNote}>
           Resets on {formatDate(new Date(usage.currentPeriodEnd))}
@@ -1673,6 +1712,73 @@ const styles = StyleSheet.create({
   legalLink: {
     color: colors.primary,
     textDecorationLine: 'underline',
+  },
+  usageBreakdown: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+  },
+  breakdownTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray800,
+    marginBottom: 12,
+  },
+  breakdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  breakdownLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  breakdownLabel: {
+    fontSize: 13,
+    color: colors.gray700,
+    marginLeft: 8,
+  },
+  breakdownValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.gray800,
+  },
+  detailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+  },
+  detailsButtonText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: '500',
+    marginRight: 4,
+  },
+  usageDetails: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: colors.gray600,
+  },
+  detailValue: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.gray700,
   },
 });
 
