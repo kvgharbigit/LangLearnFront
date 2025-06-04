@@ -6,7 +6,12 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
 import colors from '../styles/colors';
 
-const ResetPasswordScreen = () => {
+interface ResetPasswordScreenProps {
+  hash?: string;
+  onResetComplete?: () => void;
+}
+
+const ResetPasswordScreen = ({ hash: propHash, onResetComplete }: ResetPasswordScreenProps) => {
   const [loading, setLoading] = useState(true);
   const [sessionRecovered, setSessionRecovered] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -17,24 +22,8 @@ const ResetPasswordScreen = () => {
 
   useEffect(() => {
     handlePasswordResetToken();
-    
-    // Listen for incoming URLs (deep links)
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-    
-    return () => subscription?.remove();
   }, []);
 
-  const handleDeepLink = (event: { url: string }) => {
-    console.log('Deep link received:', event.url);
-    
-    // Extract hash from deep link
-    const url = new URL(event.url);
-    const hash = url.hash;
-    
-    if (hash) {
-      processResetToken(hash);
-    }
-  };
 
   const handlePasswordResetToken = async () => {
     try {
@@ -46,20 +35,26 @@ const ResetPasswordScreen = () => {
       
       let hash = '';
       
-      // Check for hash in route params (from deep link)
-      if (params?.hash) {
-        console.log('Found hash in route params:', params.hash);
+      // Check if we have the hash from props first (most reliable)
+      if (propHash) {
+        console.log('Found hash from props:', propHash);
+        hash = propHash;
+      }
+      // Check if we have the hash directly from route params (from deep link)
+      else if (params?.hash) {
+        console.log('Found hash from route params:', params.hash);
         hash = params.hash;
       }
-      // Check for individual token parameters
+      // React Navigation automatically parses URL parameters
+      // Check for direct URL parameters (React Navigation will parse these)
       else if (params?.access_token && params?.type === 'recovery') {
-        console.log('Found individual token params:', {
+        console.log('Found parsed token params from React Navigation:', {
           access_token: params.access_token?.substring(0, 20) + '...',
           type: params.type
         });
         hash = `#access_token=${params.access_token}&expires_in=${params.expires_in || 3600}&refresh_token=${params.refresh_token || ''}&token_type=${params.token_type || 'bearer'}&type=recovery`;
       }
-      // Check if we can get the initial URL that opened the app
+      // Fallback: check if we can get the initial URL that opened the app
       else {
         console.log('Checking initial URL...');
         const initialUrl = await Linking.getInitialURL();
@@ -125,6 +120,7 @@ const ResetPasswordScreen = () => {
       }
       
       // For recovery tokens, we need to set the session directly
+      // But we don't want to trigger full authentication until password is changed
       console.log('Setting session from recovery token...');
       
       const { data, error } = await supabase.auth.setSession({
@@ -206,11 +202,12 @@ const ResetPasswordScreen = () => {
           {
             text: 'OK',
             onPress: () => {
-              // Reset the reset password flag and navigate to login
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Login' as never }],
-              });
+              // Clear the reset password flag to allow normal navigation
+              if (onResetComplete) {
+                onResetComplete();
+              }
+              // The App.tsx will automatically navigate to Main since user is authenticated
+              // No need to manually navigate since the flag will be cleared
             }
           }
         ]
@@ -267,7 +264,12 @@ const ResetPasswordScreen = () => {
           </Text>
           <TouchableOpacity 
             style={styles.button}
-            onPress={() => navigation.navigate('Login' as never)}
+            onPress={() => {
+              if (onResetComplete) {
+                onResetComplete();
+              }
+              navigation.navigate('Login' as never);
+            }}
           >
             <Text style={styles.buttonText}>Back to Login</Text>
           </TouchableOpacity>

@@ -148,14 +148,8 @@ const RootNavigator = () => {
     return () => subscription?.remove();
   }, []);
 
-  // Clear reset password flag when user becomes authenticated
-  React.useEffect(() => {
-    if (isAuthenticated && shouldShowResetPassword) {
-      console.log('User authenticated after password reset - clearing reset flag');
-      setShouldShowResetPassword(false);
-      setResetTokenHash('');
-    }
-  }, [isAuthenticated, shouldShowResetPassword]);
+  // Don't automatically clear reset password flag when user becomes authenticated
+  // Let the ResetPasswordScreen handle clearing the flag after successful password update
 
   // Set up a periodic check to detect authentication status
   React.useEffect(() => {
@@ -227,8 +221,12 @@ const RootNavigator = () => {
           <AuthStack.Screen name="Register" component={RegisterScreen} />
           <AuthStack.Screen 
             name="ResetPassword" 
-            component={ResetPasswordScreen}
-            initialParams={{ hash: resetTokenHash }}
+            children={() => (
+              <ResetPasswordScreen 
+                hash={resetTokenHash}
+                onResetComplete={() => setShouldShowResetPassword(false)}
+              />
+            )}
           />
         </AuthStack.Navigator>
       </NavigationContainer>

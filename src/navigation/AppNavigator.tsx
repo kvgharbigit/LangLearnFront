@@ -1,6 +1,6 @@
 // src/navigation/AppNavigator.tsx
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -45,6 +45,42 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
+
+// Deep linking configuration
+const linking = {
+  prefixes: ['confluency://'],
+  config: {
+    screens: {
+      Auth: {
+        screens: {
+          ResetPassword: 'auth/reset-password',
+          Login: 'auth/login',
+          Register: 'auth/register',
+        },
+      },
+      Main: {
+        screens: {
+          Home: {
+            screens: {
+              LanguageLanding: 'home',
+              LanguageTutor: 'tutor',
+              AudioTest: 'audio-test',
+            },
+          },
+          Profile: {
+            screens: {
+              ProfileMain: 'profile',
+              EditProfile: 'profile/edit',
+              Subscription: 'profile/subscription',
+              PrivacyPolicy: 'profile/privacy',
+              TermsOfService: 'profile/terms',
+            },
+          },
+        },
+      },
+    },
+  },
+};
 
 // Auth Navigator - Screens accessible before login
 const AuthNavigator = () => {
@@ -128,6 +164,38 @@ const MainNavigator = () => {
 // Main App Navigator - Switches between Auth and Main based on login state
 const AppNavigator = () => {
   const { isAuthenticated, loading, user } = useAuth();
+  const [shouldShowResetPassword, setShouldShowResetPassword] = useState(false);
+
+  // Function to clear reset password flag - can be called by ResetPasswordScreen
+  const clearResetPasswordFlag = () => {
+    console.log('Clearing reset password flag');
+    setShouldShowResetPassword(false);
+  };
+
+  // Check for reset password deep link on app start
+  useEffect(() => {
+    const checkInitialURL = async () => {
+      try {
+        const initialUrl = await Linking.getInitialURL();
+        if (initialUrl && initialUrl.includes('auth/reset-password')) {
+          setShouldShowResetPassword(true);
+        }
+      } catch (error) {
+        console.log('Error checking initial URL:', error);
+      }
+    };
+
+    checkInitialURL();
+
+    // Listen for incoming URLs while app is running
+    const subscription = Linking.addEventListener('url', (event) => {
+      if (event.url.includes('auth/reset-password')) {
+        setShouldShowResetPassword(true);
+      }
+    });
+
+    return () => subscription?.remove();
+  }, []);
   
   // Only check subscription status when authenticated
   // Check every 24 hours (86400000 ms)
@@ -161,13 +229,47 @@ const AppNavigator = () => {
     );
   };
 
-  // Navigation state is determined by isAuthenticated value
+  // Navigation state logic:
+  // 1. If reset password flow is active, always show Auth stack
+  // 2. Otherwise, show Main if authenticated, Auth if not
+  const shouldShowMain = isAuthenticated && !shouldShowResetPassword;
+  
+  console.log('RootNavigator: Navigation decision -', {
+    isAuthenticated,
+    shouldShowResetPassword,
+    shouldShowMain,
+    userId: user?.id
+  });
+
+  // Handle navigation based on auth state changes
+  useEffect(() => {
+    if (!loading && navigationRef.current) {
+      const currentRoute = navigationRef.current.getCurrentRoute();
+      
+      if (shouldShowMain && currentRoute?.name !== 'Main') {
+        // Only navigate to Main if not in reset password flow
+        if (!shouldShowResetPassword) {
+          console.log('Navigating to Main - user authenticated');
+          navigationRef.current.reset({
+            index: 0,
+            routes: [{ name: 'Main' }],
+          });
+        }
+      } else if (!shouldShowMain && currentRoute?.name !== 'Auth') {
+        console.log('Navigating to Auth - user not authenticated');
+        navigationRef.current.reset({
+          index: 0,
+          routes: [{ name: 'Auth' }],
+        });
+      }
+    }
+  }, [shouldShowMain, shouldShowResetPassword, loading]);
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       <Stack.Navigator 
         screenOptions={{ headerShown: false }}
-        initialRouteName={isAuthenticated ? "Main" : "Auth"}
+        initialRouteName="Auth"
       >
         {/* Always include both screens but control navigation via initialRouteName */}
         <Stack.Screen 
