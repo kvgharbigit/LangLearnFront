@@ -17,13 +17,60 @@ const ResetPasswordScreen = ({ hash: propHash, onResetComplete }: ResetPasswordS
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [autoRedirectTimer, setAutoRedirectTimer] = useState<NodeJS.Timeout | null>(null);
+  const [errorHandled, setErrorHandled] = useState(false);
   const navigation = useNavigation();
   const route = useRoute();
 
   useEffect(() => {
     handlePasswordResetToken();
+    
+    // Cleanup timer on unmount
+    return () => {
+      if (autoRedirectTimer) {
+        clearTimeout(autoRedirectTimer);
+      }
+    };
   }, []);
 
+  const handleRedirectToLogin = () => {
+    // Clear the reset password flag and navigate to login
+    if (onResetComplete) {
+      onResetComplete();
+    }
+    navigation.navigate('Login' as never);
+  };
+
+  const showErrorAndRedirect = (title: string, message: string, autoRedirectDelay: number = 5000) => {
+    // Mark that we've handled an error to prevent showing the error screen
+    setErrorHandled(true);
+    
+    // Set up auto-redirect timer
+    const timer = setTimeout(() => {
+      handleRedirectToLogin();
+    }, autoRedirectDelay);
+    
+    setAutoRedirectTimer(timer);
+    
+    // Show alert with manual redirect option
+    Alert.alert(
+      title,
+      `${message}\n\nYou will be redirected to login in ${autoRedirectDelay / 1000} seconds.`,
+      [
+        {
+          text: 'Go to Login Now',
+          onPress: () => {
+            // Clear the auto-redirect timer
+            if (timer) {
+              clearTimeout(timer);
+            }
+            handleRedirectToLogin();
+          }
+        }
+      ],
+      { cancelable: false }
+    );
+  };
 
   const handlePasswordResetToken = async () => {
     try {
@@ -80,7 +127,10 @@ const ResetPasswordScreen = ({ hash: propHash, onResetComplete }: ResetPasswordS
       
       if (!hash) {
         console.error('No recovery token found anywhere');
-        Alert.alert('Error', 'No recovery token found. Please use the reset link from your email.');
+        showErrorAndRedirect(
+          'No Reset Token',
+          'No password reset token was found. Please use the reset link from your email.'
+        );
         setLoading(false);
         return;
       }
@@ -88,7 +138,10 @@ const ResetPasswordScreen = ({ hash: propHash, onResetComplete }: ResetPasswordS
       await processResetToken(hash);
     } catch (error) {
       console.error('Password reset handling error:', error);
-      Alert.alert('Error', 'Failed to process password reset');
+      showErrorAndRedirect(
+        'Error',
+        'Failed to process password reset. Please try again.'
+      );
       setLoading(false);
     }
   };
@@ -136,9 +189,15 @@ const ResetPasswordScreen = ({ hash: propHash, onResetComplete }: ResetPasswordS
         });
         
         if (error.message.includes('expired')) {
-          Alert.alert('Error', 'Reset link has expired. Please request a new one.');
+          showErrorAndRedirect(
+            'Link Expired',
+            'This password reset link has expired. Please request a new one.'
+          );
         } else if (error.message.includes('invalid')) {
-          Alert.alert('Error', 'Invalid reset link. Please request a new one.');
+          showErrorAndRedirect(
+            'Invalid Link',
+            'This password reset link is invalid. Please request a new one.'
+          );
         } else {
           Alert.alert('Error', `Token setup failed: ${error.message}`);
         }
@@ -157,13 +216,19 @@ const ResetPasswordScreen = ({ hash: propHash, onResetComplete }: ResetPasswordS
         setSessionRecovered(true);
       } else {
         console.error('No session returned from recovery token setup');
-        Alert.alert('Error', 'Failed to establish session from reset token');
+        showErrorAndRedirect(
+          'Session Error',
+          'Failed to establish session from reset token. Please request a new reset link.'
+        );
       }
       
       setLoading(false);
     } catch (error) {
       console.error('Token processing error:', error);
-      Alert.alert('Error', 'Failed to process reset token');
+      showErrorAndRedirect(
+        'Processing Error',
+        'Failed to process reset token. Please request a new reset link.'
+      );
       setLoading(false);
     }
   };
@@ -254,7 +319,7 @@ const ResetPasswordScreen = ({ hash: propHash, onResetComplete }: ResetPasswordS
     );
   }
 
-  if (!sessionRecovered) {
+  if (!sessionRecovered && !errorHandled) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
@@ -344,7 +409,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: colors.error,
+    color: colors.danger,
     marginBottom: 16,
     textAlign: 'center',
   },
