@@ -84,6 +84,9 @@ const translations: Record<string, Record<string, string>> = {
     'language.start.button': 'Start Learning',
     'language.app.title': 'App Language',
 
+    // Common
+    'common.error': 'Error',
+    
     // Buttons
     'button.cancel': 'Cancel',
     'button.save': 'Save',
@@ -147,6 +150,9 @@ const translations: Record<string, Record<string, string>> = {
     'language.start.button': 'Comenzar a Aprender',
     'language.app.title': 'Idioma de la Aplicación',
 
+    // Common
+    'common.error': 'Error',
+    
     'button.cancel': 'Cancelar',
     'button.save': 'Guardar',
     'button.select': 'Seleccionar',
@@ -191,6 +197,9 @@ const translations: Record<string, Record<string, string>> = {
     'language.start.button': 'Commencer l\'Apprentissage',
     'language.app.title': 'Langue de l\'Application',
 
+    // Common
+    'common.error': 'Erreur',
+    
     'button.cancel': 'Annuler',
     'button.save': 'Enregistrer',
     'button.select': 'Sélectionner',
@@ -235,6 +244,9 @@ const translations: Record<string, Record<string, string>> = {
     'language.start.button': 'Mit dem Lernen beginnen',
     'language.app.title': 'App-Sprache',
 
+    // Common
+    'common.error': 'Fehler',
+    
     'button.cancel': 'Abbrechen',
     'button.save': 'Speichern',
     'button.select': 'Auswählen',
@@ -279,6 +291,9 @@ const translations: Record<string, Record<string, string>> = {
     'language.start.button': '开始学习',
     'language.app.title': '应用语言',
 
+    // Common
+    'common.error': '错误',
+    
     'button.cancel': '取消',
     'button.save': '保存',
     'button.select': '选择',

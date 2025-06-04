@@ -148,11 +148,11 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
       translate('profile.logoutConfirmMessage'),
       [
         {
-          text: translate('common.cancel'),
+          text: translate('button.cancel'),
           style: 'cancel',
         },
         {
-          text: translate('common.logout'),
+          text: translate('profile.logout'),
           style: 'destructive',
           onPress: async () => {
             setIsLoading(true);
@@ -256,7 +256,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
-          accessibilityLabel={translate('common.back')}
+          accessibilityLabel={translate('button.back')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.gray800} />
         </TouchableOpacity>
@@ -310,6 +310,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{translate('profile.settings')}</Text>
             
+            {/* App Language Selection - Temporarily Disabled
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => navigation.navigate('AppLanguage')}
@@ -324,6 +325,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
             </TouchableOpacity>
+            */}
             
             <TouchableOpacity
               style={styles.menuItem}
@@ -398,7 +400,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
               accessibilityLabel="Delete Account"
             >
               <View style={styles.menuIconContainer}>
-                <Ionicons name="trash-outline" size={22} color={colors.error} />
+                <Ionicons name="trash-outline" size={22} color={colors.gray800} />
               </View>
               <View style={styles.menuTextContainer}>
                 <Text style={styles.deleteAccountText}>Delete Account</Text>
@@ -479,14 +481,14 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.logoutButton}
             onPress={handleLogout}
             disabled={isLoading}
-            accessibilityLabel={translate('common.logout')}
+            accessibilityLabel={translate('profile.logout')}
           >
             {isLoading ? (
-              <ActivityIndicator size="small" color={colors.error} />
+              <ActivityIndicator size="small" color={colors.danger} />
             ) : (
               <>
-                <Ionicons name="log-out-outline" size={20} color={colors.error} />
-                <Text style={styles.logoutText}>{translate('common.logout')}</Text>
+                <Ionicons name="log-out-outline" size={20} color={colors.danger} />
+                <Text style={styles.logoutText}>{translate('profile.logout')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -708,7 +710,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   logoutText: {
-    color: colors.error,
+    color: colors.danger,
     fontWeight: '600',
     marginLeft: 8,
   },
@@ -770,7 +772,7 @@ const styles = StyleSheet.create({
   },
   deleteAccountText: {
     fontSize: 16,
-    color: colors.error,
+    color: colors.gray800,
     marginBottom: 2,
   },
   deleteAccountSubtext: {
@@ -800,7 +802,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.error,
+    color: colors.danger,
     marginBottom: 16,
     textAlign: 'center',
   },

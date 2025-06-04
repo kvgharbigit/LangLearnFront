@@ -33,18 +33,18 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
       title: 'Conversations',
       modes: [
         {
-          id: 'topic_lesson' as ConversationMode,
-          label: 'Special Topic Lesson',
-          icon: 'school-outline',
-          description: 'Explore fascinating topics in your target language - history, culture, sport, geopolitics...',
-          placeholder: '• History of Rome\n• Dog Training Tips\n• Modern Art Movements'
-        },
-        {
           id: 'free_conversation' as ConversationMode,
           label: 'Free Conversation',
           icon: 'chatbubbles-outline',
           description: 'Engage in natural, unstructured conversations about any topic that interests you.',
           placeholder: '• Game of Thrones\n• Golfing Tips\n• Holiday Destinations'
+        },
+        {
+          id: 'topic_lesson' as ConversationMode,
+          label: 'Special Topic Lesson',
+          icon: 'school-outline',
+          description: 'Explore fascinating topics in your target language - history, culture, sport, geopolitics...',
+          placeholder: '• History of Rome\n• Dog Training Tips\n• Modern Art Movements'
         },
         {
           id: 'interview' as ConversationMode,
