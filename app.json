@@ -2,7 +2,7 @@
   "expo": {
     "name": "Confluency",
     "slug": "language-tutor",
-    "version": "1.1.0",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/transparent_background_icon.png",
     "userInterfaceStyle": "light",
