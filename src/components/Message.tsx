@@ -66,7 +66,8 @@ const Message: React.FC<MessageProps> = ({
   const [isShowingNativeTranslation, setIsShowingNativeTranslation] = useState<boolean>(false);
   // Use message timestamp as unique key for height tracking
   const messageKey = `${message.timestamp}_${message.content}`;
-  const [nativeContainerHeight, setNativeContainerHeight] = useState<number | null>(null);
+  const [annotationContainerHeight, setAnnotationContainerHeight] = useState<number | null>(null);
+  const [heightLocked, setHeightLocked] = useState<boolean>(false);
   
   // Calculate padding needed to equalize text heights
   const textPadding = useMemo(() => {
@@ -89,8 +90,10 @@ const Message: React.FC<MessageProps> = ({
 
   // Reset height when message changes
   useEffect(() => {
-    setNativeContainerHeight(null);
+    setAnnotationContainerHeight(null);
+    setHeightLocked(false);
     setIsShowingNativeTranslation(false); // Also reset toggle state
+    setIsShowingTranslation(false); // Reset regular translation toggle too
   }, [messageKey]);
 
   // Calculate estimated height based on text content to minimize layout changes
@@ -275,11 +278,12 @@ const Message: React.FC<MessageProps> = ({
   };
 
   // Handler to measure and lock container height
-  const handleNativeContainerLayout = (event: any) => {
-    if (nativeContainerHeight === null) {
+  const handleAnnotationContainerLayout = (event: any) => {
+    if (!heightLocked && annotationContainerHeight === null) {
       const { height } = event.nativeEvent.layout;
-      // Add minimal padding for the hint text (approx 5px for hint + tiny margin)
-      setNativeContainerHeight(Math.max(height + 5, 50)); // Minimum 50px height
+      console.log(`📏 Measuring annotation container height: ${height}px for ${isUser ? 'user' : 'assistant'} message`);
+      setAnnotationContainerHeight(height);
+      setHeightLocked(true);
     }
   };
 
@@ -306,15 +310,42 @@ const Message: React.FC<MessageProps> = ({
       <View style={styles.messageContent}>
         {isUser && bothCorrectionsMatch ? (
           // NEW CASE: When both corrections match the user input, show only one message in green with both emoji indicators
-          <View style={styles.perfectMatchContainer}>
-            <Text style={styles.perfectMatchText}>
-              {message.corrected} {/* Use the corrected version with proper punctuation */}
-            </Text>
-            <View style={styles.emojiContainer}>
-              <Text style={styles.emojiIcon}>📝</Text>
-              <Text style={styles.emojiIcon}>🌍</Text>
+          message.natural_translation ? (
+            <TouchableOpacity
+              onPress={toggleNativeTranslation}
+              activeOpacity={0.6}
+              style={[
+                styles.perfectMatchTouchable,
+                heightLocked && annotationContainerHeight ? { height: annotationContainerHeight } : {}
+              ]}
+              onLayout={handleAnnotationContainerLayout}
+            >
+              <View style={styles.perfectMatchContainer}>
+                <Text style={styles.perfectMatchText}>
+                  {isShowingNativeTranslation ? message.natural_translation : message.corrected}
+                </Text>
+                <View style={styles.emojiContainer}>
+                  <Text style={styles.emojiIcon}>📝</Text>
+                  <Text style={styles.emojiIcon}>🌍</Text>
+                </View>
+              </View>
+              {isAssistant && (
+                <Text style={styles.nativeTranslationHint}>
+                  {isShowingNativeTranslation ? "Tap to see original" : "Tap to see translation"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.perfectMatchContainer}>
+              <Text style={styles.perfectMatchText}>
+                {message.corrected} {/* Use the corrected version with proper punctuation */}
+              </Text>
+              <View style={styles.emojiContainer}>
+                <Text style={styles.emojiIcon}>📝</Text>
+                <Text style={styles.emojiIcon}>🌍</Text>
+              </View>
             </View>
-          </View>
+          )
         ) : isUser && onlyGrammarCorrect ? (
           // NEW CASE: Grammatically correct but not natively correct
           <View>
@@ -329,10 +360,14 @@ const Message: React.FC<MessageProps> = ({
             </View>
 
             {/* Show only the native alternative below */}
-            <View style={[
-              styles.annotationsContainer,
-              isUser ? styles.annotationsContainerUser : {}
-            ]}>
+            <View 
+              style={[
+                styles.annotationsContainer,
+                isUser ? styles.annotationsContainerUser : {},
+                heightLocked && annotationContainerHeight ? { height: annotationContainerHeight } : {}
+              ]}
+              onLayout={handleAnnotationContainerLayout}
+            >
               {message.natural_translation ? (
                 <TouchableOpacity
                   onPress={toggleNativeTranslation}
@@ -341,7 +376,6 @@ const Message: React.FC<MessageProps> = ({
                     styles.nativeTranslationTouchable, 
                     isUser ? styles.nativeTranslationContainerUser : styles.nativeTranslationContainer
                   ]}
-                  onLayout={handleNativeContainerLayout}
                 >
                   <View style={[
                     styles.messageAnnotation, 
@@ -417,7 +451,11 @@ const Message: React.FC<MessageProps> = ({
           <TouchableOpacity
             onPress={toggleTranslation}
             activeOpacity={0.6}
-            style={styles.translationTouchable}
+            style={[
+              styles.translationTouchable,
+              heightLocked && annotationContainerHeight ? { height: annotationContainerHeight } : {}
+            ]}
+            onLayout={handleAnnotationContainerLayout}
           >
             <Text style={[
               styles.mainText,
@@ -442,56 +480,131 @@ const Message: React.FC<MessageProps> = ({
         )}
 
         {showCorrections && !bothCorrectionsMatch && !onlyGrammarCorrect && (
-          <View style={[
-            styles.annotationsContainer,
-            isUser ? styles.annotationsContainerUser : {}
-          ]}>
+          <View 
+            style={[
+              styles.annotationsContainer,
+              isUser ? styles.annotationsContainerUser : {},
+              heightLocked && annotationContainerHeight ? { height: annotationContainerHeight } : {}
+            ]}
+            onLayout={handleAnnotationContainerLayout}
+          >
             {/* Check if natural and corrected are identical */}
             {message.corrected && (naturalAndCorrectedIdentical ? (
               // When natural and corrected are identical, show only one line with both emojis
-              <View style={[
-                styles.messageAnnotation,
-                styles.grammarHint,
-                isEquivalentToCorrected && styles.identical
-              ]}>
-                <View style={styles.annotationRow}>
-                  <View style={styles.combinedEmojiContainer}>
-                    <Text style={[
-                      styles.annotationLabel,
-                      isUser ? styles.userAnnotationLabel : null,
-                      isEquivalentToCorrected && styles.identicalLabel
-                    ]}>
-                      📝
-                    </Text>
-                    <Text style={[
-                      styles.annotationLabel,
-                      isUser ? styles.userAnnotationLabel : {},
-                      isEquivalentToNative && styles.identicalLabel
-                    ]}>
-                      🌍
-                    </Text>
-                  </View>
+              message.natural_translation ? (
+                <TouchableOpacity
+                  onPress={toggleNativeTranslation}
+                  activeOpacity={0.6}
+                  style={[
+                    styles.nativeTranslationTouchable, 
+                    isUser ? styles.nativeTranslationContainerUser : styles.nativeTranslationContainer
+                  ]}
+                >
+                  <View style={[
+                    styles.messageAnnotation,
+                    styles.grammarHint,
+                    isEquivalentToCorrected && styles.identical,
+                    isUser ? styles.messageAnnotationUser : {}
+                  ]}>
+                    <View style={styles.annotationRow}>
+                      <View style={styles.combinedEmojiContainer}>
+                        <Text style={[
+                          styles.annotationLabel,
+                          isUser ? styles.userAnnotationLabel : null,
+                          isEquivalentToCorrected && styles.identicalLabel
+                        ]}>
+                          📝
+                        </Text>
+                        <Text style={[
+                          styles.annotationLabel,
+                          isUser ? styles.userAnnotationLabel : {},
+                          isEquivalentToNative && styles.identicalLabel
+                        ]}>
+                          🌍
+                        </Text>
+                      </View>
 
-                  <View style={styles.annotationTextContainer}>
-                    {isEquivalentToCorrected ? (
-                      // When perfectly correct, display in bold green
-                      <Text style={styles.perfectMatchText}>
-                        {message.corrected}
-                        <Text style={styles.matchIcon}>✓</Text>
+                      <View style={styles.annotationTextContainer}>
+                        {isShowingNativeTranslation ? (
+                          <Text style={[
+                            correctedBaseStyle, 
+                            styles.nativeTranslationText,
+                            { paddingBottom: textPadding.translation }
+                          ]}>
+                            {message.natural_translation}
+                          </Text>
+                        ) : isEquivalentToCorrected ? (
+                          // When perfectly correct, display in bold green
+                          <Text style={[styles.perfectMatchText, { paddingBottom: textPadding.original }]}>
+                            {message.corrected}
+                            <Text style={styles.matchIcon}>✓</Text>
+                          </Text>
+                        ) : (
+                          // When not perfectly correct, use the highlighting approach
+                          <View style={{ paddingBottom: textPadding.original }}>
+                            <HTML
+                              source={{ html: highlightedCorrected }}
+                              contentWidth={screenWidth * 0.75}
+                              tagsStyles={correctedTagsStyles}
+                              baseFontStyle={correctedBaseStyle}
+                              customHTMLElementModels={customHTMLElementModels}
+                            />
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                  {isAssistant && (
+                    <Text style={styles.nativeTranslationHint}>
+                      {isShowingNativeTranslation ? "Tap to see original" : "Tap to see translation"}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <View style={[
+                  styles.messageAnnotation,
+                  styles.grammarHint,
+                  isEquivalentToCorrected && styles.identical
+                ]}>
+                  <View style={styles.annotationRow}>
+                    <View style={styles.combinedEmojiContainer}>
+                      <Text style={[
+                        styles.annotationLabel,
+                        isUser ? styles.userAnnotationLabel : null,
+                        isEquivalentToCorrected && styles.identicalLabel
+                      ]}>
+                        📝
                       </Text>
-                    ) : (
-                      // When not perfectly correct, use the highlighting approach
-                      <HTML
-                        source={{ html: highlightedCorrected }}
-                        contentWidth={screenWidth * 0.75} // Increased available width
-                        tagsStyles={correctedTagsStyles}
-                        baseFontStyle={correctedBaseStyle}
-                        customHTMLElementModels={customHTMLElementModels}
-                      />
-                    )}
+                      <Text style={[
+                        styles.annotationLabel,
+                        isUser ? styles.userAnnotationLabel : {},
+                        isEquivalentToNative && styles.identicalLabel
+                      ]}>
+                        🌍
+                      </Text>
+                    </View>
+
+                    <View style={styles.annotationTextContainer}>
+                      {isEquivalentToCorrected ? (
+                        // When perfectly correct, display in bold green
+                        <Text style={styles.perfectMatchText}>
+                          {message.corrected}
+                          <Text style={styles.matchIcon}>✓</Text>
+                        </Text>
+                      ) : (
+                        // When not perfectly correct, use the highlighting approach
+                        <HTML
+                          source={{ html: highlightedCorrected }}
+                          contentWidth={screenWidth * 0.75} // Increased available width
+                          tagsStyles={correctedTagsStyles}
+                          baseFontStyle={correctedBaseStyle}
+                          customHTMLElementModels={customHTMLElementModels}
+                        />
+                      )}
+                    </View>
                   </View>
                 </View>
-              </View>
+              )
             ) : (
               // Original rendering when natural and corrected are different
               <>
@@ -539,7 +652,6 @@ const Message: React.FC<MessageProps> = ({
                         styles.nativeTranslationTouchable, 
                         isUser ? styles.nativeTranslationContainerUser : styles.nativeTranslationContainer
                       ]}
-                      onLayout={handleNativeContainerLayout}
                     >
                       <View style={[
                         styles.messageAnnotation,
@@ -808,6 +920,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start', // Align items to the top instead of center
     justifyContent: 'space-between',
+    width: '100%',
+  },
+  perfectMatchTouchable: {
     width: '100%',
   },
   perfectMatchText: {
