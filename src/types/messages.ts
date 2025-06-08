@@ -6,6 +6,7 @@ export interface Message {
   timestamp: string;
   corrected?: string;
   natural?: string;
+  natural_translation?: string; // Translation of the natural field
   translation?: string; // Added translation field
   isTemporary?: boolean;
   hasAudio?: boolean; // Whether audio is available for this message

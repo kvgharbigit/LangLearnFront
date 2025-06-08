@@ -35,6 +35,7 @@ export interface MessageData {
   content: string;
   corrected?: string;
   natural?: string;
+  natural_translation?: string;
   translation?: string;
   timestamp: string;
   isTemporary?: boolean;
@@ -62,6 +63,52 @@ const Message: React.FC<MessageProps> = ({
 }) => {
   // Add state for tracking if we're showing the translation
   const [isShowingTranslation, setIsShowingTranslation] = useState<boolean>(false);
+  const [isShowingNativeTranslation, setIsShowingNativeTranslation] = useState<boolean>(false);
+  // Use message timestamp as unique key for height tracking
+  const messageKey = `${message.timestamp}_${message.content}`;
+  const [nativeContainerHeight, setNativeContainerHeight] = useState<number | null>(null);
+  
+  // Calculate padding needed to equalize text heights
+  const textPadding = useMemo(() => {
+    if (!message.natural_translation || !message.natural) return { original: 0, translation: 0 };
+    
+    const originalLength = message.natural.length;
+    const translationLength = message.natural_translation.length;
+    
+    // Estimate line count for each (rough estimate: 35 chars per line)
+    const originalLines = Math.ceil(originalLength / 35);
+    const translationLines = Math.ceil(translationLength / 35);
+    const maxLines = Math.max(originalLines, translationLines);
+    
+    // Calculate padding needed to equalize heights (16px per line difference)
+    const originalPadding = (maxLines - originalLines) * 16;
+    const translationPadding = (maxLines - translationLines) * 16;
+    
+    return { original: originalPadding, translation: translationPadding };
+  }, [message.natural, message.natural_translation]);
+
+  // Reset height when message changes
+  useEffect(() => {
+    setNativeContainerHeight(null);
+    setIsShowingNativeTranslation(false); // Also reset toggle state
+  }, [messageKey]);
+
+  // Calculate estimated height based on text content to minimize layout changes
+  const estimatedHeight = useMemo(() => {
+    if (!message.natural_translation || !message.natural) return null;
+    
+    // Estimate height based on longer text content + base height
+    const originalLength = message.natural.length;
+    const translationLength = message.natural_translation.length;
+    const maxLength = Math.max(originalLength, translationLength);
+    
+    // Base height + estimated text height + hint (only for assistant)
+    const baseHeight = isUser ? 30 : 40; // Even smaller base for user messages
+    const hintHeight = isAssistant ? 15 : 0;
+    const minHeight = isUser ? 30 : 55; // Even smaller minimum for user messages
+    
+    return Math.max(minHeight, baseHeight + Math.ceil(maxLength * 0.8) + hintHeight);
+  }, [message.natural, message.natural_translation, isAssistant, isUser]);
 
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
@@ -91,12 +138,15 @@ const Message: React.FC<MessageProps> = ({
   // Log message fields for debugging
   useEffect(() => {
     if (message.natural) {
-      console.log("Message with natural field:", {
+      console.log("🔍 [DEBUG] Message with natural field:", {
         content: message.content,
-        natural: message.natural
+        natural: message.natural,
+        natural_translation: message.natural_translation,
+        has_natural_translation: !!message.natural_translation,
+        all_message_keys: Object.keys(message)
       });
     }
-  }, [message.content, message.natural]);
+  }, [message.content, message.natural, message.natural_translation]);
 
   // Check if BOTH corrections match - this is our new case to handle
   const bothCorrectionsMatch = isEquivalentToNative && isEquivalentToCorrected && message.natural && message.corrected;
@@ -212,6 +262,27 @@ const Message: React.FC<MessageProps> = ({
     }
   };
 
+  // Toggle native translation function
+  const toggleNativeTranslation = () => {
+    console.log("toggleNativeTranslation called", {
+      has_natural_translation: !!message.natural_translation,
+      current_state: isShowingNativeTranslation,
+      natural_translation: message.natural_translation
+    });
+    if (message.natural_translation) {
+      setIsShowingNativeTranslation(!isShowingNativeTranslation);
+    }
+  };
+
+  // Handler to measure and lock container height
+  const handleNativeContainerLayout = (event: any) => {
+    if (nativeContainerHeight === null) {
+      const { height } = event.nativeEvent.layout;
+      // Add minimal padding for the hint text (approx 5px for hint + tiny margin)
+      setNativeContainerHeight(Math.max(height + 5, 50)); // Minimum 50px height
+    }
+  };
+
   // Check if this message should show a replay button
   // Only show replay button on the latest assistant message when TTS is completed
   const showReplayButton = isAssistant &&
@@ -258,24 +329,76 @@ const Message: React.FC<MessageProps> = ({
             </View>
 
             {/* Show only the native alternative below */}
-            <View style={styles.annotationsContainer}>
-              <View style={[styles.messageAnnotation, styles.nativeHint]}>
-                <View style={styles.annotationRow}>
-                  <Text style={[styles.annotationLabel, isUser ? styles.userAnnotationLabel : {}]}>
-                    🌍
-                  </Text>
-                  <View style={styles.annotationTextContainer}>
-                    {/* Apply the highlighted native text with our new styling */}
-                    <HTML
-                      source={{ html: highlightedNative }}
-                      contentWidth={screenWidth * 0.75} // Increased available width
-                      tagsStyles={nativeTagsStyles}
-                      baseFontStyle={nativeBaseStyle}
-                      customHTMLElementModels={customHTMLElementModels}
-                    />
+            <View style={[
+              styles.annotationsContainer,
+              isUser ? styles.annotationsContainerUser : {}
+            ]}>
+              {message.natural_translation ? (
+                <TouchableOpacity
+                  onPress={toggleNativeTranslation}
+                  activeOpacity={0.6}
+                  style={[
+                    styles.nativeTranslationTouchable, 
+                    isUser ? styles.nativeTranslationContainerUser : styles.nativeTranslationContainer
+                  ]}
+                  onLayout={handleNativeContainerLayout}
+                >
+                  <View style={[
+                    styles.messageAnnotation, 
+                    styles.nativeHint,
+                    isUser ? styles.messageAnnotationUser : {}
+                  ]}>
+                    <View style={styles.annotationRow}>
+                      <Text style={[styles.annotationLabel, isUser ? styles.userAnnotationLabel : {}]}>
+                        🌍
+                      </Text>
+                      <View style={styles.annotationTextContainer}>
+                        {isShowingNativeTranslation ? (
+                          <Text style={[
+                            nativeBaseStyle, 
+                            styles.nativeTranslationText,
+                            { paddingBottom: textPadding.translation }
+                          ]}>
+                            {message.natural_translation}
+                          </Text>
+                        ) : (
+                          <View style={{ paddingBottom: textPadding.original }}>
+                            <HTML
+                              source={{ html: highlightedNative }}
+                              contentWidth={screenWidth * 0.75}
+                              tagsStyles={nativeTagsStyles}
+                              baseFontStyle={nativeBaseStyle}
+                              customHTMLElementModels={customHTMLElementModels}
+                            />
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                  {isAssistant && (
+                    <Text style={styles.nativeTranslationHint}>
+                      {isShowingNativeTranslation ? "Tap to see original" : "Tap to see translation"}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.messageAnnotation, styles.nativeHint]}>
+                  <View style={styles.annotationRow}>
+                    <Text style={[styles.annotationLabel, isUser ? styles.userAnnotationLabel : {}]}>
+                      🌍
+                    </Text>
+                    <View style={styles.annotationTextContainer}>
+                      <HTML
+                        source={{ html: highlightedNative }}
+                        contentWidth={screenWidth * 0.75}
+                        tagsStyles={nativeTagsStyles}
+                        baseFontStyle={nativeBaseStyle}
+                        customHTMLElementModels={customHTMLElementModels}
+                      />
+                    </View>
                   </View>
                 </View>
-              </View>
+              )}
             </View>
           </View>
         ) : isUser && message.corrected && !isEquivalentToCorrected ? (
@@ -319,7 +442,10 @@ const Message: React.FC<MessageProps> = ({
         )}
 
         {showCorrections && !bothCorrectionsMatch && !onlyGrammarCorrect && (
-          <View style={styles.annotationsContainer}>
+          <View style={[
+            styles.annotationsContainer,
+            isUser ? styles.annotationsContainerUser : {}
+          ]}>
             {/* Check if natural and corrected are identical */}
             {message.corrected && (naturalAndCorrectedIdentical ? (
               // When natural and corrected are identical, show only one line with both emojis
@@ -405,41 +531,104 @@ const Message: React.FC<MessageProps> = ({
                 </View>
 
                 {message.natural && (
-                  <View style={[
-                    styles.messageAnnotation,
-                    styles.nativeHint,
-                    isEquivalentToNative && styles.identical
-                  ]}>
-                    <View style={styles.annotationRow}>
-                      <Text style={[
-                        styles.annotationLabel,
-                        isUser ? styles.userAnnotationLabel : {},
-                        isEquivalentToNative && styles.identicalLabel
+                  message.natural_translation ? (
+                    <TouchableOpacity
+                      onPress={toggleNativeTranslation}
+                      activeOpacity={0.6}
+                      style={[
+                        styles.nativeTranslationTouchable, 
+                        isUser ? styles.nativeTranslationContainerUser : styles.nativeTranslationContainer
+                      ]}
+                      onLayout={handleNativeContainerLayout}
+                    >
+                      <View style={[
+                        styles.messageAnnotation,
+                        styles.nativeHint,
+                        isEquivalentToNative && styles.identical,
+                        isUser ? styles.messageAnnotationUser : {}
                       ]}>
-                        🌍
-                      </Text>
-
-                      <View style={styles.annotationTextContainer}>
-                        {isEquivalentToNative ? (
-                          // When perfectly correct, display in bold green
-                          <Text style={styles.perfectMatchText}>
-                            {message.natural}
-                            <Text style={styles.matchIcon}>✓</Text>
+                        <View style={styles.annotationRow}>
+                          <Text style={[
+                            styles.annotationLabel,
+                            isUser ? styles.userAnnotationLabel : {},
+                            isEquivalentToNative && styles.identicalLabel
+                          ]}>
+                            🌍
                           </Text>
-                        ) : (
-                          // When not perfectly correct, use the highlighting approach
-                          // Now includes green highlighting for matching words in similar positions
-                          <HTML
-                            source={{ html: highlightedNative }}
-                            contentWidth={screenWidth * 0.75} // Increased available width
-                            tagsStyles={nativeTagsStyles}
-                            baseFontStyle={nativeBaseStyle}
-                            customHTMLElementModels={customHTMLElementModels}
-                          />
-                        )}
+
+                          <View style={styles.annotationTextContainer}>
+                            {isShowingNativeTranslation ? (
+                              <Text style={[
+                                nativeBaseStyle, 
+                                styles.nativeTranslationText,
+                                { paddingBottom: textPadding.translation }
+                              ]}>
+                                {message.natural_translation}
+                              </Text>
+                            ) : isEquivalentToNative ? (
+                              // When perfectly correct, display in bold green
+                              <Text style={[styles.perfectMatchText, { paddingBottom: textPadding.original }]}>
+                                {message.natural}
+                                <Text style={styles.matchIcon}>✓</Text>
+                              </Text>
+                            ) : (
+                              // When not perfectly correct, use the highlighting approach
+                              <View style={{ paddingBottom: textPadding.original }}>
+                                <HTML
+                                  source={{ html: highlightedNative }}
+                                  contentWidth={screenWidth * 0.75}
+                                  tagsStyles={nativeTagsStyles}
+                                  baseFontStyle={nativeBaseStyle}
+                                  customHTMLElementModels={customHTMLElementModels}
+                                />
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                      {isAssistant && (
+                        <Text style={styles.nativeTranslationHint}>
+                          {isShowingNativeTranslation ? "Tap to see original" : "Tap to see translation"}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[
+                      styles.messageAnnotation,
+                      styles.nativeHint,
+                      isEquivalentToNative && styles.identical
+                    ]}>
+                      <View style={styles.annotationRow}>
+                        <Text style={[
+                          styles.annotationLabel,
+                          isUser ? styles.userAnnotationLabel : {},
+                          isEquivalentToNative && styles.identicalLabel
+                        ]}>
+                          🌍
+                        </Text>
+
+                        <View style={styles.annotationTextContainer}>
+                          {isEquivalentToNative ? (
+                            // When perfectly correct, display in bold green
+                            <Text style={styles.perfectMatchText}>
+                              {message.natural}
+                              <Text style={styles.matchIcon}>✓</Text>
+                            </Text>
+                          ) : (
+                            // When not perfectly correct, use the highlighting approach
+                            // Now includes green highlighting for matching words in similar positions
+                            <HTML
+                              source={{ html: highlightedNative }}
+                              contentWidth={screenWidth * 0.75} // Increased available width
+                              tagsStyles={nativeTagsStyles}
+                              baseFontStyle={nativeBaseStyle}
+                              customHTMLElementModels={customHTMLElementModels}
+                            />
+                          )}
+                        </View>
                       </View>
                     </View>
-                  </View>
+                  )
                 )}
               </>
             ))}
@@ -663,6 +852,48 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: 'italic',
   },
+  // New styles for native translation feature
+  nativeTranslationTouchable: {
+    width: '100%',
+  },
+  nativeTranslationText: {
+    fontStyle: 'italic',
+    color: '#555',
+  },
+  nativeTranslationHint: {
+    fontSize: 11,
+    color: '#6c757d',
+    marginTop: 0,
+    fontStyle: 'italic',
+    alignSelf: 'flex-end', // Align to bottom-right of container
+  },
+  nativeTranslationContainer: {
+    minHeight: 50, // Ensure minimum height to prevent jumping
+    justifyContent: 'space-between', // Push hint to bottom
+    paddingBottom: 2, // Minimal padding from message edge
+  },
+  nativeTranslationContainerUser: {
+    paddingBottom: 0, // No padding for user messages - keep it tight
+    paddingTop: 0, // Remove top padding too
+    marginBottom: 0, // Remove bottom margin
+    // Remove minHeight and height constraints - let content determine size naturally
+    justifyContent: 'flex-start', // No space-between needed since no hint text
+  },
+  messageAnnotationUser: {
+    marginTop: 0, // Remove top margin for user messages
+    marginBottom: 0, // Remove bottom margin for user messages
+    paddingVertical: 0, // Remove vertical padding
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  annotationsContainerUser: {
+    marginTop: 1, // Minimal top margin
+    marginBottom: 0, // Remove negative margin - let it sit naturally
+    paddingTop: 4, // Small padding after border
+    paddingBottom: 0, // Remove bottom padding
+    borderTopWidth: 1, // Add border separator back
+    borderTopColor: 'rgba(0, 0, 0, 0.1)', // Light border like assistant messages
+  },
   // New styles for replay button
   replayButtonContainer: {
     marginTop: 8,
@@ -716,6 +947,7 @@ export default React.memo(Message, (prev, next) => {
     prev.message.content === next.message.content &&
     prev.message.corrected === next.message.corrected &&
     prev.message.natural === next.message.natural &&
+    prev.message.natural_translation === next.message.natural_translation &&
     prev.message.translation === next.message.translation &&
     prev.originalUserMessage === next.originalUserMessage &&
     prev.isLatestAssistantMessage === next.isLatestAssistantMessage &&

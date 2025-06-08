@@ -260,6 +260,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
           translation: response.translation,
           corrected: response.corrected,
           natural: response.natural,
+          natural_translation: response.natural_translation,
           conversationId: response.conversation_id
         };
         

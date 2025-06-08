@@ -1535,6 +1535,7 @@ const handleSubmit = async (inputMessage: string) => {
         role: 'assistant',
         content: lastAssistantMessage.content,
         translation: lastAssistantMessage.translation || '',
+        natural_translation: lastAssistantMessage.natural_translation,
         timestamp: new Date().toISOString(),
         hasAudio: !isMuted,
         tts_status: 'completed', // Repetitions use cached audio, so always completed
@@ -1617,7 +1618,8 @@ const handleSubmit = async (inputMessage: string) => {
             newHistory.push({
               ...currentMsg,
               corrected: nextMsg.corrected,
-              natural: nextMsg.natural
+              natural: nextMsg.natural,
+              natural_translation: nextMsg.natural_translation
             });
 
             // Add assistant message without the corrections but WITH translation
@@ -1778,6 +1780,7 @@ const handleAudioData = async () => {
             content: response.transcribed_text,
             corrected: response.corrected,
             natural: response.natural,
+            natural_translation: response.natural_translation,
             timestamp: new Date().toISOString()
           },
           // AI response (without corrections but WITH translation)
@@ -1785,6 +1788,7 @@ const handleAudioData = async () => {
             role: 'assistant',
             content: response.reply,
             translation: response.translation, // Include translation
+            natural_translation: response.natural_translation,
             timestamp: new Date().toISOString(),
             hasAudio: response.has_audio, // Set hasAudio based on API response
             tts_status: response.tts_status || 'completed' // Include TTS status from API
