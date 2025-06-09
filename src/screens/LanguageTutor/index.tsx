@@ -17,6 +17,13 @@ import {
   BackHandler,
   Animated,
 } from 'react-native';
+
+// Add global function for updating message TTS status
+declare global {
+  interface Window {
+    updateMessageTTSStatus?: (conversationId: string, messageIndex: number, status: 'running' | 'completed' | 'failed' | 'skipped') => void;
+  }
+}
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import { Message as MessageType } from '../../types/messages';
@@ -73,6 +80,41 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const [isLoadingResponse, setIsLoadingResponse] = useState<boolean>(false);
   const [showOfflineQueue, setShowOfflineQueue] = useState<boolean>(false);
   const [showQuotaExceededModal, setShowQuotaExceededModal] = useState<boolean>(false);
+  
+  // Function to update TTS status of a message in history
+  const updateMessageTTSStatus = useCallback((messageConvId: string, messageIndex: number, status: 'running' | 'completed' | 'failed' | 'skipped') => {
+    setHistory(currentHistory => {
+      // Find the message to update based on the conversation ID and index
+      // For messageIndex = -1, use the last message in the conversation
+      const updatedHistory = [...currentHistory];
+      let found = false;
+      
+      // Start from the most recent message and work backwards to find the matching message
+      for (let i = updatedHistory.length - 1; i >= 0; i--) {
+        const message = updatedHistory[i];
+        
+        // Check if this message belongs to the target conversation
+        if (message.conversationId === messageConvId) {
+          if (messageIndex === -1 || i === messageIndex) {
+            // Found the message to update
+            updatedHistory[i] = {
+              ...message,
+              tts_status: status
+            };
+            found = true;
+            console.log(`Updated message TTS status: ${status} for conversation ${messageConvId}, index ${messageIndex}`);
+            break;
+          }
+        }
+      }
+      
+      if (!found) {
+        console.warn(`Couldn't find message to update TTS status: conversation ${messageConvId}, index ${messageIndex}`);
+      }
+      
+      return updatedHistory;
+    });
+  }, []);
   
   // Get subscription status from hook
   const subscription = useSubscriptionStatus();
@@ -261,7 +303,9 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
           corrected: response.corrected,
           natural: response.natural,
           natural_translation: response.natural_translation,
-          conversationId: response.conversation_id
+          conversationId: response.conversation_id,
+          hasAudio: response.has_audio,
+          tts_status: response.has_audio ? 'running' : 'skipped'
         };
         
         // Debug log to verify the 'natural' field
@@ -274,9 +318,15 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
           setConversationId(response.conversation_id);
         }
         
-        // Play audio response if not muted
-        if (!isMuted && response.has_audio) {
-          await playAudio(response.conversation_id, response.message_index);
+        // Update message status when the response is received
+        if (response.has_audio) {
+          // First, update the TTS status on the message to indicate it's ready
+          updateMessageTTSStatus(response.conversation_id, response.message_index || -1, 'completed');
+          
+          // Then play audio if not muted
+          if (!isMuted) {
+            await playAudio(response.conversation_id, response.message_index);
+          }
         }
       }
     } catch (error) {
@@ -390,9 +440,15 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         // Hide start button
         setShowStartButton(false);
         
-        // Check if we should play welcome audio
-        if (!isMuted && response.has_audio) {
-          await playAudio(response.conversation_id, response.message_index);
+        // Update message status and play welcome audio if needed
+        if (response.has_audio) {
+          // First, update the TTS status on the message to indicate it's ready
+          updateMessageTTSStatus(response.conversation_id, response.message_index || 0, 'completed');
+          
+          // Then play audio if not muted
+          if (!isMuted) {
+            await playAudio(response.conversation_id, response.message_index);
+          }
         }
         
         return response.conversation_id;
@@ -536,13 +592,23 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       return false; // Don't prevent default back button behavior
     });
     
+    // Expose the updateMessageTTSStatus function globally
+    if (typeof window !== 'undefined') {
+      window.updateMessageTTSStatus = updateMessageTTSStatus;
+    }
+    
     // Cleanup listeners when component unmounts
     return () => {
       unsubscribeBlur();
       unsubscribeFocus();
       backHandler.remove();
+      
+      // Remove global function on unmount
+      if (typeof window !== 'undefined') {
+        window.updateMessageTTSStatus = undefined;
+      }
     };
-  }, [navigation, isPlaying, stopAudio]);
+  }, [navigation, isPlaying, stopAudio, updateMessageTTSStatus]);
   
   return (
     <SafeView>

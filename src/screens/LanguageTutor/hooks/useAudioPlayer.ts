@@ -109,6 +109,11 @@ export default function useAudioPlayer({
         if (status.error) {
           console.error(`🎵 Error loading sound: ${status.error}`);
           setStatusMessage(`Audio error: ${status.error}`);
+          
+          // If there's an error loading the sound, update the message status
+          if (window && window.updateMessageTTSStatus && lastAudioConversationId && lastAudioMessageIndex !== null) {
+            window.updateMessageTTSStatus(lastAudioConversationId, lastAudioMessageIndex, 'failed');
+          }
         }
         return;
       }
@@ -118,6 +123,11 @@ export default function useAudioPlayer({
         console.log("🎵 Audio playback completed");
         setIsPlaying(false);
         if (onStatusUpdate) onStatusUpdate(false);
+        
+        // Make sure the message status is updated to completed
+        if (window && window.updateMessageTTSStatus && lastAudioConversationId && lastAudioMessageIndex !== null) {
+          window.updateMessageTTSStatus(lastAudioConversationId, lastAudioMessageIndex, 'completed');
+        }
         
         // Cleanup sound object
         if (soundRef.current) {
@@ -132,7 +142,7 @@ export default function useAudioPlayer({
         }
       }
     };
-  }, [onStatusUpdate]);
+  }, [onStatusUpdate, lastAudioConversationId, lastAudioMessageIndex]);
 
   /**
    * Play audio from a specific message
@@ -170,6 +180,13 @@ export default function useAudioPlayer({
       
       console.log(`🎵 Loading audio from: ${audioUrl}`);
       
+      // Update the message's TTS status in history
+      // This is an important step to signal that we are attempting to load audio
+      // Find and update the message in the parent component
+      if (window && window.updateMessageTTSStatus) {
+        window.updateMessageTTSStatus(conversationId, messageIndex, 'running');
+      }
+      
       // Load and play the audio
       const { sound } = await Audio.Sound.createAsync(
         { uri: audioUrl, isNetwork: true },
@@ -189,11 +206,21 @@ export default function useAudioPlayer({
       await sound.playAsync();
       setStatusMessage('');
       
+      // Update the message's TTS status to completed
+      if (window && window.updateMessageTTSStatus) {
+        window.updateMessageTTSStatus(conversationId, messageIndex, 'completed');
+      }
+      
     } catch (error) {
       console.error('Error playing audio:', error);
       setStatusMessage('Failed to play audio');
       setIsPlaying(false);
       if (onStatusUpdate) onStatusUpdate(false);
+      
+      // Update the message's TTS status to failed
+      if (window && window.updateMessageTTSStatus) {
+        window.updateMessageTTSStatus(conversationId, messageIndex, 'failed');
+      }
     }
   }, [isMuted, tempo, stopAudio, configureAudioForPlayback, createPlaybackStatusCallback, onStatusUpdate]);
 
