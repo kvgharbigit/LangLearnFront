@@ -753,7 +753,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Conversation Tokens</Text>
+        <Text style={styles.headerTitle}>Confluency Tokens</Text>
         <View style={styles.placeholderButton} />
       </View>
       

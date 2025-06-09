@@ -52,19 +52,33 @@ export interface MonthlyUsage {
 // Pricing constants for cost calculations (same as backend)
 const PRICING = {
   WHISPER_PER_MINUTE: 0.006,     // $0.006 per minute of audio
-  CLAUDE_INPUT_PER_MILLION: 0.25, // $0.25 per million tokens
-  CLAUDE_OUTPUT_PER_MILLION: 1.25,// $1.25 per million tokens
+  CLAUDE_INPUT_PER_MILLION: 0.25, // $0.25 per million tokens for Claude
+  CLAUDE_OUTPUT_PER_MILLION: 1.25,// $1.25 per million tokens for Claude
+  OPENAI_INPUT_PER_MILLION: 0.1,  // $0.1 per million tokens for GPT-4.1 Nano
+  OPENAI_OUTPUT_PER_MILLION: 0.4, // $0.4 per million tokens for GPT-4.1 Nano
   TTS_PER_MILLION: 4.0,          // $4.00 per million characters
   TOKENS_PER_CHAR: 1/3,           // Estimate: 1 token ~ 3 characters
 };
 
 /**
  * Calculate costs based on usage metrics
+ * @param usage Usage metrics
+ * @param useOpenAIPricing Whether to use OpenAI's pricing instead of Claude's
  */
-export function calculateCosts(usage: UsageDetails): UsageCosts {
+export function calculateCosts(usage: UsageDetails, useOpenAIPricing: boolean = false): UsageCosts {
   const whisperCost = usage.whisperMinutes * PRICING.WHISPER_PER_MINUTE;
-  const claudeInputCost = (usage.claudeInputTokens / 1000000) * PRICING.CLAUDE_INPUT_PER_MILLION;
-  const claudeOutputCost = (usage.claudeOutputTokens / 1000000) * PRICING.CLAUDE_OUTPUT_PER_MILLION;
+  
+  // Use the appropriate pricing based on the current LLM provider
+  const inputCostPerMillion = useOpenAIPricing 
+    ? PRICING.OPENAI_INPUT_PER_MILLION 
+    : PRICING.CLAUDE_INPUT_PER_MILLION;
+    
+  const outputCostPerMillion = useOpenAIPricing 
+    ? PRICING.OPENAI_OUTPUT_PER_MILLION 
+    : PRICING.CLAUDE_OUTPUT_PER_MILLION;
+  
+  const claudeInputCost = (usage.claudeInputTokens / 1000000) * inputCostPerMillion;
+  const claudeOutputCost = (usage.claudeOutputTokens / 1000000) * outputCostPerMillion;
   const ttsCost = (usage.ttsCharacters / 1000000) * PRICING.TTS_PER_MILLION;
   const totalCost = whisperCost + claudeInputCost + claudeOutputCost + ttsCost;
   
