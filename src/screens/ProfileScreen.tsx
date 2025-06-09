@@ -220,15 +220,32 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
       
       if (result.success) {
         // Account deleted successfully
-        // The app will automatically navigate to the login screen via AuthContext
+        // Close the confirmation modal
+        setShowDeleteConfirmation(false);
+        setConfirmationText('');
+        
+        // Clear any cached user data
+        const { clearCachedUser } = await import('../services/supabaseAuthService');
+        clearCachedUser();
+        
+        // Clear AsyncStorage
+        try {
+          const AsyncStorage = await import('@react-native-async-storage/async-storage');
+          await AsyncStorage.default.clear();
+          console.log('AsyncStorage cleared after account deletion');
+        } catch (storageError) {
+          console.error('Error clearing storage after account deletion:', storageError);
+        }
+        
+        // Explicitly navigate to the Auth stack
+        const NavigationService = await import('../navigation/NavigationService');
+        NavigationService.default.reset([{ name: 'Auth' }]);
+        
+        // Show success message
         Alert.alert(
           'Account Deleted',
           'Your account and all data have been permanently deleted.'
         );
-        
-        // Close the confirmation modal
-        setShowDeleteConfirmation(false);
-        setConfirmationText('');
       } else {
         // Error deleting account
         Alert.alert(

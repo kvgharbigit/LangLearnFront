@@ -15,8 +15,8 @@ export interface SubscriptionPlan {
 // Pricing model constants for usage calculation
 export const PRICING = {
   WHISPER_PER_MINUTE: 0.006,    // $0.006 per minute of audio
-  CLAUDE_INPUT_PER_MILLION: 0.25,   // $0.25 per million input tokens
-  CLAUDE_OUTPUT_PER_MILLION: 1.25,  // $1.25 per million output tokens
+  CLAUDE_INPUT_PER_MILLION: 0.1,   // $0.1 per million input tokens (OpenAI GPT-4.1 Nano pricing)
+  CLAUDE_OUTPUT_PER_MILLION: 0.4,  // $0.4 per million output tokens (OpenAI GPT-4.1 Nano pricing)
   TTS_PER_MILLION: 4.0,         // $4.00 per million characters
   TOKENS_PER_CHAR: 1/3,         // 1 token = 3 characters of text
 };

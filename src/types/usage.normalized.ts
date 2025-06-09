@@ -52,8 +52,8 @@ export interface MonthlyUsage {
 // Pricing constants for cost calculations (same as backend)
 const PRICING = {
   WHISPER_PER_MINUTE: 0.006,     // $0.006 per minute of audio
-  CLAUDE_INPUT_PER_MILLION: 0.25, // $0.25 per million tokens for Claude
-  CLAUDE_OUTPUT_PER_MILLION: 1.25,// $1.25 per million tokens for Claude
+  CLAUDE_INPUT_PER_MILLION: 0.1,  // $0.1 per million tokens for GPT-4.1 Nano (previously Claude: $0.25)
+  CLAUDE_OUTPUT_PER_MILLION: 0.4, // $0.4 per million tokens for GPT-4.1 Nano (previously Claude: $1.25)
   OPENAI_INPUT_PER_MILLION: 0.1,  // $0.1 per million tokens for GPT-4.1 Nano
   OPENAI_OUTPUT_PER_MILLION: 0.4, // $0.4 per million tokens for GPT-4.1 Nano
   TTS_PER_MILLION: 4.0,          // $4.00 per million characters
@@ -65,7 +65,7 @@ const PRICING = {
  * @param usage Usage metrics
  * @param useOpenAIPricing Whether to use OpenAI's pricing instead of Claude's
  */
-export function calculateCosts(usage: UsageDetails, useOpenAIPricing: boolean = false): UsageCosts {
+export function calculateCosts(usage: UsageDetails, useOpenAIPricing: boolean = true): UsageCosts {
   const whisperCost = usage.whisperMinutes * PRICING.WHISPER_PER_MINUTE;
   
   // Use the appropriate pricing based on the current LLM provider

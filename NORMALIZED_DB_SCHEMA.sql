@@ -56,60 +56,39 @@ SELECT
     u.daily_usage,
     u.created_at,
     u.updated_at,
-    -- Calculate costs (these formulas should match your application code)
+    -- Calculate costs with OpenAI GPT-4.1 Nano pricing
     (u.whisper_minutes * 0.006) AS whisper_cost,
-    (u.claude_input_tokens / 1000000 * 2.5) AS claude_input_cost,
-    (u.claude_output_tokens / 1000000 * 7.5) AS claude_output_cost,
+    (u.claude_input_tokens / 1000000 * 0.1) AS claude_input_cost,
+    (u.claude_output_tokens / 1000000 * 0.4) AS claude_output_cost,
     (u.tts_characters / 1000000 * 4.0) AS tts_cost,
-    -- Total cost
+    -- Total cost with OpenAI GPT-4.1 Nano pricing
     (u.whisper_minutes * 0.006) + 
-    (u.claude_input_tokens / 1000000 * 2.5) + 
-    (u.claude_output_tokens / 1000000 * 7.5) + 
+    (u.claude_input_tokens / 1000000 * 0.1) +
+    (u.claude_output_tokens / 1000000 * 0.4) +
     (u.tts_characters / 1000000 * 4.0) AS total_cost,
     -- Get subscription info from users table
     usr.subscription_tier,
     -- Derive credit_limit from subscription_tier
     CASE 
-        WHEN usr.subscription_tier = 'premium' THEN 8.0
-        WHEN usr.subscription_tier = 'basic' THEN 3.0
-        WHEN usr.subscription_tier = 'gold' THEN 16.0
-        ELSE 0.75 -- free tier
+        WHEN usr.subscription_tier = 'premium' THEN 7.50
+        WHEN usr.subscription_tier = 'basic' THEN 2.50
+        WHEN usr.subscription_tier = 'gold' THEN 15.00
+        ELSE 0.50 -- free tier
     END AS credit_limit,
-    -- Calculate percentage used
-    CASE 
-        WHEN usr.subscription_tier = 'premium' THEN 
-            LEAST(
-                ((u.whisper_minutes * 0.006) + 
-                (u.claude_input_tokens / 1000000 * 2.5) + 
-                (u.claude_output_tokens / 1000000 * 7.5) + 
-                (u.tts_characters / 1000000 * 4.0)) / 8.0 * 100,
-                100
-            )
-        WHEN usr.subscription_tier = 'basic' THEN 
-            LEAST(
-                ((u.whisper_minutes * 0.006) + 
-                (u.claude_input_tokens / 1000000 * 2.5) + 
-                (u.claude_output_tokens / 1000000 * 7.5) + 
-                (u.tts_characters / 1000000 * 4.0)) / 3.0 * 100,
-                100
-            )
-        WHEN usr.subscription_tier = 'gold' THEN 
-            LEAST(
-                ((u.whisper_minutes * 0.006) + 
-                (u.claude_input_tokens / 1000000 * 2.5) + 
-                (u.claude_output_tokens / 1000000 * 7.5) + 
-                (u.tts_characters / 1000000 * 4.0)) / 16.0 * 100,
-                100
-            )
-        ELSE -- free tier
-            LEAST(
-                ((u.whisper_minutes * 0.006) + 
-                (u.claude_input_tokens / 1000000 * 2.5) + 
-                (u.claude_output_tokens / 1000000 * 7.5) + 
-                (u.tts_characters / 1000000 * 4.0)) / 0.75 * 100,
-                100
-            )
-    END AS percentage_used
+    -- Calculate percentage used using the derived credit_limit
+    LEAST(
+        ((u.whisper_minutes * 0.006) + 
+        (u.claude_input_tokens / 1000000 * 0.1) + 
+        (u.claude_output_tokens / 1000000 * 0.4) + 
+        (u.tts_characters / 1000000 * 4.0)) / 
+        CASE 
+            WHEN usr.subscription_tier = 'premium' THEN 7.50
+            WHEN usr.subscription_tier = 'basic' THEN 2.50
+            WHEN usr.subscription_tier = 'gold' THEN 15.00
+            ELSE 0.50 -- free tier
+        END * 100,
+        100
+    ) AS percentage_used
 FROM 
     usage u
 JOIN 

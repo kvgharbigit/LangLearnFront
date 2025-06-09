@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import colors from '../styles/colors';
 import { AUDIO_SETTINGS } from '../constants/settings';
+import { DEBUG_TOOLS_TOGGLE } from '../constants/debug';
 import MicrophoneTest from './MicrophoneTest';
 import { getLanguageInfo } from '../constants/languages';
 import {
@@ -805,27 +806,29 @@ const TutorHeader: React.FC<Props> = ({
               </>
             ) : (
               <>
-                {/* Debug Mode */}
-                <View style={styles.switchSetting}>
-                  <View style={styles.switchTextContainer}>
-                    <View style={styles.settingIconContainer}>
-                      <Ionicons name="bug" size={16} color="#FF9800" />
+                {/* Debug Mode - only shown when DEBUG_TOOLS_TOGGLE is true */}
+                {DEBUG_TOOLS_TOGGLE && (
+                  <View style={styles.switchSetting}>
+                    <View style={styles.switchTextContainer}>
+                      <View style={styles.settingIconContainer}>
+                        <Ionicons name="bug" size={16} color="#FF9800" />
+                      </View>
+                      <View>
+                        <Text style={styles.switchLabel}>Debug Mode</Text>
+                        <Text style={styles.switchDescription}>
+                          Show detailed audio metrics for debugging
+                        </Text>
+                      </View>
                     </View>
-                    <View>
-                      <Text style={styles.switchLabel}>Debug Mode</Text>
-                      <Text style={styles.switchDescription}>
-                        Show detailed audio metrics for debugging
-                      </Text>
-                    </View>
+                    <Switch
+                      value={debugMode}
+                      onValueChange={handleDebugModeToggle}
+                      trackColor={{ false: colors.gray300, true: colors.primaryLight }}
+                      thumbColor={debugMode ? colors.primary : colors.gray100}
+                      ios_backgroundColor={colors.gray300}
+                    />
                   </View>
-                  <Switch
-                    value={debugMode}
-                    onValueChange={handleDebugModeToggle}
-                    trackColor={{ false: colors.gray300, true: colors.primaryLight }}
-                    thumbColor={debugMode ? colors.primary : colors.gray100}
-                    ios_backgroundColor={colors.gray300}
-                  />
-                </View>
+                )}
 
                 {/* Voice Input Toggle */}
                 <View style={styles.switchSetting}>
@@ -869,12 +872,12 @@ const TutorHeader: React.FC<Props> = ({
                       <Text style={[
                         styles.switchLabel,
                         !voiceInputEnabled && styles.disabledText
-                      ]}>Auto-send Recording</Text>
+                      ]}>Auto-Send</Text>
                       <Text style={[
                         styles.switchDescription,
                         !voiceInputEnabled && styles.disabledText
                       ]}>
-                        Automatically send when silence is detected
+                        Automatically send your voice message when prolonged silence is detected
                       </Text>
                     </View>
                   </View>
@@ -908,12 +911,12 @@ const TutorHeader: React.FC<Props> = ({
                       <Text style={[
                         styles.switchLabel,
                         !voiceInputEnabled && styles.disabledText
-                      ]}>Auto-record</Text>
+                      ]}>Auto-Record</Text>
                       <Text style={[
                         styles.switchDescription,
                         !voiceInputEnabled && styles.disabledText
                       ]}>
-                        Start recording after AI response finishes
+                        Start listening for your voice response after AI response finishes playing
                       </Text>
                     </View>
                   </View>
@@ -1267,7 +1270,8 @@ settingIconContainer: {
   backgroundColor: colors.primaryLight,
   alignItems: 'center',
   justifyContent: 'center',
-  marginRight: 8, // Added explicit margin right for spacing
+  marginRight: 12, // Increased margin for better spacing
+  marginTop: 2, // Align icon with the first line of text
 },
 mutedIconContainer: {
   backgroundColor: 'rgba(244, 67, 54, 0.1)',
@@ -1480,20 +1484,22 @@ thresholdDescription: {
 // Switch Settings
 switchSetting: {
   flexDirection: 'row',
-  alignItems: 'center',
+  alignItems: 'flex-start',
   justifyContent: 'space-between',
   backgroundColor: colors.white,
   padding: 16,
+  paddingVertical: 18,
   borderRadius: 12,
   marginBottom: 16,
   borderWidth: 1,
   borderColor: colors.gray200,
+  minHeight: 80,
 },
 switchTextContainer: {
   flexDirection: 'row',
-  alignItems: 'center',
+  alignItems: 'flex-start',
   flex: 1,
-  marginRight: 12,
+  marginRight: 32,
 },
 switchLabel: {
   fontSize: 15,
@@ -1504,6 +1510,9 @@ switchLabel: {
 switchDescription: {
   fontSize: 13,
   color: colors.gray600,
+  flexShrink: 1,
+  paddingRight: 4,
+  lineHeight: 18,
 },
 disabledSetting: {
   opacity: 0.7,

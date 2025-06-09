@@ -2442,7 +2442,7 @@ const renderMessages = () => {
                 styles.voiceOptionText,
                 autoSendEnabled && styles.voiceOptionTextActive
               ]}>
-                Auto-send
+                Auto-Send
               </Text>
             </TouchableOpacity>
 
@@ -2457,7 +2457,7 @@ const renderMessages = () => {
                 styles.voiceOptionText,
                 autoRecordEnabled && styles.voiceOptionTextActive
               ]}>
-                Auto-record
+                Auto-Record
               </Text>
             </TouchableOpacity>
           </View>
