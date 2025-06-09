@@ -67,7 +67,6 @@ const Message: React.FC<MessageProps> = ({
   // Use message timestamp as unique key for height tracking
   const messageKey = `${message.timestamp}_${message.content}`;
   const [annotationContainerHeight, setAnnotationContainerHeight] = useState<number | null>(null);
-  const [heightLocked, setHeightLocked] = useState<boolean>(false);
   
   // Calculate padding needed to equalize text heights
   const textPadding = useMemo(() => {
@@ -88,13 +87,10 @@ const Message: React.FC<MessageProps> = ({
     return { original: originalPadding, translation: translationPadding };
   }, [message.natural, message.natural_translation]);
 
-  // Reset height when message changes
+  // Reset height when message changes or translation state changes
   useEffect(() => {
     setAnnotationContainerHeight(null);
-    setHeightLocked(false);
-    setIsShowingNativeTranslation(false); // Also reset toggle state
-    setIsShowingTranslation(false); // Reset regular translation toggle too
-  }, [messageKey]);
+  }, [messageKey, isShowingTranslation, isShowingNativeTranslation]);
 
   // Calculate estimated height based on text content to minimize layout changes
   const estimatedHeight = useMemo(() => {
@@ -261,6 +257,8 @@ const Message: React.FC<MessageProps> = ({
   // Toggle translation function
   const toggleTranslation = () => {
     if (message.translation) {
+      // Reset the height measurement to ensure proper resizing
+      setAnnotationContainerHeight(null);
       setIsShowingTranslation(!isShowingTranslation);
     }
   };
@@ -273,18 +271,17 @@ const Message: React.FC<MessageProps> = ({
       natural_translation: message.natural_translation
     });
     if (message.natural_translation) {
+      // Reset the height measurement to ensure proper resizing
+      setAnnotationContainerHeight(null);
       setIsShowingNativeTranslation(!isShowingNativeTranslation);
     }
   };
 
-  // Handler to measure and lock container height
+  // Handler to measure container height
   const handleAnnotationContainerLayout = (event: any) => {
-    if (!heightLocked && annotationContainerHeight === null) {
-      const { height } = event.nativeEvent.layout;
-      console.log(`📏 Measuring annotation container height: ${height}px for ${isUser ? 'user' : 'assistant'} message`);
-      setAnnotationContainerHeight(height);
-      setHeightLocked(true);
-    }
+    const { height } = event.nativeEvent.layout;
+    console.log(`📏 Measuring annotation container height: ${height}px for ${isUser ? 'user' : 'assistant'} message`);
+    setAnnotationContainerHeight(height);
   };
 
   // Check if this message should show a replay button
@@ -314,10 +311,7 @@ const Message: React.FC<MessageProps> = ({
             <TouchableOpacity
               onPress={toggleNativeTranslation}
               activeOpacity={0.6}
-              style={[
-                styles.perfectMatchTouchable,
-                heightLocked && annotationContainerHeight ? { height: annotationContainerHeight } : {}
-              ]}
+              style={styles.perfectMatchTouchable}
               onLayout={handleAnnotationContainerLayout}
             >
               <View style={styles.perfectMatchContainer}>
@@ -363,8 +357,7 @@ const Message: React.FC<MessageProps> = ({
             <View 
               style={[
                 styles.annotationsContainer,
-                isUser ? styles.annotationsContainerUser : {},
-                heightLocked && annotationContainerHeight ? { height: annotationContainerHeight } : {}
+                isUser ? styles.annotationsContainerUser : {}
               ]}
               onLayout={handleAnnotationContainerLayout}
             >
@@ -409,11 +402,6 @@ const Message: React.FC<MessageProps> = ({
                       </View>
                     </View>
                   </View>
-                  {isAssistant && (
-                    <Text style={styles.nativeTranslationHint}>
-                      {isShowingNativeTranslation ? "Tap to see original" : "Tap to see translation"}
-                    </Text>
-                  )}
                 </TouchableOpacity>
               ) : (
                 <View style={[styles.messageAnnotation, styles.nativeHint]}>
@@ -451,10 +439,7 @@ const Message: React.FC<MessageProps> = ({
           <TouchableOpacity
             onPress={toggleTranslation}
             activeOpacity={0.6}
-            style={[
-              styles.translationTouchable,
-              heightLocked && annotationContainerHeight ? { height: annotationContainerHeight } : {}
-            ]}
+            style={styles.translationTouchable}
             onLayout={handleAnnotationContainerLayout}
           >
             <Text style={[
@@ -463,9 +448,6 @@ const Message: React.FC<MessageProps> = ({
               isShowingTranslation && styles.translationText
             ]}>
               {isShowingTranslation ? message.translation : message.content}
-            </Text>
-            <Text style={styles.translationHint}>
-              {isShowingTranslation ? "Tap to see original" : "Tap to see translation"}
             </Text>
           </TouchableOpacity>
         ) : (
@@ -483,8 +465,7 @@ const Message: React.FC<MessageProps> = ({
           <View 
             style={[
               styles.annotationsContainer,
-              isUser ? styles.annotationsContainerUser : {},
-              heightLocked && annotationContainerHeight ? { height: annotationContainerHeight } : {}
+              isUser ? styles.annotationsContainerUser : {}
             ]}
             onLayout={handleAnnotationContainerLayout}
           >
@@ -554,11 +535,6 @@ const Message: React.FC<MessageProps> = ({
                       </View>
                     </View>
                   </View>
-                  {isAssistant && (
-                    <Text style={styles.nativeTranslationHint}>
-                      {isShowingNativeTranslation ? "Tap to see original" : "Tap to see translation"}
-                    </Text>
-                  )}
                 </TouchableOpacity>
               ) : (
                 <View style={[
@@ -956,16 +932,11 @@ const styles = StyleSheet.create({
   // New styles for translation feature
   translationTouchable: {
     width: '100%',
+    flexShrink: 1,
   },
   translationText: {
     fontStyle: 'italic',
     color: '#555',
-  },
-  translationHint: {
-    fontSize: 12,
-    color: '#6c757d',
-    marginTop: 4,
-    fontStyle: 'italic',
   },
   // New styles for native translation feature
   nativeTranslationTouchable: {
@@ -975,17 +946,10 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: '#555',
   },
-  nativeTranslationHint: {
-    fontSize: 11,
-    color: '#6c757d',
-    marginTop: 0,
-    fontStyle: 'italic',
-    alignSelf: 'flex-end', // Align to bottom-right of container
-  },
   nativeTranslationContainer: {
     minHeight: 50, // Ensure minimum height to prevent jumping
-    justifyContent: 'space-between', // Push hint to bottom
-    paddingBottom: 2, // Minimal padding from message edge
+    justifyContent: 'flex-start', // Don't push hint to bottom
+    paddingBottom: 0, // Remove padding as we're using hintContainer
   },
   nativeTranslationContainerUser: {
     paddingBottom: 0, // No padding for user messages - keep it tight
