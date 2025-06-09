@@ -37,7 +37,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'basic_tier',
     name: 'Basic',
     tier: 'basic',
-    price: 4.00,
+    price: 4.99,
     monthlyCredits: 2.50, // $2.50 worth of usage
     monthlyTokens: 250, // 2.50 credits * 100
     features: [
@@ -48,7 +48,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'premium_tier',
     name: 'Premium',
     tier: 'premium',
-    price: 11.00,
+    price: 9.99,
     monthlyCredits: 7.50, // $7.50 worth of usage
     monthlyTokens: 750, // 7.50 credits * 100
     isPopular: true,
@@ -60,7 +60,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'gold_tier',
     name: 'Gold',
     tier: 'gold',
-    price: 20.00,
+    price: 18.99,
     monthlyCredits: 15.00, // $15.00 worth of usage
     monthlyTokens: 1500, // 15.00 credits * 100
     features: [
