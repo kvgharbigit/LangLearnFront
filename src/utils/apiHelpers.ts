@@ -1,9 +1,9 @@
 import NetInfo from '@react-native-community/netinfo';
 
 // Constants for API requests
-export const REQUEST_TIMEOUT = 60000; // 60 seconds (increased from 20)
-export const MAX_RETRIES = 3;
-export const BASE_DELAY = 2000; // 2 second base delay for exponential backoff (increased from 1)
+export const REQUEST_TIMEOUT = 20000; // 20 seconds (reduced from 30 seconds)
+export const MAX_RETRIES = 2; // Reduced from 3
+export const BASE_DELAY = 1000; // 1 second base delay for exponential backoff (reduced from 2 seconds)
 
 // Helper function to implement timeout for fetch requests
 export const fetchWithTimeout = async (url: string, options: RequestInit, timeout = REQUEST_TIMEOUT) => {
@@ -55,8 +55,18 @@ export const fetchWithRetry = async (
       const isNetworkError = 
         error.message === 'Network request failed' || 
         error.message === 'No network connection' ||
-        error.name === 'AbortError' ||
         !navigator.onLine;
+      
+      // Check if it's a timeout error (AbortError)
+      const isTimeoutError = error.name === 'AbortError' || 
+                           error.message === 'Network request timed out' ||
+                           error.message?.includes('timeout');
+      
+      // For timeout errors, don't retry at all - immediately fail
+      if (isTimeoutError) {
+        console.log("🚫 Request timed out - stopping retry attempts");
+        break;
+      }
       
       // If it's the last attempt or not a network error, don't retry
       if (attempt >= retries || !isNetworkError) {

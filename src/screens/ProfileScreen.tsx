@@ -532,6 +532,10 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
               This action is permanent and cannot be undone. All your data will be deleted.
             </Text>
             
+            <Text style={styles.warningText}>
+              Important: Your email address cannot be used to register a new account for 6 months after deletion.
+            </Text>
+            
             <Text style={styles.confirmText}>
               To confirm, type "delete" below:
             </Text>
@@ -826,9 +830,20 @@ const styles = StyleSheet.create({
   modalDescription: {
     fontSize: 16,
     color: colors.gray700,
-    marginBottom: 20,
+    marginBottom: 16,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  warningText: {
+    fontSize: 15,
+    color: colors.danger,
+    marginBottom: 20,
+    textAlign: 'center',
+    fontWeight: '500',
+    backgroundColor: '#FFEBEE',
+    padding: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   confirmText: {
     fontSize: 14,

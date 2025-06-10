@@ -60,6 +60,8 @@ interface Props {
   isPlaying: boolean;
   stopAudio: () => void;
   navigation: any;
+  // Optional prop for testing error modal (only in dev mode)
+  testErrorModal?: () => void;
 }
 
 const TutorHeader: React.FC<Props> = ({
@@ -90,6 +92,8 @@ const TutorHeader: React.FC<Props> = ({
   isPlaying,
   stopAudio,
   navigation,
+  // Debug test function
+  testErrorModal,
 }) => {
   // State
   const [settingsModalVisible, setSettingsModalVisible] = useState<boolean>(false);
@@ -828,6 +832,17 @@ const TutorHeader: React.FC<Props> = ({
                       ios_backgroundColor={colors.gray300}
                     />
                   </View>
+                )}
+                
+                {/* Test Error Modal - only when both debug mode is on and we're in dev mode */}
+                {DEBUG_TOOLS_TOGGLE && __DEV__ && testErrorModal && (
+                  <TouchableOpacity
+                    style={styles.testErrorButton}
+                    onPress={testErrorModal}
+                  >
+                    <Ionicons name="warning" size={16} color="white" />
+                    <Text style={styles.testErrorButtonText}>Test Server Error Modal</Text>
+                  </TouchableOpacity>
                 )}
 
                 {/* Voice Input Toggle */}
@@ -1638,6 +1653,24 @@ returnButtonText: {
   color: 'white',
   fontWeight: '600',
   fontSize: 15,
+},
+
+// Test error button
+testErrorButton: {
+  backgroundColor: '#F44336',
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 12,
+  borderRadius: 12,
+  marginTop: 16,
+  marginBottom: 16,
+  gap: 8,
+},
+testErrorButtonText: {
+  color: 'white',
+  fontWeight: '600',
+  fontSize: 14,
 }
 });
 

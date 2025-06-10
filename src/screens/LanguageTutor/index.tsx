@@ -55,6 +55,7 @@ import QuotaExceededModal from '../../components/QuotaExceededModal';
 import MuteInfoModal from '../../components/MuteInfoModal';
 import ReplayButton from '../../components/ReplayButton';
 import SubscriptionCancelledBanner from '../../components/SubscriptionCancelledBanner';
+// Removed ServerErrorModal import - now using direct alerts
 
 // Import styles and constants
 import colors from '../../styles/colors';
@@ -162,6 +163,14 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     updateSilenceDuration
   } = useAudioSettings();
   
+  // Debug function exposed to TutorHeader in __DEV__ mode only
+  const testErrorModal = useCallback(() => {
+    if (__DEV__) {
+      console.log('Testing connection error state');
+      setHasInitError(true);
+    }
+  }, []);
+  
   const {
     isPlaying,
     statusMessage: audioStatusMessage,
@@ -262,6 +271,9 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     
     setIsLoadingResponse(true);
     
+      // Simple logging for request start
+    console.log("📤 Sending message to API");
+    
     try {
       // If no conversation exists, create one
       if (!conversationId) {
@@ -295,6 +307,9 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         isMuted,
         getConversationMode()
       );
+      
+      // Clear the timeout since we got a response
+      clearTimeout(timeoutId);
       
       // Add assistant response to history
       if (response) {
@@ -337,8 +352,22 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      
+      // Clear the timeout to prevent showing both alerts
+      clearTimeout(timeoutId);
+      
+      // Navigate back to landing page with error message
+      Alert.alert(
+        "Connection Error",
+        "We're unable to connect to the language tutor server. Please try again later.",
+        [
+          { text: "Return to Homepage", onPress: () => navigation.navigate('LanguageLanding') }
+        ],
+        { cancelable: false }
+      );
     } finally {
+      // Clear the timeout if we reach this point (success or error)
+      clearTimeout(timeoutId);
       setIsLoadingResponse(false);
     }
   }, [
@@ -397,17 +426,54 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     setAutoSendEnabled(newValue);
     toggleAutoSend(newValue);
   }, [autoSendEnabled, toggleAutoSend]);
+  
+  /**
+   * Test function to trigger the error state
+   * This is only for debugging purposes
+   */
+  const testServerErrorModal = useCallback(() => {
+    setHasInitError(true);
+    console.log("🔴 ERROR STATE SET TO TRUE FOR TESTING");
+  }, []);
 
   /**
    * Initialize a new conversation
    */
   const initializeConversation = useCallback(async () => {
+    // Reset error state
+    setHasInitError(false);
+    setErrorMessage("");
+    
+    // Set up a timeout to force error state after 10 seconds
+    const timeoutId = setTimeout(() => {
+      console.log("⏱️ Initialization timeout reached - FORCING ERROR STATE");
+      setIsLoading(false);
+      // Force the error state to be true
+      setHasInitError(true);
+      // Override welcome message completely
+      setErrorMessage("We're having trouble connecting to our language tutor service. This may be due to network issues or the server being unavailable.");
+      // Force welcomeData to be null so it doesn't show
+      setWelcomeData(null);
+      console.log("🔴 ERROR STATE FORCED");
+      
+      // Return to homepage after a delay if user doesn't click button
+      setTimeout(() => {
+        if (hasInitError) {
+          console.log("🏠 Auto-navigating to homepage after timeout");
+          navigation.navigate('LanguageLanding');
+        }
+      }, 5000);
+    }, 8000); // 8 seconds
+    
     try {
       setIsLoading(true);
       
       // Check if user has available quota
       const hasQuota = await hasAvailableQuota();
       if (!hasQuota) {
+        // Clear timeout since we're not waiting on server response anymore
+        clearTimeout(timeoutId);
+        
         // Show quota exceeded modal
         setShowQuotaExceededModal(true);
         
@@ -433,6 +499,9 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         is_muted: isMuted,
         conversation_mode: getConversationMode(),
       });
+      
+      // Clear the timeout since we got a response
+      clearTimeout(timeoutId);
       
       if (response) {
         // Set conversation ID
@@ -463,9 +532,25 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       return null;
     } catch (error) {
       console.error('Error initializing conversation:', error);
-      Alert.alert('Error', 'Failed to create conversation. Please try again.');
+      
+      // Clear the timeout to prevent showing both alerts
+      clearTimeout(timeoutId);
+      
+      // Force the error state to be true
+      setIsLoading(false);
+      setHasInitError(true);
+      console.log("🔴 ERROR STATE SET TO TRUE IN CATCH BLOCK");
+      
+      // Force a render update
+      setWelcomeData(prev => ({
+        ...prev,
+        hasError: true
+      }));
+      
       return null;
     } finally {
+      // Clear the timeout if we reach this point (success or error)
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   }, [
@@ -640,6 +725,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         autoRecordEnabled={autoRecordEnabled}
         autoSendEnabled={autoSendEnabled}
         navigation={navigation}
+        testErrorModal={__DEV__ ? testErrorModal : undefined}
       />
       
       <KeyboardAvoidingView
@@ -653,11 +739,11 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         {/* Main conversation container */}
         {history.length === 0 ? (
           // Show welcome screen if no messages yet
-          welcomeReady && welcomeData && (
+          welcomeReady && (
             <EmptyConversation
-              welcomeIcon={welcomeData.icon}
-              welcomeTitle={welcomeData.title}
-              welcomeMessage={welcomeData.message}
+              welcomeIcon={welcomeData?.icon || '👋'}
+              welcomeTitle={welcomeData?.title || 'Welcome'}
+              welcomeMessage={welcomeData?.message || 'Loading...'}
               onStartPress={initializeConversation}
               isLoading={isLoading}
             />
@@ -734,6 +820,8 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
           navigation={navigation}
           afterDismiss={() => {}}
         />
+        
+        {/* Server Error Modal removed - now using inline EmptyConversation error state */}
       </KeyboardAvoidingView>
     </SafeView>
   );
