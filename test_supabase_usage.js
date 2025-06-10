@@ -87,11 +87,11 @@ async function testUsageServiceIssue() {
         } else if (usageData) {
           console.log('✅ Found usage record for user');
           
-          // Check for the whisperMinutes field specifically
-          if ('whisper_minutes' in usageData) {
-            console.log(`✅ whisper_minutes field exists with value: ${usageData.whisper_minutes}`);
+          // Check for the transcription_minutes field specifically
+          if ('transcription_minutes' in usageData) {
+            console.log(`✅ transcription_minutes field exists with value: ${usageData.transcription_minutes}`);
           } else {
-            console.log('❌ whisper_minutes field is MISSING from the usage record');
+            console.log('❌ transcription_minutes field is MISSING from the usage record');
           }
           
           // Display all fields in the usage record
@@ -145,9 +145,9 @@ async function testUsageServiceIssue() {
                 user_id: tempUserId,
                 current_period_start: start,
                 current_period_end: end,
-                whisper_minutes: 5,
-                claude_input_tokens: 1000,
-                claude_output_tokens: 2000,
+                transcription_minutes: 5,
+                llm_input_tokens: 1000,
+                llm_output_tokens: 2000,
                 tts_characters: 500,
                 credit_limit: 1.5,
                 token_limit: 150000,
@@ -173,11 +173,11 @@ async function testUsageServiceIssue() {
               } else if (data) {
                 console.log('✅ Created usage record verified:');
                 
-                // Check for whisperMinutes field specifically
-                if ('whisper_minutes' in data) {
-                  console.log(`✅ whisper_minutes field exists with value: ${data.whisper_minutes}`);
+                // Check for transcription_minutes field specifically
+                if ('transcription_minutes' in data) {
+                  console.log(`✅ transcription_minutes field exists with value: ${data.transcription_minutes}`);
                 } else {
-                  console.log('❌ whisper_minutes field is MISSING from the created record');
+                  console.log('❌ transcription_minutes field is MISSING from the created record');
                 }
                 
                 console.log('\nℹ️ Fields in the created record:');
@@ -297,9 +297,9 @@ async function testUsageServiceIssue() {
           
           // Debug the structure of usageDetails that would be constructed
           const usageDetails = {
-            whisperMinutes: currentUsage.whisper_minutes || 0,
-            claudeInputTokens: currentUsage.claude_input_tokens || 0,
-            claudeOutputTokens: currentUsage.claude_output_tokens || 0,
+            whisperMinutes: currentUsage.transcription_minutes || 0,
+            claudeInputTokens: currentUsage.llm_input_tokens || 0,
+            claudeOutputTokens: currentUsage.llm_output_tokens || 0,
             ttsCharacters: currentUsage.tts_characters || 0
           };
           
@@ -308,10 +308,10 @@ async function testUsageServiceIssue() {
           
           // Check each field individually
           console.log('\nℹ️ Field-by-field check:');
-          console.log(`whisper_minutes in DB: ${currentUsage.whisper_minutes !== undefined ? currentUsage.whisper_minutes : 'undefined'}`);
+          console.log(`transcription_minutes in DB: ${currentUsage.transcription_minutes !== undefined ? currentUsage.transcription_minutes : 'undefined'}`);
           console.log(`whisperMinutes mapped: ${usageDetails.whisperMinutes !== undefined ? usageDetails.whisperMinutes : 'undefined'}`);
           
-          console.log(`claude_input_tokens in DB: ${currentUsage.claude_input_tokens !== undefined ? currentUsage.claude_input_tokens : 'undefined'}`);
+          console.log(`llm_input_tokens in DB: ${currentUsage.llm_input_tokens !== undefined ? currentUsage.llm_input_tokens : 'undefined'}`);
           console.log(`claudeInputTokens mapped: ${usageDetails.claudeInputTokens !== undefined ? usageDetails.claudeInputTokens : 'undefined'}`);
           
           // Simulate adding some usage

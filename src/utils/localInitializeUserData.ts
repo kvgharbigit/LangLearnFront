@@ -55,9 +55,9 @@ export const localInitializeUserData = async (userId: string): Promise<boolean> 
         const dailyUsage = {
             [today]: {
                 date: today,
-                whisper_minutes: 0,
-                claude_input_tokens: 0,
-                claude_output_tokens: 0,
+                transcription_minutes: 0,
+                llm_input_tokens: 0,
+                llm_output_tokens: 0,
                 tts_characters: 0
             }
         };
@@ -66,9 +66,9 @@ export const localInitializeUserData = async (userId: string): Promise<boolean> 
             user_id: userId,
             current_period_start: start,
             current_period_end: end,
-            whisper_minutes: 0,
-            claude_input_tokens: 0,
-            claude_output_tokens: 0,
+            transcription_minutes: 0,
+            llm_input_tokens: 0,
+            llm_output_tokens: 0,
             tts_characters: 0,
             daily_usage: JSON.stringify(dailyUsage),
             created_at: new Date().toISOString(),

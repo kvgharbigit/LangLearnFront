@@ -60,27 +60,27 @@ export const trackClaudeUsage = async (
     if (!dailyUsage[today]) {
       dailyUsage[today] = {
         date: today,
-        whisper_minutes: 0,
-        claude_input_tokens: 0,
-        claude_output_tokens: 0,
+        transcription_minutes: 0,
+        llm_input_tokens: 0,
+        llm_output_tokens: 0,
         tts_characters: 0
       };
     }
     
     // Update daily usage
-    dailyUsage[today].claude_input_tokens += inputTokens;
-    dailyUsage[today].claude_output_tokens += outputTokens;
+    dailyUsage[today].llm_input_tokens += inputTokens;
+    dailyUsage[today].llm_output_tokens += outputTokens;
     
     // Update total usage
-    const newInputTokens = (usageData.claude_input_tokens || 0) + inputTokens;
-    const newOutputTokens = (usageData.claude_output_tokens || 0) + outputTokens;
+    const newInputTokens = (usageData.llm_input_tokens || 0) + inputTokens;
+    const newOutputTokens = (usageData.llm_output_tokens || 0) + outputTokens;
     
     // Update the database - ONLY raw metrics, NOT calculated fields
     const { error: updateError } = await supabase
       .from('usage')
       .update({
-        claude_input_tokens: newInputTokens,
-        claude_output_tokens: newOutputTokens,
+        llm_input_tokens: newInputTokens,
+        llm_output_tokens: newOutputTokens,
         daily_usage: JSON.stringify(dailyUsage)
       })
       .eq('user_id', user.id);

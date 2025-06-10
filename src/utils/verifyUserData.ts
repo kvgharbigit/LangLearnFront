@@ -103,7 +103,7 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
     logVerify('info', 'USAGE', 'Checking usage table record');
     const { data: usageData, error: usageError } = await supabase
       .from('usage')
-      .select('user_id, whisper_minutes, claude_input_tokens, claude_output_tokens, tts_characters')
+      .select('user_id, transcription_minutes, llm_input_tokens, llm_output_tokens, tts_characters')
       .eq('user_id', userId)
       .maybeSingle();
       
@@ -121,7 +121,7 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
         // Re-run the query without the problematic column
         const { data: basicUsageData, error: basicError } = await supabase
           .from('usage')
-          .select('user_id, whisper_minutes, claude_input_tokens, claude_output_tokens, tts_characters')
+          .select('user_id, transcription_minutes, llm_input_tokens, llm_output_tokens, tts_characters')
           .eq('user_id', userId)
           .maybeSingle();
           
@@ -150,14 +150,14 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
           verificationResults.usageTable.success = true;
           
           // Calculate tokens used from raw metrics using pricing constants
-          const WHISPER_PER_MINUTE = 0.006;
-          const CLAUDE_INPUT_PER_MILLION = 2.5;
-          const CLAUDE_OUTPUT_PER_MILLION = 7.5;
+          const TRANSCRIPTION_PER_MINUTE = 0.006;
+          const LLM_INPUT_PER_MILLION = 2.5;
+          const LLM_OUTPUT_PER_MILLION = 7.5;
           const TTS_PER_MILLION = 4.0;
           
-          const whisperCost = (basicUsageData.whisper_minutes || 0) * WHISPER_PER_MINUTE;
-          const claudeInputCost = ((basicUsageData.claude_input_tokens || 0) / 1000000) * CLAUDE_INPUT_PER_MILLION;
-          const claudeOutputCost = ((basicUsageData.claude_output_tokens || 0) / 1000000) * CLAUDE_OUTPUT_PER_MILLION;
+          const whisperCost = (basicUsageData.transcription_minutes || 0) * TRANSCRIPTION_PER_MINUTE;
+          const claudeInputCost = ((basicUsageData.llm_input_tokens || 0) / 1000000) * LLM_INPUT_PER_MILLION;
+          const claudeOutputCost = ((basicUsageData.llm_output_tokens || 0) / 1000000) * LLM_OUTPUT_PER_MILLION;
           const ttsCost = ((basicUsageData.tts_characters || 0) / 1000000) * TTS_PER_MILLION;
           const totalCost = whisperCost + claudeInputCost + claudeOutputCost + ttsCost;
           const tokensUsed = Math.round(totalCost * 100); // 1 credit = 100 tokens
@@ -209,9 +209,9 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
       const CLAUDE_OUTPUT_PER_MILLION = 7.5;
       const TTS_PER_MILLION = 4.0;
       
-      const whisperCost = (usageData.whisper_minutes || 0) * WHISPER_PER_MINUTE;
-      const claudeInputCost = ((usageData.claude_input_tokens || 0) / 1000000) * CLAUDE_INPUT_PER_MILLION;
-      const claudeOutputCost = ((usageData.claude_output_tokens || 0) / 1000000) * CLAUDE_OUTPUT_PER_MILLION;
+      const whisperCost = (usageData.transcription_minutes || 0) * WHISPER_PER_MINUTE;
+      const claudeInputCost = ((usageData.llm_input_tokens || 0) / 1000000) * CLAUDE_INPUT_PER_MILLION;
+      const claudeOutputCost = ((usageData.llm_output_tokens || 0) / 1000000) * CLAUDE_OUTPUT_PER_MILLION;
       const ttsCost = ((usageData.tts_characters || 0) / 1000000) * TTS_PER_MILLION;
       const totalCost = whisperCost + claudeInputCost + claudeOutputCost + ttsCost;
       const tokensUsed = Math.round(totalCost * 100); // 1 credit = 100 tokens
@@ -262,6 +262,69 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
       
       // Try to initialize using the backend only
       try {
+        // Special handling for partial initialization (user exists but usage doesn't)
+        if (userExists && !usageExists) {
+          logVerify('info', 'PARTIAL_INIT', 'User exists but usage record is missing, using direct local initialization for usage only');
+          
+          try {
+            // Get today's date in YYYY-MM-DD format
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Initial daily usage (empty for the current day)
+            const dailyUsage = {
+              [today]: {
+                date: today,
+                transcription_minutes: 0,
+                llm_input_tokens: 0,
+                llm_output_tokens: 0,
+                tts_characters: 0
+              }
+            };
+            
+            // Get current billing cycle
+            const currentTime = Date.now();
+            const { getMonthlyPeriod } = require('../types/usage');
+            const { start, end } = getMonthlyPeriod();
+            
+            // Create just the usage record
+            const { error: usageError } = await supabase.from('usage').upsert({
+              user_id: userId,
+              current_period_start: start,
+              current_period_end: end,
+              transcription_minutes: 0,
+              llm_input_tokens: 0,
+              llm_output_tokens: 0,
+              tts_characters: 0,
+              daily_usage: JSON.stringify(dailyUsage),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+            
+            if (usageError) {
+              logVerify('error', 'USAGE_INIT_ERROR', `Error creating usage record: ${usageError.message}`);
+              throw new Error(`Usage record creation failed: ${usageError.message}`);
+            }
+            
+            logVerify('info', 'USAGE_INIT_SUCCESS', 'Successfully created missing usage record directly');
+            
+            // Record success
+            await recordVerificationIssue('usage_init_success', {
+              userId,
+              timestamp: new Date().toISOString()
+            });
+            
+            // Clear any previous verification errors
+            await AsyncStorage.removeItem('@confluency:verification_issues');
+            
+            // Return true to indicate successful initialization
+            return true;
+          } catch (usageInitError) {
+            logVerify('error', 'USAGE_INIT_ERROR', `Error during usage initialization: ${usageInitError instanceof Error ? usageInitError.message : String(usageInitError)}`);
+            // Fall back to regular initialization
+          }
+        }
+        
+        // Standard initialization flow for both tables
         const backendInitResult = await initializeUserData(userId);
         
         if (backendInitResult) {

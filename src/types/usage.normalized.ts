@@ -7,10 +7,15 @@
  * Raw usage metrics
  */
 export interface UsageDetails {
-  whisperMinutes: number;
-  claudeInputTokens: number;
-  claudeOutputTokens: number;
+  whisperMinutes: number; // For backwards compatibility, points to transcriptionMinutes
+  claudeInputTokens: number; // For backwards compatibility, points to llmInputTokens
+  claudeOutputTokens: number; // For backwards compatibility, points to llmOutputTokens
   ttsCharacters: number;
+  
+  // New generic field names
+  transcriptionMinutes: number;
+  llmInputTokens: number;
+  llmOutputTokens: number;
 }
 
 /**
@@ -33,6 +38,11 @@ export interface SupabaseDailyUsageEntry {
   claude_input_tokens: number;
   claude_output_tokens: number;
   tts_characters: number;
+  
+  // For backwards compatibility
+  transcription_minutes?: number;
+  llm_input_tokens?: number;
+  llm_output_tokens?: number;
 }
 
 /**
@@ -66,7 +76,9 @@ const PRICING = {
  * @param useOpenAIPricing Whether to use OpenAI's pricing instead of Claude's
  */
 export function calculateCosts(usage: UsageDetails, useOpenAIPricing: boolean = true): UsageCosts {
-  const whisperCost = usage.whisperMinutes * PRICING.WHISPER_PER_MINUTE;
+  // Use transcriptionMinutes if available, otherwise fall back to whisperMinutes
+  const transcriptionMinutes = usage.transcriptionMinutes || usage.whisperMinutes;
+  const whisperCost = transcriptionMinutes * PRICING.WHISPER_PER_MINUTE;
   
   // Use the appropriate pricing based on the current LLM provider
   const inputCostPerMillion = useOpenAIPricing 
@@ -77,8 +89,12 @@ export function calculateCosts(usage: UsageDetails, useOpenAIPricing: boolean = 
     ? PRICING.OPENAI_OUTPUT_PER_MILLION 
     : PRICING.CLAUDE_OUTPUT_PER_MILLION;
   
-  const claudeInputCost = (usage.claudeInputTokens / 1000000) * inputCostPerMillion;
-  const claudeOutputCost = (usage.claudeOutputTokens / 1000000) * outputCostPerMillion;
+  // Use llmInputTokens if available, otherwise fall back to claudeInputTokens
+  const inputTokens = usage.llmInputTokens || usage.claudeInputTokens;
+  const outputTokens = usage.llmOutputTokens || usage.claudeOutputTokens;
+  
+  const claudeInputCost = (inputTokens / 1000000) * inputCostPerMillion;
+  const claudeOutputCost = (outputTokens / 1000000) * outputCostPerMillion;
   const ttsCost = (usage.ttsCharacters / 1000000) * PRICING.TTS_PER_MILLION;
   const totalCost = whisperCost + claudeInputCost + claudeOutputCost + ttsCost;
   
@@ -146,11 +162,21 @@ export function estimateTokens(text: string): number {
  * Convert from SupabaseDailyUsageEntry to UsageDetails
  */
 export function convertToUsageDetails(entry: SupabaseDailyUsageEntry): UsageDetails {
+  const transcriptionMinutes = entry.transcription_minutes || entry.whisper_minutes || 0;
+  const llmInputTokens = entry.llm_input_tokens || entry.claude_input_tokens || 0;
+  const llmOutputTokens = entry.llm_output_tokens || entry.claude_output_tokens || 0;
+  
   return {
-    whisperMinutes: entry.whisper_minutes || 0,
-    claudeInputTokens: entry.claude_input_tokens || 0,
-    claudeOutputTokens: entry.claude_output_tokens || 0,
-    ttsCharacters: entry.tts_characters || 0
+    // New field names
+    transcriptionMinutes,
+    llmInputTokens,
+    llmOutputTokens,
+    ttsCharacters: entry.tts_characters || 0,
+    
+    // For backwards compatibility
+    whisperMinutes: transcriptionMinutes,
+    claudeInputTokens: llmInputTokens,
+    claudeOutputTokens: llmOutputTokens
   };
 }
 
@@ -163,9 +189,9 @@ export function convertToDailyUsageEntry(
 ): SupabaseDailyUsageEntry {
   return {
     date,
-    whisper_minutes: usageDetails.whisperMinutes,
-    claude_input_tokens: usageDetails.claudeInputTokens,
-    claude_output_tokens: usageDetails.claudeOutputTokens,
+    transcription_minutes: usageDetails.transcriptionMinutes || usageDetails.whisperMinutes,
+    llm_input_tokens: usageDetails.llmInputTokens || usageDetails.claudeInputTokens,
+    llm_output_tokens: usageDetails.llmOutputTokens || usageDetails.claudeOutputTokens,
     tts_characters: usageDetails.ttsCharacters
   };
 }

@@ -11,9 +11,9 @@ import { estimateTokens } from '../types/usage.normalized';
 import userPreferences from './userPreferences';
 
 // Update this to your actual API URL
-export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
+//export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
 //const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
-//export const API_URL ="http://10.0.0.116:8004" //desktop
+export const API_URL ="http://10.0.0.116:8004" //desktop
 //export const API_URL = "http://192.168.86.247:8004"
 
 
@@ -412,27 +412,27 @@ export const sendTextMessage = async (
               if (!dailyUsage[today]) {
                 dailyUsage[today] = {
                   date: today,
-                  whisper_minutes: 0,
-                  claude_input_tokens: 0,
-                  claude_output_tokens: 0,
+                  transcription_minutes: 0,
+                  llm_input_tokens: 0,
+                  llm_output_tokens: 0,
                   tts_characters: 0
                 };
               }
               
               // Update daily usage
-              dailyUsage[today].claude_input_tokens += inputTokens;
-              dailyUsage[today].claude_output_tokens += outputTokens;
+              dailyUsage[today].llm_input_tokens += inputTokens;
+              dailyUsage[today].llm_output_tokens += outputTokens;
               
               // Update total tokens
-              const newInputTokens = (usageData.claude_input_tokens || 0) + inputTokens;
-              const newOutputTokens = (usageData.claude_output_tokens || 0) + outputTokens;
+              const newInputTokens = (usageData.llm_input_tokens || 0) + inputTokens;
+              const newOutputTokens = (usageData.llm_output_tokens || 0) + outputTokens;
               
               // Update only the raw metrics
               await supabase
                 .from('usage')
                 .update({
-                  claude_input_tokens: newInputTokens,
-                  claude_output_tokens: newOutputTokens,
+                  llm_input_tokens: newInputTokens,
+                  llm_output_tokens: newOutputTokens,
                   daily_usage: JSON.stringify(dailyUsage)
                 })
                 .eq('user_id', user.id);
@@ -781,27 +781,27 @@ export const sendVoiceRecording = async ({
               if (!dailyUsage[today]) {
                 dailyUsage[today] = {
                   date: today,
-                  whisper_minutes: 0,
-                  claude_input_tokens: 0,
-                  claude_output_tokens: 0,
+                  transcription_minutes: 0,
+                  llm_input_tokens: 0,
+                  llm_output_tokens: 0,
                   tts_characters: 0
                 };
               }
               
               // Update daily usage
-              dailyUsage[today].claude_input_tokens += inputTokens;
-              dailyUsage[today].claude_output_tokens += outputTokens;
+              dailyUsage[today].llm_input_tokens += inputTokens;
+              dailyUsage[today].llm_output_tokens += outputTokens;
               
               // Update total tokens
-              const newInputTokens = (usageData.claude_input_tokens || 0) + inputTokens;
-              const newOutputTokens = (usageData.claude_output_tokens || 0) + outputTokens;
+              const newInputTokens = (usageData.llm_input_tokens || 0) + inputTokens;
+              const newOutputTokens = (usageData.llm_output_tokens || 0) + outputTokens;
               
               // Update only the raw metrics
               await supabase
                 .from('usage')
                 .update({
-                  claude_input_tokens: newInputTokens,
-                  claude_output_tokens: newOutputTokens,
+                  llm_input_tokens: newInputTokens,
+                  llm_output_tokens: newOutputTokens,
                   daily_usage: JSON.stringify(dailyUsage)
                 })
                 .eq('user_id', user.id);
@@ -1172,27 +1172,27 @@ export const createConversation = async ({
               if (!dailyUsage[today]) {
                 dailyUsage[today] = {
                   date: today,
-                  whisper_minutes: 0,
-                  claude_input_tokens: 0,
-                  claude_output_tokens: 0,
+                  transcription_minutes: 0,
+                  llm_input_tokens: 0,
+                  llm_output_tokens: 0,
                   tts_characters: 0
                 };
               }
               
               // Update daily usage
-              dailyUsage[today].claude_input_tokens += inputTokens;
-              dailyUsage[today].claude_output_tokens += outputTokens;
+              dailyUsage[today].llm_input_tokens += inputTokens;
+              dailyUsage[today].llm_output_tokens += outputTokens;
               
               // Update total tokens
-              const newInputTokens = (usageData.claude_input_tokens || 0) + inputTokens;
-              const newOutputTokens = (usageData.claude_output_tokens || 0) + outputTokens;
+              const newInputTokens = (usageData.llm_input_tokens || 0) + inputTokens;
+              const newOutputTokens = (usageData.llm_output_tokens || 0) + outputTokens;
               
               // Update only the raw metrics
               await supabase
                 .from('usage')
                 .update({
-                  claude_input_tokens: newInputTokens,
-                  claude_output_tokens: newOutputTokens,
+                  llm_input_tokens: newInputTokens,
+                  llm_output_tokens: newOutputTokens,
                   daily_usage: JSON.stringify(dailyUsage)
                 })
                 .eq('user_id', user.id);

@@ -40,10 +40,16 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
     
     // Initialize with empty usage
     const emptyUsage: UsageDetails = {
+      // New field names
+      transcriptionMinutes: 0,
+      llmInputTokens: 0, 
+      llmOutputTokens: 0,
+      ttsCharacters: 0,
+      
+      // For backwards compatibility
       whisperMinutes: 0,
       claudeInputTokens: 0, 
-      claudeOutputTokens: 0,
-      ttsCharacters: 0
+      claudeOutputTokens: 0
     };
     
     const costs = calculateCosts(emptyUsage);
@@ -87,9 +93,9 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
         user_id: userId,
         current_period_start: start,
         current_period_end: end,
-        whisper_minutes: 0,
-        claude_input_tokens: 0,
-        claude_output_tokens: 0,
+        transcription_minutes: 0,
+        llm_input_tokens: 0,
+        llm_output_tokens: 0,
         tts_characters: 0,
         daily_usage: JSON.stringify(emptyDailyUsage)
       }]);
@@ -185,10 +191,16 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
     
     // Extract raw usage metrics
     const usageDetails: UsageDetails = {
-      whisperMinutes: data.whisper_minutes || 0,
-      claudeInputTokens: data.claude_input_tokens || 0,
-      claudeOutputTokens: data.claude_output_tokens || 0,
-      ttsCharacters: data.tts_characters || 0
+      // New field names
+      transcriptionMinutes: data.transcription_minutes || 0,
+      llmInputTokens: data.llm_input_tokens || 0,
+      llmOutputTokens: data.llm_output_tokens || 0,
+      ttsCharacters: data.tts_characters || 0,
+      
+      // For backwards compatibility
+      whisperMinutes: data.transcription_minutes || 0,
+      claudeInputTokens: data.llm_input_tokens || 0,
+      claudeOutputTokens: data.llm_output_tokens || 0
     };
     
     // Calculate costs on-the-fly
@@ -242,10 +254,16 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
     
     // Reset usage but keep history of daily usage
     const emptyUsage: UsageDetails = {
+      // New field names
+      transcriptionMinutes: 0,
+      llmInputTokens: 0,
+      llmOutputTokens: 0,
+      ttsCharacters: 0,
+      
+      // For backwards compatibility
       whisperMinutes: 0,
       claudeInputTokens: 0,
-      claudeOutputTokens: 0,
-      ttsCharacters: 0
+      claudeOutputTokens: 0
     };
     
     const costs = calculateCosts(emptyUsage);
@@ -287,9 +305,9 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
         current_period_end: end,
         
         // Reset usage metrics
-        whisper_minutes: 0,
-        claude_input_tokens: 0,
-        claude_output_tokens: 0,
+        transcription_minutes: 0,
+        llm_input_tokens: 0,
+        llm_output_tokens: 0,
         tts_characters: 0,
         
         // Reset daily usage
@@ -332,9 +350,9 @@ export const trackApiUsage = async (
     if (!currentUsage.dailyUsage[today]) {
       currentUsage.dailyUsage[today] = {
         date: today,
-        whisper_minutes: 0,
-        claude_input_tokens: 0,
-        claude_output_tokens: 0,
+        transcription_minutes: 0,
+        llm_input_tokens: 0,
+        llm_output_tokens: 0,
         tts_characters: 0
       };
     }
@@ -343,17 +361,24 @@ export const trackApiUsage = async (
     const dailyUsage = currentUsage.dailyUsage[today];
     
     // Update daily usage with raw metrics only
-    dailyUsage.whisper_minutes += usageToAdd.whisperMinutes || 0;
-    dailyUsage.claude_input_tokens += usageToAdd.claudeInputTokens || 0;
-    dailyUsage.claude_output_tokens += usageToAdd.claudeOutputTokens || 0;
+    dailyUsage.transcription_minutes += usageToAdd.transcriptionMinutes || usageToAdd.whisperMinutes || 0;
+    dailyUsage.llm_input_tokens += usageToAdd.llmInputTokens || usageToAdd.claudeInputTokens || 0;
+    dailyUsage.llm_output_tokens += usageToAdd.llmOutputTokens || usageToAdd.claudeOutputTokens || 0;
     dailyUsage.tts_characters += usageToAdd.ttsCharacters || 0;
     
     // Update the monthly totals in the usageDetails object
     const monthlyUsage = currentUsage.usageDetails;
-    monthlyUsage.whisperMinutes += usageToAdd.whisperMinutes || 0;
-    monthlyUsage.claudeInputTokens += usageToAdd.claudeInputTokens || 0;
-    monthlyUsage.claudeOutputTokens += usageToAdd.claudeOutputTokens || 0;
+    
+    // Update new field names
+    monthlyUsage.transcriptionMinutes += usageToAdd.transcriptionMinutes || usageToAdd.whisperMinutes || 0;
+    monthlyUsage.llmInputTokens += usageToAdd.llmInputTokens || usageToAdd.claudeInputTokens || 0;
+    monthlyUsage.llmOutputTokens += usageToAdd.llmOutputTokens || usageToAdd.claudeOutputTokens || 0;
     monthlyUsage.ttsCharacters += usageToAdd.ttsCharacters || 0;
+    
+    // Keep backwards compatibility fields in sync
+    monthlyUsage.whisperMinutes = monthlyUsage.transcriptionMinutes;
+    monthlyUsage.claudeInputTokens = monthlyUsage.llmInputTokens;
+    monthlyUsage.claudeOutputTokens = monthlyUsage.llmOutputTokens;
     
     // Calculate costs for monthly usage (on-the-fly, not stored in DB)
     currentUsage.calculatedCosts = calculateCosts(monthlyUsage);
@@ -376,9 +401,9 @@ export const trackApiUsage = async (
       .from('usage')
       .update({
         // Usage fields (only raw metrics)
-        whisper_minutes: monthlyUsage.whisperMinutes,
-        claude_input_tokens: monthlyUsage.claudeInputTokens,
-        claude_output_tokens: monthlyUsage.claudeOutputTokens,
+        transcription_minutes: monthlyUsage.transcriptionMinutes,
+        llm_input_tokens: monthlyUsage.llmInputTokens,
+        llm_output_tokens: monthlyUsage.llmOutputTokens,
         tts_characters: monthlyUsage.ttsCharacters,
         
         // Daily usage (as JSON string)
@@ -400,8 +425,8 @@ export const trackApiUsage = async (
  */
 export const trackWhisperUsage = async (audioDurationSeconds: number): Promise<void> => {
   const minutes = audioDurationSeconds / 60;
-  await trackApiUsage({ whisperMinutes: minutes });
-  console.log(`Tracked Whisper usage: ${minutes.toFixed(2)} minutes (${audioDurationSeconds}s)`);
+  await trackApiUsage({ transcriptionMinutes: minutes });
+  console.log(`Tracked transcription usage: ${minutes.toFixed(2)} minutes (${audioDurationSeconds}s)`);
 };
 
 /**
@@ -459,27 +484,27 @@ export const trackClaudeUsage = async (
     if (!dailyUsage[today]) {
       dailyUsage[today] = {
         date: today,
-        whisper_minutes: 0,
-        claude_input_tokens: 0,
-        claude_output_tokens: 0,
+        transcription_minutes: 0,
+        llm_input_tokens: 0,
+        llm_output_tokens: 0,
         tts_characters: 0
       };
     }
     
     // Update daily usage
-    dailyUsage[today].claude_input_tokens += inputTokens;
-    dailyUsage[today].claude_output_tokens += outputTokens;
+    dailyUsage[today].llm_input_tokens += inputTokens;
+    dailyUsage[today].llm_output_tokens += outputTokens;
     
     // Update total usage
-    const newInputTokens = (usageData.claude_input_tokens || 0) + inputTokens;
-    const newOutputTokens = (usageData.claude_output_tokens || 0) + outputTokens;
+    const newInputTokens = (usageData.llm_input_tokens || 0) + inputTokens;
+    const newOutputTokens = (usageData.llm_output_tokens || 0) + outputTokens;
     
     // Update the database - ONLY raw metrics, NOT calculated fields
     const { error: updateError } = await supabase
       .from('usage')
       .update({
-        claude_input_tokens: newInputTokens,
-        claude_output_tokens: newOutputTokens,
+        llm_input_tokens: newInputTokens,
+        llm_output_tokens: newOutputTokens,
         daily_usage: JSON.stringify(dailyUsage)
       })
       .eq('user_id', user.id);
@@ -657,9 +682,9 @@ export const forceQuotaExceeded = async (): Promise<void> => {
     // Add enough usage to exceed limit (add usage equivalent to 2x credit limit)
     const tokensToAdd = creditLimit * 1000000 * 2; // large number to ensure quota exceeded
     
-    // Update with excessive claude usage
+    // Update with excessive LLM usage
     await trackApiUsage({
-      claudeInputTokens: tokensToAdd,
+      llmInputTokens: tokensToAdd,
     }, user.id);
     
     console.log('Quota marked as exceeded to sync with server');

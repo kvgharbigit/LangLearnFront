@@ -58,20 +58,20 @@ async function diagnoseUsageError() {
     // Step 3: Examine specific fields
     console.log('\n📋 EXAMINING RECORD STRUCTURE');
     
-    // Check whisper_minutes field
-    if ('whisper_minutes' in usage) {
-      console.log(`✅ whisper_minutes exists with value: ${usage.whisper_minutes} (type: ${typeof usage.whisper_minutes})`);
+    // Check transcription_minutes field
+    if ('transcription_minutes' in usage) {
+      console.log(`✅ transcription_minutes exists with value: ${usage.transcription_minutes} (type: ${typeof usage.transcription_minutes})`);
     } else {
-      console.log('❌ whisper_minutes field is MISSING from the record');
+      console.log('❌ transcription_minutes field is MISSING from the record');
     }
     
     // Check usageDetails construction
     console.log('\n📋 SIMULATING USAGE DETAILS CONSTRUCTION');
     
     const usageDetails = {
-      whisperMinutes: usage.whisper_minutes,
-      claudeInputTokens: usage.claude_input_tokens,
-      claudeOutputTokens: usage.claude_output_tokens,
+      whisperMinutes: usage.transcription_minutes,
+      claudeInputTokens: usage.llm_input_tokens,
+      claudeOutputTokens: usage.llm_output_tokens,
       ttsCharacters: usage.tts_characters
     };
     

@@ -38,10 +38,15 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
     
     // Initialize with empty usage
     const emptyUsage: UsageDetails = {
+      transcriptionMinutes: 0,
+      llmInputTokens: 0, 
+      llmOutputTokens: 0,
+      ttsCharacters: 0,
+      
+      // For backwards compatibility
       whisperMinutes: 0,
       claudeInputTokens: 0, 
-      claudeOutputTokens: 0,
-      ttsCharacters: 0
+      claudeOutputTokens: 0
     };
     
     const costs = calculateCosts(emptyUsage);
@@ -70,13 +75,13 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
         user_id: userId,
         current_period_start: start,
         current_period_end: end,
-        whisper_minutes: 0,
-        claude_input_tokens: 0,
-        claude_output_tokens: 0,
+        transcription_minutes: 0,
+        llm_input_tokens: 0,
+        llm_output_tokens: 0,
         tts_characters: 0,
-        whisper_cost: 0,
-        claude_input_cost: 0,
-        claude_output_cost: 0,
+        transcription_cost: 0,
+        llm_input_cost: 0,
+        llm_output_cost: 0,
         tts_cost: 0,
         total_cost: 0,
         credit_limit: creditLimit,
@@ -116,14 +121,22 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
           whisperMinutes: 10.5,
           claudeInputTokens: 5000,
           claudeOutputTokens: 7500,
-          ttsCharacters: 15000
+          ttsCharacters: 15000,
+          // Add new field names for compatibility
+          transcriptionMinutes: 10.5,
+          llmInputTokens: 5000,
+          llmOutputTokens: 7500
         },
         calculatedCosts: {
           whisperCost: 0.063,
           claudeInputCost: 0.00125,
           claudeOutputCost: 0.009375,
           ttsCost: 0.06,
-          totalCost: 0.133625
+          totalCost: 0.133625,
+          // Add new field names for compatibility
+          transcriptionCost: 0.063,
+          llmInputCost: 0.00125,
+          llmOutputCost: 0.009375
         },
         creditLimit: 1.5, // Free tier credit limit
         tokenLimit: 150, // Free tier: 1.5 credits * 100
@@ -169,10 +182,15 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
     
     // Convert snake_case database fields to camelCase application fields
     const usageDetails: UsageDetails = {
-      whisperMinutes: data.whisper_minutes || 0,
-      claudeInputTokens: data.claude_input_tokens || 0,
-      claudeOutputTokens: data.claude_output_tokens || 0,
-      ttsCharacters: data.tts_characters || 0
+      whisperMinutes: data.transcription_minutes || 0,
+      claudeInputTokens: data.llm_input_tokens || 0,
+      claudeOutputTokens: data.llm_output_tokens || 0,
+      ttsCharacters: data.tts_characters || 0,
+      
+      // For backwards compatibility, using the new field names
+      transcriptionMinutes: data.transcription_minutes || 0,
+      llmInputTokens: data.llm_input_tokens || 0,
+      llmOutputTokens: data.llm_output_tokens || 0
     };
     
     const usage: MonthlyUsage = {
@@ -221,7 +239,12 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
       whisperMinutes: 0,
       claudeInputTokens: 0,
       claudeOutputTokens: 0,
-      ttsCharacters: 0
+      ttsCharacters: 0,
+      
+      // For backwards compatibility
+      transcriptionMinutes: 0,
+      llmInputTokens: 0,
+      llmOutputTokens: 0
     };
     
     const costs = calculateCosts(emptyUsage);
@@ -249,15 +272,15 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
         current_period_end: end,
         
         // Reset usage metrics
-        whisper_minutes: 0,
-        claude_input_tokens: 0,
-        claude_output_tokens: 0,
+        transcription_minutes: 0,
+        llm_input_tokens: 0,
+        llm_output_tokens: 0,
         tts_characters: 0,
         
         // Reset cost fields
-        whisper_cost: 0,
-        claude_input_cost: 0,
-        claude_output_cost: 0,
+        transcription_cost: 0,
+        llm_input_cost: 0,
+        llm_output_cost: 0,
         tts_cost: 0,
         total_cost: 0,
         
@@ -305,13 +328,13 @@ export const trackApiUsage = async (
     if (!currentUsage.dailyUsage[today]) {
       currentUsage.dailyUsage[today] = {
         date: today,
-        whisper_minutes: 0,
-        claude_input_tokens: 0,
-        claude_output_tokens: 0,
+        transcription_minutes: 0,
+        llm_input_tokens: 0,
+        llm_output_tokens: 0,
         tts_characters: 0,
-        whisper_cost: 0,
-        claude_input_cost: 0,
-        claude_output_cost: 0,
+        transcription_cost: 0,
+        llm_input_cost: 0,
+        llm_output_cost: 0,
         tts_cost: 0,
         total_cost: 0
       };
@@ -321,9 +344,9 @@ export const trackApiUsage = async (
     const dailyUsage = currentUsage.dailyUsage[today];
     
     // Update daily usage with flat structure matching Supabase
-    dailyUsage.whisper_minutes += usageToAdd.whisperMinutes || 0;
-    dailyUsage.claude_input_tokens += usageToAdd.claudeInputTokens || 0;
-    dailyUsage.claude_output_tokens += usageToAdd.claudeOutputTokens || 0;
+    dailyUsage.transcription_minutes += usageToAdd.whisperMinutes || 0;
+    dailyUsage.llm_input_tokens += usageToAdd.claudeInputTokens || 0;
+    dailyUsage.llm_output_tokens += usageToAdd.claudeOutputTokens || 0;
     dailyUsage.tts_characters += usageToAdd.ttsCharacters || 0;
     
     // Calculate costs for daily usage
@@ -331,9 +354,9 @@ export const trackApiUsage = async (
     const costs = calculateCosts(dailyUsageDetails);
     
     // Update cost fields in the flat structure
-    dailyUsage.whisper_cost = costs.whisperCost;
-    dailyUsage.claude_input_cost = costs.claudeInputCost;
-    dailyUsage.claude_output_cost = costs.claudeOutputCost;
+    dailyUsage.transcription_cost = costs.whisperCost;
+    dailyUsage.llm_input_cost = costs.claudeInputCost;
+    dailyUsage.llm_output_cost = costs.claudeOutputCost;
     dailyUsage.tts_cost = costs.ttsCost;
     dailyUsage.total_cost = costs.totalCost;
     
@@ -362,15 +385,15 @@ export const trackApiUsage = async (
       .from('usage')
       .update({
         // Usage fields (snake_case for database)
-        whisper_minutes: monthlyUsage.whisperMinutes,
-        claude_input_tokens: monthlyUsage.claudeInputTokens,
-        claude_output_tokens: monthlyUsage.claudeOutputTokens,
+        transcription_minutes: monthlyUsage.whisperMinutes,
+        llm_input_tokens: monthlyUsage.claudeInputTokens,
+        llm_output_tokens: monthlyUsage.claudeOutputTokens,
         tts_characters: monthlyUsage.ttsCharacters,
         
         // Cost fields (calculated based on current usage)
-        whisper_cost: currentUsage.calculatedCosts.whisperCost,
-        claude_input_cost: currentUsage.calculatedCosts.claudeInputCost,
-        claude_output_cost: currentUsage.calculatedCosts.claudeOutputCost,
+        transcription_cost: currentUsage.calculatedCosts.whisperCost,
+        llm_input_cost: currentUsage.calculatedCosts.claudeInputCost,
+        llm_output_cost: currentUsage.calculatedCosts.claudeOutputCost,
         tts_cost: currentUsage.calculatedCosts.ttsCost,
         total_cost: currentUsage.calculatedCosts.totalCost,
         
@@ -390,15 +413,18 @@ export const trackApiUsage = async (
 };
 
 /**
- * Track WhisperAI usage
+ * Track WhisperAI usage (renamed to Transcription)
  */
 export const trackWhisperUsage = async (audioDurationSeconds: number): Promise<void> => {
   const minutes = audioDurationSeconds / 60;
-  await trackApiUsage({ whisperMinutes: minutes });
+  await trackApiUsage({ 
+    whisperMinutes: minutes,
+    transcriptionMinutes: minutes // Add new field name for compatibility
+  });
 };
 
 /**
- * Track Claude API usage
+ * Track Claude API usage (renamed to LLM)
  */
 export const trackClaudeUsage = async (
   inputText: string, 
@@ -409,7 +435,10 @@ export const trackClaudeUsage = async (
   
   await trackApiUsage({ 
     claudeInputTokens: inputTokens,
-    claudeOutputTokens: outputTokens
+    claudeOutputTokens: outputTokens,
+    // Add new field names for compatibility
+    llmInputTokens: inputTokens,
+    llmOutputTokens: outputTokens
   });
 };
 

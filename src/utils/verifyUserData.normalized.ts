@@ -103,7 +103,7 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
     logVerify('info', 'USAGE', 'Checking usage table record');
     const { data: usageData, error: usageError } = await supabase
       .from('usage')
-      .select('user_id, whisper_minutes, claude_input_tokens, claude_output_tokens, tts_characters')
+      .select('user_id, transcription_minutes, llm_input_tokens, llm_output_tokens, tts_characters')
       .eq('user_id', userId)
       .maybeSingle();
       
@@ -144,9 +144,9 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
     if (usageData) {
       // Calculate tokens used from raw usage metrics (simplified calculation)
       const tokensUsed = Math.round(
-        (usageData.whisper_minutes * 0.006 + 
-        usageData.claude_input_tokens / 1000000 * 2.5 + 
-        usageData.claude_output_tokens / 1000000 * 7.5 + 
+        (usageData.transcription_minutes * 0.006 + 
+        usageData.llm_input_tokens / 1000000 * 2.5 + 
+        usageData.llm_output_tokens / 1000000 * 7.5 + 
         usageData.tts_characters / 1000000 * 4.0) * 100
       );
       

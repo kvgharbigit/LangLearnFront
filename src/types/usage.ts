@@ -20,13 +20,13 @@ export interface UsageCosts {
 // New interface matching Supabase structure for daily usage entries
 export interface SupabaseDailyUsageEntry {
   date: string; // ISO date string (YYYY-MM-DD)
-  whisper_minutes: number;
-  claude_input_tokens: number;
-  claude_output_tokens: number;
+  transcription_minutes: number;
+  llm_input_tokens: number;
+  llm_output_tokens: number;
   tts_characters: number;
-  whisper_cost: number;
-  claude_input_cost: number;
-  claude_output_cost: number;
+  transcription_cost: number;
+  llm_input_cost: number;
+  llm_output_cost: number;
   tts_cost: number;
   total_cost: number;
 }
@@ -71,13 +71,13 @@ export const convertToDailyUsageEntry = (
   
   return {
     date,
-    whisper_minutes: usageDetails.whisperMinutes,
-    claude_input_tokens: usageDetails.claudeInputTokens,
-    claude_output_tokens: usageDetails.claudeOutputTokens,
+    transcription_minutes: usageDetails.whisperMinutes,
+    llm_input_tokens: usageDetails.claudeInputTokens,
+    llm_output_tokens: usageDetails.claudeOutputTokens,
     tts_characters: usageDetails.ttsCharacters,
-    whisper_cost: costs.whisperCost,
-    claude_input_cost: costs.claudeInputCost,
-    claude_output_cost: costs.claudeOutputCost,
+    transcription_cost: costs.whisperCost,
+    llm_input_cost: costs.claudeInputCost,
+    llm_output_cost: costs.claudeOutputCost,
     tts_cost: costs.ttsCost,
     total_cost: costs.totalCost
   };
@@ -86,9 +86,9 @@ export const convertToDailyUsageEntry = (
 // Helper function to convert from DB format to UsageDetails
 export const convertToUsageDetails = (entry: SupabaseDailyUsageEntry): UsageDetails => {
   return {
-    whisperMinutes: entry.whisper_minutes || 0,
-    claudeInputTokens: entry.claude_input_tokens || 0,
-    claudeOutputTokens: entry.claude_output_tokens || 0,
+    whisperMinutes: entry.transcription_minutes || 0,
+    claudeInputTokens: entry.llm_input_tokens || 0,
+    claudeOutputTokens: entry.llm_output_tokens || 0,
     ttsCharacters: entry.tts_characters || 0
   };
 };

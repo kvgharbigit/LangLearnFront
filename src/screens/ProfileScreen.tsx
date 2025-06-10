@@ -239,7 +239,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         
         // Explicitly navigate to the Auth stack
         const NavigationService = await import('../navigation/NavigationService');
-        NavigationService.default.reset([{ name: 'Auth' }]);
+        NavigationService.default.navigateByAuthState(false);
         
         // Show success message
         Alert.alert(

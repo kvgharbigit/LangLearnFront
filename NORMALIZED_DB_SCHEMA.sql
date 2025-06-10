@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS usage (
     current_period_start BIGINT NOT NULL,
     current_period_end BIGINT NOT NULL,
     -- Raw usage metrics only
-    whisper_minutes REAL NOT NULL DEFAULT 0,
-    claude_input_tokens BIGINT NOT NULL DEFAULT 0,
-    claude_output_tokens BIGINT NOT NULL DEFAULT 0,
+    transcription_minutes REAL NOT NULL DEFAULT 0,
+    llm_input_tokens BIGINT NOT NULL DEFAULT 0,
+    llm_output_tokens BIGINT NOT NULL DEFAULT 0,
     tts_characters BIGINT NOT NULL DEFAULT 0,
     -- Daily usage for historical tracking
     daily_usage JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -49,22 +49,22 @@ SELECT
     u.user_id,
     u.current_period_start,
     u.current_period_end,
-    u.whisper_minutes,
-    u.claude_input_tokens,
-    u.claude_output_tokens,
+    u.transcription_minutes,
+    u.llm_input_tokens,
+    u.llm_output_tokens,
     u.tts_characters,
     u.daily_usage,
     u.created_at,
     u.updated_at,
     -- Calculate costs with OpenAI GPT-4.1 Nano pricing
-    (u.whisper_minutes * 0.006) AS whisper_cost,
-    (u.claude_input_tokens / 1000000 * 0.1) AS claude_input_cost,
-    (u.claude_output_tokens / 1000000 * 0.4) AS claude_output_cost,
+    (u.transcription_minutes * 0.006) AS transcription_cost,
+    (u.llm_input_tokens / 1000000 * 0.1) AS llm_input_cost,
+    (u.llm_output_tokens / 1000000 * 0.4) AS llm_output_cost,
     (u.tts_characters / 1000000 * 4.0) AS tts_cost,
     -- Total cost with OpenAI GPT-4.1 Nano pricing
-    (u.whisper_minutes * 0.006) + 
-    (u.claude_input_tokens / 1000000 * 0.1) +
-    (u.claude_output_tokens / 1000000 * 0.4) +
+    (u.transcription_minutes * 0.006) + 
+    (u.llm_input_tokens / 1000000 * 0.1) +
+    (u.llm_output_tokens / 1000000 * 0.4) +
     (u.tts_characters / 1000000 * 4.0) AS total_cost,
     -- Get subscription info from users table
     usr.subscription_tier,
@@ -77,9 +77,9 @@ SELECT
     END AS credit_limit,
     -- Calculate percentage used using the derived credit_limit
     LEAST(
-        ((u.whisper_minutes * 0.006) + 
-        (u.claude_input_tokens / 1000000 * 0.1) + 
-        (u.claude_output_tokens / 1000000 * 0.4) + 
+        ((u.transcription_minutes * 0.006) + 
+        (u.llm_input_tokens / 1000000 * 0.1) + 
+        (u.llm_output_tokens / 1000000 * 0.4) + 
         (u.tts_characters / 1000000 * 4.0)) / 
         CASE 
             WHEN usr.subscription_tier = 'premium' THEN 7.50
