@@ -1,9 +1,9 @@
 import NetInfo from '@react-native-community/netinfo';
 
 // Constants for API requests
-export const REQUEST_TIMEOUT = 20000; // 20 seconds
+export const REQUEST_TIMEOUT = 60000; // 60 seconds (increased from 20)
 export const MAX_RETRIES = 3;
-export const BASE_DELAY = 1000; // 1 second base delay for exponential backoff
+export const BASE_DELAY = 2000; // 2 second base delay for exponential backoff (increased from 1)
 
 // Helper function to implement timeout for fetch requests
 export const fetchWithTimeout = async (url: string, options: RequestInit, timeout = REQUEST_TIMEOUT) => {

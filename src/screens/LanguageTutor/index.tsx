@@ -254,6 +254,12 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       return;
     }
     
+    // Prevent duplicate sends - check if already loading
+    if (isLoadingResponse) {
+      console.log('Message send already in progress, ignoring duplicate request');
+      return;
+    }
+    
     setIsLoadingResponse(true);
     
     try {
