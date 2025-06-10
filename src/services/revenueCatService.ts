@@ -1,7 +1,6 @@
 // src/services/revenueCatService.ts
 import { Platform } from 'react-native';
 import { SubscriptionTier, SUBSCRIPTION_PLANS } from '../types/subscription';
-import { updateSubscriptionTier } from './supabaseUsageService';
 import { USE_SIMULATED_REVENUECAT } from '../utils/revenueCatConfig';
 
 // Define types for RevenueCat APIs to maintain type safety
@@ -519,7 +518,8 @@ export const purchasePackage = async (
           const newTier = getTierFromProductIdentifier(pckg.product.identifier);
           console.log('[RevenueCat.purchasePackage] Updating usage limits for tier:', newTier);
           
-          // Update the usage limits for the new tier
+          // Update the usage limits for the new tier - use dynamic import to avoid circular dependency
+          const { updateSubscriptionTier } = await import('./supabaseUsageService');
           await updateSubscriptionTier(newTier);
           console.log(`[RevenueCat.purchasePackage] ✅ Usage limits updated for tier: ${newTier}`);
         } catch (err) {
@@ -988,7 +988,7 @@ export const syncSubscriptionWithDatabase = async (): Promise<boolean> => {
     }
     
     // Import required functions from other services
-    const { updateSubscriptionTier } = await import('./supabaseUsageService.normalized');
+    const { updateSubscriptionTier } = await import('./supabaseUsageService');
     const { getCurrentUser } = await import('./supabaseAuthService');
     const { supabase } = await import('../supabase/config');
     

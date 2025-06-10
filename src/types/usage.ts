@@ -1,23 +1,23 @@
 // src/types/usage.ts
 import { PRICING } from './subscription';
 
-// Original application interfaces
+// Application interfaces with updated field names
 export interface UsageDetails {
-  whisperMinutes: number;
-  claudeInputTokens: number;
-  claudeOutputTokens: number;
+  transcriptionMinutes: number;
+  llmInputTokens: number;
+  llmOutputTokens: number;
   ttsCharacters: number;
 }
 
 export interface UsageCosts {
-  whisperCost: number;
-  claudeInputCost: number;
-  claudeOutputCost: number;
+  transcriptionCost: number;
+  llmInputCost: number;
+  llmOutputCost: number;
   ttsCost: number;
   totalCost: number;
 }
 
-// New interface matching Supabase structure for daily usage entries
+// Interface matching Supabase structure for daily usage entries
 export interface SupabaseDailyUsageEntry {
   date: string; // ISO date string (YYYY-MM-DD)
   transcription_minutes: number;
@@ -31,7 +31,7 @@ export interface SupabaseDailyUsageEntry {
   total_cost: number;
 }
 
-// Updated monthly usage interface
+// Monthly usage interface
 export interface MonthlyUsage {
   currentPeriodStart: number; // timestamp
   currentPeriodEnd: number; // timestamp
@@ -40,23 +40,23 @@ export interface MonthlyUsage {
   creditLimit: number;
   tokenLimit: number;
   percentageUsed: number;
-  dailyUsage: Record<string, SupabaseDailyUsageEntry>; // Updated to use Supabase structure
+  dailyUsage: Record<string, SupabaseDailyUsageEntry>;
   subscriptionTier: string;
 }
 
 // Helper functions to calculate costs
 export const calculateCosts = (usage: UsageDetails): UsageCosts => {
-  const whisperCost = usage.whisperMinutes * PRICING.WHISPER_PER_MINUTE;
-  const claudeInputCost = (usage.claudeInputTokens / 1000000) * PRICING.CLAUDE_INPUT_PER_MILLION;
-  const claudeOutputCost = (usage.claudeOutputTokens / 1000000) * PRICING.CLAUDE_OUTPUT_PER_MILLION;
+  const transcriptionCost = usage.transcriptionMinutes * PRICING.TRANSCRIPTION_PER_MINUTE;
+  const llmInputCost = (usage.llmInputTokens / 1000000) * PRICING.LLM_INPUT_PER_MILLION;
+  const llmOutputCost = (usage.llmOutputTokens / 1000000) * PRICING.LLM_OUTPUT_PER_MILLION;
   const ttsCost = (usage.ttsCharacters / 1000000) * PRICING.TTS_PER_MILLION;
   
-  const totalCost = whisperCost + claudeInputCost + claudeOutputCost + ttsCost;
+  const totalCost = transcriptionCost + llmInputCost + llmOutputCost + ttsCost;
   
   return {
-    whisperCost,
-    claudeInputCost,
-    claudeOutputCost,
+    transcriptionCost,
+    llmInputCost,
+    llmOutputCost,
     ttsCost,
     totalCost
   };
@@ -71,13 +71,13 @@ export const convertToDailyUsageEntry = (
   
   return {
     date,
-    transcription_minutes: usageDetails.whisperMinutes,
-    llm_input_tokens: usageDetails.claudeInputTokens,
-    llm_output_tokens: usageDetails.claudeOutputTokens,
+    transcription_minutes: usageDetails.transcriptionMinutes,
+    llm_input_tokens: usageDetails.llmInputTokens,
+    llm_output_tokens: usageDetails.llmOutputTokens,
     tts_characters: usageDetails.ttsCharacters,
-    transcription_cost: costs.whisperCost,
-    llm_input_cost: costs.claudeInputCost,
-    llm_output_cost: costs.claudeOutputCost,
+    transcription_cost: costs.transcriptionCost,
+    llm_input_cost: costs.llmInputCost,
+    llm_output_cost: costs.llmOutputCost,
     tts_cost: costs.ttsCost,
     total_cost: costs.totalCost
   };
@@ -86,9 +86,9 @@ export const convertToDailyUsageEntry = (
 // Helper function to convert from DB format to UsageDetails
 export const convertToUsageDetails = (entry: SupabaseDailyUsageEntry): UsageDetails => {
   return {
-    whisperMinutes: entry.transcription_minutes || 0,
-    claudeInputTokens: entry.llm_input_tokens || 0,
-    claudeOutputTokens: entry.llm_output_tokens || 0,
+    transcriptionMinutes: entry.transcription_minutes || 0,
+    llmInputTokens: entry.llm_input_tokens || 0,
+    llmOutputTokens: entry.llm_output_tokens || 0,
     ttsCharacters: entry.tts_characters || 0
   };
 };

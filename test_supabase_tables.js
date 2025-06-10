@@ -82,7 +82,7 @@ async function testSupabaseTables() {
         // Required columns for usage table
         const requiredColumns = [
           'user_id', 'current_period_start', 'current_period_end', 
-          'whisper_minutes', 'claude_input_tokens', 'claude_output_tokens', 
+          'transcription_minutes', 'llm_input_tokens', 'llm_output_tokens', 
           'tts_characters', 'credit_limit', 'token_limit', 
           'percentage_used', 'daily_usage', 'subscription_tier'
         ];
@@ -175,9 +175,9 @@ async function testSupabaseTables() {
             user_id: testUserId,
             current_period_start: Date.now(),
             current_period_end: Date.now() + (30 * 24 * 60 * 60 * 1000),
-            whisper_minutes: 0,
-            claude_input_tokens: 0,
-            claude_output_tokens: 0,
+            transcription_minutes: 0,
+            llm_input_tokens: 0,
+            llm_output_tokens: 0,
             tts_characters: 0,
             credit_limit: 1.5,
             token_limit: 150000,
@@ -236,9 +236,9 @@ async function testSupabaseTables() {
         user_id: updateTestUserId,
         current_period_start: Date.now(),
         current_period_end: Date.now() + (30 * 24 * 60 * 60 * 1000),
-        whisper_minutes: 0,
-        claude_input_tokens: 0,
-        claude_output_tokens: 0,
+        transcription_minutes: 0,
+        llm_input_tokens: 0,
+        llm_output_tokens: 0,
         tts_characters: 0,
         credit_limit: 1.5,
         token_limit: 150000,
@@ -251,9 +251,9 @@ async function testSupabaseTables() {
       const { error: updateError } = await supabase
         .from('usage')
         .update({
-          whisper_minutes: 10,
-          claude_input_tokens: 5000,
-          claude_output_tokens: 3000,
+          transcription_minutes: 10,
+          llm_input_tokens: 5000,
+          llm_output_tokens: 3000,
           tts_characters: 2000,
           token_limit: 200000
         })
@@ -273,7 +273,7 @@ async function testSupabaseTables() {
         // Verify update
         const { data, error } = await supabase
           .from('usage')
-          .select('whisper_minutes, claude_input_tokens, claude_output_tokens, tts_characters, token_limit')
+          .select('transcription_minutes, llm_input_tokens, llm_output_tokens, tts_characters, token_limit')
           .eq('user_id', updateTestUserId)
           .single();
         

@@ -1,7 +1,6 @@
 // src/services/supabaseUsageService.ts
 import { supabase } from '../supabase/config';
 import { getCurrentUser, getIdToken } from './supabaseAuthService';
-import { getCurrentSubscription } from './revenueCatService';
 import { 
   UsageDetails, 
   UsageCosts, 
@@ -16,10 +15,26 @@ import {
   convertToDailyUsageEntry,
   convertToUsageDetails
 } from '../types/usage';
-import { SUBSCRIPTION_PLANS } from '../types/subscription';
+import { SUBSCRIPTION_PLANS, SubscriptionTier } from '../types/subscription';
+
+// Import at the top level
+import { shouldUseMockData, logDataSource } from '../utils/dataMode';
 
 // Import API URL from the api.ts file
 const API_URL = 'http://192.168.86.241:8004'; // Update to match your API_URL in api.ts
+
+// Function to get subscription tier without causing circular dependency
+const getSubscriptionTier = async (): Promise<{ tier: SubscriptionTier }> => {
+  try {
+    // Try to dynamically import to avoid circular dependency
+    const { getCurrentSubscription } = await import('./revenueCatService');
+    return await getCurrentSubscription();
+  } catch (error) {
+    console.error('Error getting subscription tier:', error);
+    // Default to free tier if there's an error
+    return { tier: 'free' };
+  }
+};
 
 /**
  * Initialize monthly usage tracking for a user
@@ -27,7 +42,7 @@ const API_URL = 'http://192.168.86.241:8004'; // Update to match your API_URL in
 export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsage> => {
   try {
     // Get user's subscription
-    const { tier } = await getCurrentSubscription();
+    const { tier } = await getSubscriptionTier();
     
     // Find the plan to get credit limit
     const plan = SUBSCRIPTION_PLANS.find(p => p.tier === tier);
@@ -41,12 +56,7 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
       transcriptionMinutes: 0,
       llmInputTokens: 0, 
       llmOutputTokens: 0,
-      ttsCharacters: 0,
-      
-      // For backwards compatibility
-      whisperMinutes: 0,
-      claudeInputTokens: 0, 
-      claudeOutputTokens: 0
+      ttsCharacters: 0
     };
     
     const costs = calculateCosts(emptyUsage);
@@ -99,9 +109,6 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
     throw error;
   }
 };
-
-// Import at the top level
-import { shouldUseMockData, logDataSource } from '../utils/dataMode';
 
 /**
  * Get the current usage for a user
@@ -182,15 +189,15 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
     
     // Convert snake_case database fields to camelCase application fields
     const usageDetails: UsageDetails = {
-      whisperMinutes: data.transcription_minutes || 0,
-      claudeInputTokens: data.llm_input_tokens || 0,
-      claudeOutputTokens: data.llm_output_tokens || 0,
-      ttsCharacters: data.tts_characters || 0,
-      
-      // For backwards compatibility, using the new field names
       transcriptionMinutes: data.transcription_minutes || 0,
       llmInputTokens: data.llm_input_tokens || 0,
-      llmOutputTokens: data.llm_output_tokens || 0
+      llmOutputTokens: data.llm_output_tokens || 0,
+      ttsCharacters: data.tts_characters || 0,
+      
+      // For backwards compatibility
+      whisperMinutes: data.transcription_minutes || 0,
+      claudeInputTokens: data.llm_input_tokens || 0,
+      claudeOutputTokens: data.llm_output_tokens || 0
     };
     
     const usage: MonthlyUsage = {
@@ -225,7 +232,7 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
 export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> => {
   try {
     // Get user's subscription
-    const { tier } = await getCurrentSubscription();
+    const { tier } = await getSubscriptionTier();
     
     // Find the plan to get credit limit
     const plan = SUBSCRIPTION_PLANS.find(p => p.tier === tier);
@@ -236,15 +243,10 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
     
     // Reset usage but keep history of daily usage
     const emptyUsage: UsageDetails = {
-      whisperMinutes: 0,
-      claudeInputTokens: 0,
-      claudeOutputTokens: 0,
-      ttsCharacters: 0,
-      
-      // For backwards compatibility
       transcriptionMinutes: 0,
       llmInputTokens: 0,
-      llmOutputTokens: 0
+      llmOutputTokens: 0,
+      ttsCharacters: 0
     };
     
     const costs = calculateCosts(emptyUsage);
@@ -344,9 +346,9 @@ export const trackApiUsage = async (
     const dailyUsage = currentUsage.dailyUsage[today];
     
     // Update daily usage with flat structure matching Supabase
-    dailyUsage.transcription_minutes += usageToAdd.whisperMinutes || 0;
-    dailyUsage.llm_input_tokens += usageToAdd.claudeInputTokens || 0;
-    dailyUsage.llm_output_tokens += usageToAdd.claudeOutputTokens || 0;
+    dailyUsage.transcription_minutes += usageToAdd.transcriptionMinutes || 0;
+    dailyUsage.llm_input_tokens += usageToAdd.llmInputTokens || 0;
+    dailyUsage.llm_output_tokens += usageToAdd.llmOutputTokens || 0;
     dailyUsage.tts_characters += usageToAdd.ttsCharacters || 0;
     
     // Calculate costs for daily usage
@@ -362,9 +364,9 @@ export const trackApiUsage = async (
     
     // Update the monthly totals in the usageDetails object
     const monthlyUsage = currentUsage.usageDetails;
-    monthlyUsage.whisperMinutes += usageToAdd.whisperMinutes || 0;
-    monthlyUsage.claudeInputTokens += usageToAdd.claudeInputTokens || 0;
-    monthlyUsage.claudeOutputTokens += usageToAdd.claudeOutputTokens || 0;
+    monthlyUsage.transcriptionMinutes += usageToAdd.transcriptionMinutes || 0;
+    monthlyUsage.llmInputTokens += usageToAdd.llmInputTokens || 0;
+    monthlyUsage.llmOutputTokens += usageToAdd.llmOutputTokens || 0;
     monthlyUsage.ttsCharacters += usageToAdd.ttsCharacters || 0;
     
     // Calculate costs for monthly usage
@@ -385,15 +387,15 @@ export const trackApiUsage = async (
       .from('usage')
       .update({
         // Usage fields (snake_case for database)
-        transcription_minutes: monthlyUsage.whisperMinutes,
-        llm_input_tokens: monthlyUsage.claudeInputTokens,
-        llm_output_tokens: monthlyUsage.claudeOutputTokens,
+        transcription_minutes: monthlyUsage.transcriptionMinutes,
+        llm_input_tokens: monthlyUsage.llmInputTokens,
+        llm_output_tokens: monthlyUsage.llmOutputTokens,
         tts_characters: monthlyUsage.ttsCharacters,
         
         // Cost fields (calculated based on current usage)
-        transcription_cost: currentUsage.calculatedCosts.whisperCost,
-        llm_input_cost: currentUsage.calculatedCosts.claudeInputCost,
-        llm_output_cost: currentUsage.calculatedCosts.claudeOutputCost,
+        transcription_cost: currentUsage.calculatedCosts.transcriptionCost,
+        llm_input_cost: currentUsage.calculatedCosts.llmInputCost,
+        llm_output_cost: currentUsage.calculatedCosts.llmOutputCost,
         tts_cost: currentUsage.calculatedCosts.ttsCost,
         total_cost: currentUsage.calculatedCosts.totalCost,
         
@@ -413,20 +415,22 @@ export const trackApiUsage = async (
 };
 
 /**
- * Track WhisperAI usage (renamed to Transcription)
+ * Track transcription usage
  */
-export const trackWhisperUsage = async (audioDurationSeconds: number): Promise<void> => {
+export const trackTranscriptionUsage = async (audioDurationSeconds: number): Promise<void> => {
   const minutes = audioDurationSeconds / 60;
   await trackApiUsage({ 
-    whisperMinutes: minutes,
-    transcriptionMinutes: minutes // Add new field name for compatibility
+    transcriptionMinutes: minutes
   });
 };
 
+// Keep the old function name as an alias for backwards compatibility
+export const trackWhisperUsage = trackTranscriptionUsage;
+
 /**
- * Track Claude API usage (renamed to LLM)
+ * Track LLM API usage
  */
-export const trackClaudeUsage = async (
+export const trackLLMUsage = async (
   inputText: string, 
   outputText: string
 ): Promise<void> => {
@@ -434,13 +438,13 @@ export const trackClaudeUsage = async (
   const outputTokens = estimateTokens(outputText);
   
   await trackApiUsage({ 
-    claudeInputTokens: inputTokens,
-    claudeOutputTokens: outputTokens,
-    // Add new field names for compatibility
     llmInputTokens: inputTokens,
     llmOutputTokens: outputTokens
   });
 };
+
+// Keep the old function name as an alias for backwards compatibility
+export const trackClaudeUsage = trackLLMUsage;
 
 /**
  * Track TTS usage
@@ -519,7 +523,7 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
       // Skip server verification only in development environment
       if (isDevelopment() || isExpoGo()) {
         // For development environment, check subscription tier and set appropriate quota
-        const { tier } = await getCurrentSubscription();
+        const { tier } = await getSubscriptionTier();
         if (tier !== 'free') {
           return true; // In dev mode, paid tiers always have quota
         } else {
@@ -656,8 +660,10 @@ export default {
   getUserUsage,
   getUserUsageInTokens,
   trackApiUsage,
-  trackWhisperUsage,
-  trackClaudeUsage,
+  trackTranscriptionUsage,
+  trackWhisperUsage,  // Keeping for backwards compatibility
+  trackLLMUsage,
+  trackClaudeUsage,   // Keeping for backwards compatibility
   trackTTSUsage,
   hasAvailableQuota,
   forceQuotaExceeded,

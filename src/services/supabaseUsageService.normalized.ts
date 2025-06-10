@@ -40,16 +40,10 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
     
     // Initialize with empty usage
     const emptyUsage: UsageDetails = {
-      // New field names
       transcriptionMinutes: 0,
       llmInputTokens: 0, 
       llmOutputTokens: 0,
-      ttsCharacters: 0,
-      
-      // For backwards compatibility
-      whisperMinutes: 0,
-      claudeInputTokens: 0, 
-      claudeOutputTokens: 0
+      ttsCharacters: 0
     };
     
     const costs = calculateCosts(emptyUsage);
@@ -124,15 +118,15 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
         currentPeriodStart: Date.now() - (15 * 24 * 60 * 60 * 1000), // 15 days ago
         currentPeriodEnd: Date.now() + (15 * 24 * 60 * 60 * 1000),  // 15 days from now
         usageDetails: {
-          whisperMinutes: 10.5,
-          claudeInputTokens: 5000,
-          claudeOutputTokens: 7500,
+          transcriptionMinutes: 10.5,
+          llmInputTokens: 5000,
+          llmOutputTokens: 7500,
           ttsCharacters: 15000
         },
         calculatedCosts: {
-          whisperCost: 0.063,
-          claudeInputCost: 0.00125,
-          claudeOutputCost: 0.009375,
+          transcriptionCost: 0.063,
+          llmInputCost: 0.00125,
+          llmOutputCost: 0.009375,
           ttsCost: 0.06,
           totalCost: 0.133625
         },
@@ -148,9 +142,15 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
     // If no userId provided, try to get the current user
     if (!userId) {
       const user = getCurrentUser();
-      if (!user) return null;
+      if (!user) {
+        console.log('📊 USAGE DEBUG: No authenticated user found');
+        return null;
+      }
       userId = user.id;
+      console.log(`📊 USAGE DEBUG: Retrieved user ID: ${userId}`);
     }
+    
+    console.log(`📊 USAGE DEBUG: Fetching usage data for user ID: ${userId}`);
     
     // First get subscription info from users table
     const { data: userData, error: userError } = await supabase
@@ -159,10 +159,19 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
       .eq('user_id', userId)
       .single();
       
-    if (userError || !userData) {
+    if (userError) {
+      console.log(`📊 USAGE DEBUG: Error fetching user data: ${userError.message}`);
       // Initialize user if not exists
       return await initializeMonthlyUsage(userId);
     }
+    
+    if (!userData) {
+      console.log(`📊 USAGE DEBUG: No user data found in Supabase`);
+      // Initialize user if not exists
+      return await initializeMonthlyUsage(userId);
+    }
+    
+    console.log(`📊 USAGE DEBUG: User data retrieved, subscription tier: ${userData.subscription_tier}`);
     
     // Then get usage data from usage table
     const { data, error } = await supabase
@@ -171,10 +180,24 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
       .eq('user_id', userId)
       .single();
     
-    if (error || !data) {
+    if (error) {
+      console.log(`📊 USAGE DEBUG: Error fetching usage data: ${error.message}`);
       // Initialize usage if not exists
       return await initializeMonthlyUsage(userId);
     }
+    
+    if (!data) {
+      console.log(`📊 USAGE DEBUG: No usage data found in Supabase`);
+      // Initialize usage if not exists
+      return await initializeMonthlyUsage(userId);
+    }
+    
+    console.log(`📊 USAGE DEBUG: Raw usage data from Supabase:`, {
+      transcription_minutes: data.transcription_minutes,
+      llm_input_tokens: data.llm_input_tokens,
+      llm_output_tokens: data.llm_output_tokens,
+      tts_characters: data.tts_characters
+    });
     
     // Parse the usage data from Supabase format to our MonthlyUsage format
     // First safely parse the daily_usage JSON string
@@ -191,27 +214,34 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
     
     // Extract raw usage metrics
     const usageDetails: UsageDetails = {
-      // New field names
       transcriptionMinutes: data.transcription_minutes || 0,
       llmInputTokens: data.llm_input_tokens || 0,
       llmOutputTokens: data.llm_output_tokens || 0,
-      ttsCharacters: data.tts_characters || 0,
-      
-      // For backwards compatibility
-      whisperMinutes: data.transcription_minutes || 0,
-      claudeInputTokens: data.llm_input_tokens || 0,
-      claudeOutputTokens: data.llm_output_tokens || 0
+      ttsCharacters: data.tts_characters || 0
     };
+    
+    console.log(`📊 USAGE DEBUG: Normalized usage metrics:`, usageDetails);
     
     // Calculate costs on-the-fly
     const calculatedCosts = calculateCosts(usageDetails);
+    console.log(`📊 USAGE DEBUG: Calculated costs:`, calculatedCosts);
     
     // Get credit limit based on subscription tier
     const { getCreditLimitForTier } = await import('../types/subscription');
     const creditLimit = getCreditLimitForTier(userData.subscription_tier || 'free');
-    const percentageUsed = creditLimit > 0 
-      ? Math.min((calculatedCosts.totalCost / creditLimit) * 100, 100)
-      : 100;
+    console.log(`📊 USAGE DEBUG: Credit limit for tier ${userData.subscription_tier}: ${creditLimit}`);
+    
+    // Calculate percentage used
+    const totalCost = calculatedCosts.totalCost;
+    let percentageUsed = 0;
+    
+    if (creditLimit <= 0) {
+      percentageUsed = 100;
+      console.log(`📊 USAGE DEBUG: Credit limit is zero or negative, setting percentage to 100%`);
+    } else {
+      percentageUsed = Math.min((totalCost / creditLimit) * 100, 100);
+      console.log(`📊 USAGE DEBUG: Percentage calculation: (${totalCost} / ${creditLimit}) * 100 = ${percentageUsed.toFixed(2)}%`);
+    }
     
     const usage: MonthlyUsage = {
       currentPeriodStart: data.current_period_start,
@@ -254,16 +284,10 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
     
     // Reset usage but keep history of daily usage
     const emptyUsage: UsageDetails = {
-      // New field names
       transcriptionMinutes: 0,
       llmInputTokens: 0,
       llmOutputTokens: 0,
-      ttsCharacters: 0,
-      
-      // For backwards compatibility
-      whisperMinutes: 0,
-      claudeInputTokens: 0,
-      claudeOutputTokens: 0
+      ttsCharacters: 0
     };
     
     const costs = calculateCosts(emptyUsage);
@@ -361,24 +385,19 @@ export const trackApiUsage = async (
     const dailyUsage = currentUsage.dailyUsage[today];
     
     // Update daily usage with raw metrics only
-    dailyUsage.transcription_minutes += usageToAdd.transcriptionMinutes || usageToAdd.whisperMinutes || 0;
-    dailyUsage.llm_input_tokens += usageToAdd.llmInputTokens || usageToAdd.claudeInputTokens || 0;
-    dailyUsage.llm_output_tokens += usageToAdd.llmOutputTokens || usageToAdd.claudeOutputTokens || 0;
+    dailyUsage.transcription_minutes += usageToAdd.transcriptionMinutes || 0;
+    dailyUsage.llm_input_tokens += usageToAdd.llmInputTokens || 0;
+    dailyUsage.llm_output_tokens += usageToAdd.llmOutputTokens || 0;
     dailyUsage.tts_characters += usageToAdd.ttsCharacters || 0;
     
     // Update the monthly totals in the usageDetails object
     const monthlyUsage = currentUsage.usageDetails;
     
-    // Update new field names
-    monthlyUsage.transcriptionMinutes += usageToAdd.transcriptionMinutes || usageToAdd.whisperMinutes || 0;
-    monthlyUsage.llmInputTokens += usageToAdd.llmInputTokens || usageToAdd.claudeInputTokens || 0;
-    monthlyUsage.llmOutputTokens += usageToAdd.llmOutputTokens || usageToAdd.claudeOutputTokens || 0;
+    // Update field values
+    monthlyUsage.transcriptionMinutes += usageToAdd.transcriptionMinutes || 0;
+    monthlyUsage.llmInputTokens += usageToAdd.llmInputTokens || 0;
+    monthlyUsage.llmOutputTokens += usageToAdd.llmOutputTokens || 0;
     monthlyUsage.ttsCharacters += usageToAdd.ttsCharacters || 0;
-    
-    // Keep backwards compatibility fields in sync
-    monthlyUsage.whisperMinutes = monthlyUsage.transcriptionMinutes;
-    monthlyUsage.claudeInputTokens = monthlyUsage.llmInputTokens;
-    monthlyUsage.claudeOutputTokens = monthlyUsage.llmOutputTokens;
     
     // Calculate costs for monthly usage (on-the-fly, not stored in DB)
     currentUsage.calculatedCosts = calculateCosts(monthlyUsage);
@@ -421,19 +440,22 @@ export const trackApiUsage = async (
 };
 
 /**
- * Track WhisperAI usage
+ * Track transcription usage
  */
-export const trackWhisperUsage = async (audioDurationSeconds: number): Promise<void> => {
+export const trackTranscriptionUsage = async (audioDurationSeconds: number): Promise<void> => {
   const minutes = audioDurationSeconds / 60;
   await trackApiUsage({ transcriptionMinutes: minutes });
   console.log(`Tracked transcription usage: ${minutes.toFixed(2)} minutes (${audioDurationSeconds}s)`);
 };
 
+// Keep the old function name as an alias for backwards compatibility
+export const trackWhisperUsage = trackTranscriptionUsage;
+
 /**
- * Track Claude API usage
+ * Track LLM API usage
  * Uses direct DB update to avoid issues with missing cost columns
  */
-export const trackClaudeUsage = async (
+export const trackLLMUsage = async (
   inputText: string, 
   outputText: string
 ): Promise<void> => {
@@ -444,7 +466,7 @@ export const trackClaudeUsage = async (
     // Get the current user
     const user = getCurrentUser();
     if (!user) {
-      console.warn('Cannot track Claude usage: No authenticated user');
+      console.warn('Cannot track LLM usage: No authenticated user');
       return;
     }
     
@@ -464,7 +486,7 @@ export const trackClaudeUsage = async (
     }
     
     if (!usageData) {
-      console.warn('Cannot track Claude usage: No usage data found');
+      console.warn('Cannot track LLM usage: No usage data found');
       return;
     }
     
@@ -510,15 +532,18 @@ export const trackClaudeUsage = async (
       .eq('user_id', user.id);
     
     if (updateError) {
-      console.error('Error updating Claude usage:', updateError);
+      console.error('Error updating LLM usage:', updateError);
       return;
     }
     
-    console.log(`Tracked Claude usage: ${inputTokens} input tokens, ${outputTokens} output tokens`);
+    console.log(`Tracked LLM usage: ${inputTokens} input tokens, ${outputTokens} output tokens`);
   } catch (error) {
-    console.error('Error in trackClaudeUsage:', error);
+    console.error('Error in trackLLMUsage:', error);
   }
 };
+
+// Keep the old function name as an alias for backwards compatibility
+export const trackClaudeUsage = trackLLMUsage;
 
 /**
  * Track TTS usage
@@ -577,22 +602,48 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
     logDataSource('QuotaService', false);
     
     const user = getCurrentUser();
-    if (!user) return false;
+    if (!user) {
+      console.log('📊 QUOTA DEBUG: No authenticated user found');
+      return false;
+    }
+    
+    console.log(`📊 QUOTA DEBUG: Checking quota for user ID: ${user.id}`);
     
     // First check with local data
     const usage = await getUserUsage(user.id);
-    if (!usage) return false;
+    if (!usage) {
+      console.log('📊 QUOTA DEBUG: No usage data returned from getUserUsage');
+      return false;
+    }
+    
+    // Detailed usage debug information
+    console.log('📊 QUOTA DEBUG: Raw usage metrics from Supabase:', {
+      transcriptionMinutes: usage.usageDetails.transcriptionMinutes,
+      llmInputTokens: usage.usageDetails.llmInputTokens,
+      llmOutputTokens: usage.usageDetails.llmOutputTokens,
+      ttsCharacters: usage.usageDetails.ttsCharacters
+    });
+    
+    console.log('📊 QUOTA DEBUG: Calculated costs:', {
+      transcriptionCost: usage.calculatedCosts.transcriptionCost,
+      llmInputCost: usage.calculatedCosts.llmInputCost,
+      llmOutputCost: usage.calculatedCosts.llmOutputCost,
+      ttsCost: usage.calculatedCosts.ttsCost,
+      totalCost: usage.calculatedCosts.totalCost
+    });
     
     // Check if percentage used is less than 100%
     const localQuotaAvailable = usage.percentageUsed < 100;
+    console.log(`📊 QUOTA DEBUG: Local quota check - Percentage used: ${usage.percentageUsed.toFixed(2)}%, Available: ${localQuotaAvailable}`);
     
     // If local quota check fails, no need to check server
     if (!localQuotaAvailable) {
+      console.log('📊 QUOTA DEBUG: Local quota check indicates quota exceeded');
       return false;
     }
     
     // Log current usage for debugging
-    console.log(`Usage check - Percentage used: ${usage.percentageUsed.toFixed(2)}%, Tier: ${usage.subscriptionTier}, Credits: ${usage.calculatedCosts.totalCost.toFixed(4)}/${usage.creditLimit}`);
+    console.log(`📊 QUOTA DEBUG: Usage check - Percentage used: ${usage.percentageUsed.toFixed(2)}%, Tier: ${usage.subscriptionTier}, Credits: ${usage.calculatedCosts.totalCost.toFixed(4)}/${usage.creditLimit}`);
     
     // Import isExpoGo and isDevelopment from deviceInfo.ts
     try {
@@ -602,23 +653,25 @@ export const hasAvailableQuota = async (): Promise<boolean> => {
       if (isDevelopment() || isExpoGo()) {
         // Use the subscription tier we already have from Supabase
         const tier = usage.subscriptionTier;
-        console.log(`Using subscription tier from Supabase: ${tier}`);
+        console.log(`📊 QUOTA DEBUG: Using subscription tier from Supabase: ${tier}`);
         
         if (tier !== 'free') {
+          console.log('📊 QUOTA DEBUG: In dev mode with paid tier, returning true');
           return true; // In dev mode, paid tiers always have quota
         } else {
           // In dev mode with free tier, check local percentage
+          console.log('📊 QUOTA DEBUG: In dev mode with free tier, checking percentage');
           return usage.percentageUsed < 100;
         }
       } else {
         // Production flow
-        console.log("In production environment, using local quota check");
+        console.log("📊 QUOTA DEBUG: In production environment, using local quota check");
         
         // TEMPORARY FIX: Skip server verification and use local data
         // This prevents incorrectly showing quota exceeded
         const tier = usage.subscriptionTier;
         const hasQuota = usage.percentageUsed < 100;
-        console.log(`Using local subscription data: Tier=${tier}, Has Quota=${hasQuota}`);
+        console.log(`📊 QUOTA DEBUG: Using local subscription data: Tier=${tier}, Has Quota=${hasQuota}`);
         return hasQuota;
         
         /* Temporarily disabled server check
@@ -824,8 +877,10 @@ export default {
   getUserUsage,
   getUserUsageInTokens,
   trackApiUsage,
-  trackWhisperUsage,
-  trackClaudeUsage,
+  trackTranscriptionUsage,
+  trackWhisperUsage,  // Keeping for backwards compatibility
+  trackLLMUsage,
+  trackClaudeUsage,   // Keeping for backwards compatibility
   trackTTSUsage,
   hasAvailableQuota,
   forceQuotaExceeded,

@@ -7,24 +7,19 @@
  * Raw usage metrics
  */
 export interface UsageDetails {
-  whisperMinutes: number; // For backwards compatibility, points to transcriptionMinutes
-  claudeInputTokens: number; // For backwards compatibility, points to llmInputTokens
-  claudeOutputTokens: number; // For backwards compatibility, points to llmOutputTokens
-  ttsCharacters: number;
-  
-  // New generic field names
   transcriptionMinutes: number;
   llmInputTokens: number;
   llmOutputTokens: number;
+  ttsCharacters: number;
 }
 
 /**
  * Calculated costs based on usage metrics
  */
 export interface UsageCosts {
-  whisperCost: number;
-  claudeInputCost: number;
-  claudeOutputCost: number;
+  transcriptionCost: number;
+  llmInputCost: number;
+  llmOutputCost: number;
   ttsCost: number;
   totalCost: number;
 }
@@ -34,15 +29,10 @@ export interface UsageCosts {
  */
 export interface SupabaseDailyUsageEntry {
   date: string;
-  whisper_minutes: number;
-  claude_input_tokens: number;
-  claude_output_tokens: number;
+  transcription_minutes: number;
+  llm_input_tokens: number;
+  llm_output_tokens: number;
   tts_characters: number;
-  
-  // For backwards compatibility
-  transcription_minutes?: number;
-  llm_input_tokens?: number;
-  llm_output_tokens?: number;
 }
 
 /**
@@ -61,13 +51,13 @@ export interface MonthlyUsage {
 
 // Pricing constants for cost calculations (same as backend)
 const PRICING = {
-  WHISPER_PER_MINUTE: 0.006,     // $0.006 per minute of audio
-  CLAUDE_INPUT_PER_MILLION: 0.1,  // $0.1 per million tokens for GPT-4.1 Nano (previously Claude: $0.25)
-  CLAUDE_OUTPUT_PER_MILLION: 0.4, // $0.4 per million tokens for GPT-4.1 Nano (previously Claude: $1.25)
-  OPENAI_INPUT_PER_MILLION: 0.1,  // $0.1 per million tokens for GPT-4.1 Nano
-  OPENAI_OUTPUT_PER_MILLION: 0.4, // $0.4 per million tokens for GPT-4.1 Nano
-  TTS_PER_MILLION: 4.0,          // $4.00 per million characters
-  TOKENS_PER_CHAR: 1/3,           // Estimate: 1 token ~ 3 characters
+  TRANSCRIPTION_PER_MINUTE: 0.006,  // $0.006 per minute of audio
+  LLM_INPUT_PER_MILLION: 0.1,    // $0.1 per million tokens for GPT-4.1 Nano (previously Claude: $0.25)
+  LLM_OUTPUT_PER_MILLION: 0.4,   // $0.4 per million tokens for GPT-4.1 Nano (previously Claude: $1.25)
+  OPENAI_INPUT_PER_MILLION: 0.1,    // $0.1 per million tokens for GPT-4.1 Nano
+  OPENAI_OUTPUT_PER_MILLION: 0.4,   // $0.4 per million tokens for GPT-4.1 Nano
+  TTS_PER_MILLION: 4.0,             // $4.00 per million characters
+  TOKENS_PER_CHAR: 1/3,             // Estimate: 1 token ~ 3 characters
 };
 
 /**
@@ -76,32 +66,26 @@ const PRICING = {
  * @param useOpenAIPricing Whether to use OpenAI's pricing instead of Claude's
  */
 export function calculateCosts(usage: UsageDetails, useOpenAIPricing: boolean = true): UsageCosts {
-  // Use transcriptionMinutes if available, otherwise fall back to whisperMinutes
-  const transcriptionMinutes = usage.transcriptionMinutes || usage.whisperMinutes;
-  const whisperCost = transcriptionMinutes * PRICING.WHISPER_PER_MINUTE;
+  const transcriptionCost = usage.transcriptionMinutes * PRICING.TRANSCRIPTION_PER_MINUTE;
   
   // Use the appropriate pricing based on the current LLM provider
   const inputCostPerMillion = useOpenAIPricing 
     ? PRICING.OPENAI_INPUT_PER_MILLION 
-    : PRICING.CLAUDE_INPUT_PER_MILLION;
+    : PRICING.LLM_INPUT_PER_MILLION;
     
   const outputCostPerMillion = useOpenAIPricing 
     ? PRICING.OPENAI_OUTPUT_PER_MILLION 
-    : PRICING.CLAUDE_OUTPUT_PER_MILLION;
+    : PRICING.LLM_OUTPUT_PER_MILLION;
   
-  // Use llmInputTokens if available, otherwise fall back to claudeInputTokens
-  const inputTokens = usage.llmInputTokens || usage.claudeInputTokens;
-  const outputTokens = usage.llmOutputTokens || usage.claudeOutputTokens;
-  
-  const claudeInputCost = (inputTokens / 1000000) * inputCostPerMillion;
-  const claudeOutputCost = (outputTokens / 1000000) * outputCostPerMillion;
+  const llmInputCost = (usage.llmInputTokens / 1000000) * inputCostPerMillion;
+  const llmOutputCost = (usage.llmOutputTokens / 1000000) * outputCostPerMillion;
   const ttsCost = (usage.ttsCharacters / 1000000) * PRICING.TTS_PER_MILLION;
-  const totalCost = whisperCost + claudeInputCost + claudeOutputCost + ttsCost;
+  const totalCost = transcriptionCost + llmInputCost + llmOutputCost + ttsCost;
   
   return {
-    whisperCost,
-    claudeInputCost,
-    claudeOutputCost,
+    transcriptionCost,
+    llmInputCost,
+    llmOutputCost,
     ttsCost,
     totalCost
   };
@@ -162,21 +146,11 @@ export function estimateTokens(text: string): number {
  * Convert from SupabaseDailyUsageEntry to UsageDetails
  */
 export function convertToUsageDetails(entry: SupabaseDailyUsageEntry): UsageDetails {
-  const transcriptionMinutes = entry.transcription_minutes || entry.whisper_minutes || 0;
-  const llmInputTokens = entry.llm_input_tokens || entry.claude_input_tokens || 0;
-  const llmOutputTokens = entry.llm_output_tokens || entry.claude_output_tokens || 0;
-  
   return {
-    // New field names
-    transcriptionMinutes,
-    llmInputTokens,
-    llmOutputTokens,
-    ttsCharacters: entry.tts_characters || 0,
-    
-    // For backwards compatibility
-    whisperMinutes: transcriptionMinutes,
-    claudeInputTokens: llmInputTokens,
-    claudeOutputTokens: llmOutputTokens
+    transcriptionMinutes: entry.transcription_minutes || 0,
+    llmInputTokens: entry.llm_input_tokens || 0,
+    llmOutputTokens: entry.llm_output_tokens || 0,
+    ttsCharacters: entry.tts_characters || 0
   };
 }
 
@@ -189,9 +163,9 @@ export function convertToDailyUsageEntry(
 ): SupabaseDailyUsageEntry {
   return {
     date,
-    transcription_minutes: usageDetails.transcriptionMinutes || usageDetails.whisperMinutes,
-    llm_input_tokens: usageDetails.llmInputTokens || usageDetails.claudeInputTokens,
-    llm_output_tokens: usageDetails.llmOutputTokens || usageDetails.claudeOutputTokens,
+    transcription_minutes: usageDetails.transcriptionMinutes,
+    llm_input_tokens: usageDetails.llmInputTokens,
+    llm_output_tokens: usageDetails.llmOutputTokens,
     tts_characters: usageDetails.ttsCharacters
   };
 }

@@ -155,11 +155,11 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
           const LLM_OUTPUT_PER_MILLION = 7.5;
           const TTS_PER_MILLION = 4.0;
           
-          const whisperCost = (basicUsageData.transcription_minutes || 0) * TRANSCRIPTION_PER_MINUTE;
-          const claudeInputCost = ((basicUsageData.llm_input_tokens || 0) / 1000000) * LLM_INPUT_PER_MILLION;
-          const claudeOutputCost = ((basicUsageData.llm_output_tokens || 0) / 1000000) * LLM_OUTPUT_PER_MILLION;
+          const transcriptionCost = (basicUsageData.transcription_minutes || 0) * TRANSCRIPTION_PER_MINUTE;
+          const llmInputCost = ((basicUsageData.llm_input_tokens || 0) / 1000000) * LLM_INPUT_PER_MILLION;
+          const llmOutputCost = ((basicUsageData.llm_output_tokens || 0) / 1000000) * LLM_OUTPUT_PER_MILLION;
           const ttsCost = ((basicUsageData.tts_characters || 0) / 1000000) * TTS_PER_MILLION;
-          const totalCost = whisperCost + claudeInputCost + claudeOutputCost + ttsCost;
+          const totalCost = transcriptionCost + llmInputCost + llmOutputCost + ttsCost;
           const tokensUsed = Math.round(totalCost * 100); // 1 credit = 100 tokens
           
           verificationResults.usageTable.data = {
@@ -204,16 +204,16 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
     verificationResults.usageTable.success = !!usageData;
     if (usageData) {
       // Calculate tokens used from raw metrics using pricing constants
-      const WHISPER_PER_MINUTE = 0.006;
-      const CLAUDE_INPUT_PER_MILLION = 2.5;
-      const CLAUDE_OUTPUT_PER_MILLION = 7.5;
+      const TRANSCRIPTION_PER_MINUTE = 0.006;
+      const LLM_INPUT_PER_MILLION = 2.5;
+      const LLM_OUTPUT_PER_MILLION = 7.5;
       const TTS_PER_MILLION = 4.0;
       
-      const whisperCost = (usageData.transcription_minutes || 0) * WHISPER_PER_MINUTE;
-      const claudeInputCost = ((usageData.llm_input_tokens || 0) / 1000000) * CLAUDE_INPUT_PER_MILLION;
-      const claudeOutputCost = ((usageData.llm_output_tokens || 0) / 1000000) * CLAUDE_OUTPUT_PER_MILLION;
+      const transcriptionCost = (usageData.transcription_minutes || 0) * TRANSCRIPTION_PER_MINUTE;
+      const llmInputCost = ((usageData.llm_input_tokens || 0) / 1000000) * LLM_INPUT_PER_MILLION;
+      const llmOutputCost = ((usageData.llm_output_tokens || 0) / 1000000) * LLM_OUTPUT_PER_MILLION;
       const ttsCost = ((usageData.tts_characters || 0) / 1000000) * TTS_PER_MILLION;
-      const totalCost = whisperCost + claudeInputCost + claudeOutputCost + ttsCost;
+      const totalCost = transcriptionCost + llmInputCost + llmOutputCost + ttsCost;
       const tokensUsed = Math.round(totalCost * 100); // 1 credit = 100 tokens
       
       verificationResults.usageTable.data = {

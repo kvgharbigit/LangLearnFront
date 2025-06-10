@@ -69,9 +69,9 @@ async function diagnoseUsageError() {
     console.log('\n📋 SIMULATING USAGE DETAILS CONSTRUCTION');
     
     const usageDetails = {
-      whisperMinutes: usage.transcription_minutes,
-      claudeInputTokens: usage.llm_input_tokens,
-      claudeOutputTokens: usage.llm_output_tokens,
+      transcriptionMinutes: usage.transcription_minutes,
+      llmInputTokens: usage.llm_input_tokens,
+      llmOutputTokens: usage.llm_output_tokens,
       ttsCharacters: usage.tts_characters
     };
     
@@ -129,17 +129,17 @@ async function diagnoseUsageError() {
     // Step 5: Trace the error
     console.log('\n📋 ERROR DIAGNOSIS');
     console.log('Based on analysis, the most likely causes of:');
-    console.log('TypeError: Cannot read property \'whisperMinutes\' of undefined');
+    console.log('TypeError: Cannot read property \'transcriptionMinutes\' of undefined');
     console.log('are:');
     
-    // Check if whisper_minutes exists but is null
-    if ('whisper_minutes' in usage && usage.whisper_minutes === null) {
-      console.log('1. ⚠️ whisper_minutes exists in database but is NULL');
+    // Check if transcription_minutes exists but is null
+    if ('transcription_minutes' in usage && usage.transcription_minutes === null) {
+      console.log('1. ⚠️ transcription_minutes exists in database but is NULL');
     }
     
     // Check if usageDetails would be undefined
-    if (usageDetails.whisperMinutes === undefined) {
-      console.log('2. ⚠️ whisperMinutes is undefined after mapping from whisper_minutes');
+    if (usageDetails.transcriptionMinutes === undefined) {
+      console.log('2. ⚠️ transcriptionMinutes is undefined after mapping from transcription_minutes');
     }
     
     // Check if daily_usage could be causing issues
@@ -162,7 +162,7 @@ async function diagnoseUsageError() {
     
     console.log('\n📋 CONCLUSION');
     console.log('The most likely explanation is that when trying to update usage,');
-    console.log('the code is attempting to access currentUsage.usageDetails.whisperMinutes');
+    console.log('the code is attempting to access currentUsage.usageDetails.transcriptionMinutes');
     console.log('but currentUsage.usageDetails is undefined.');
     
     console.log('\nThis could be caused by:');

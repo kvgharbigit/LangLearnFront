@@ -68,21 +68,21 @@ function getCurrentRoute() {
 
 /**
  * Navigate after authentication state change
- * This handles the tricky case of navigating between Auth and Main stacks
+ * This helps switch between authenticated and unauthenticated states
  */
 function navigateByAuthState(isAuthenticated: boolean) {
   if (navigationRef.current) {
-    const rootState = navigationRef.current.getRootState();
-    const currentRootRoute = rootState.routes[rootState.index].name;
-    
-    // If we're already on the correct stack, no need to navigate
-    if ((isAuthenticated && currentRootRoute === 'Main') || 
-        (!isAuthenticated && currentRootRoute === 'Auth')) {
-      return;
+    if (isAuthenticated) {
+      // Navigate to the main landing screen if authenticated
+      if (getCurrentRoute() !== 'LanguageLanding') {
+        reset([{ name: 'LanguageLanding' }]);
+      }
+    } else {
+      // Navigate to login if not authenticated
+      if (getCurrentRoute() !== 'Login') {
+        reset([{ name: 'Login' }]);
+      }
     }
-    
-    // Reset to the appropriate stack
-    reset([{ name: isAuthenticated ? 'Main' : 'Auth' }]);
   }
 }
 

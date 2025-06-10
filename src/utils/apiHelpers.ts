@@ -1,9 +1,9 @@
 import NetInfo from '@react-native-community/netinfo';
 
 // Constants for API requests
-export const REQUEST_TIMEOUT = 20000; // 20 seconds (reduced from 30 seconds)
-export const MAX_RETRIES = 2; // Reduced from 3
-export const BASE_DELAY = 1000; // 1 second base delay for exponential backoff (reduced from 2 seconds)
+export const REQUEST_TIMEOUT = 30000; // Increase back to 30 seconds for Whisper API
+export const MAX_RETRIES = 3; // Increase back to 3 retries
+export const BASE_DELAY = 2000; // Increase back to 2 seconds for more reliable backoff
 
 // Helper function to implement timeout for fetch requests
 export const fetchWithTimeout = async (url: string, options: RequestInit, timeout = REQUEST_TIMEOUT) => {
@@ -28,12 +28,23 @@ export const checkNetworkConnectivity = async (): Promise<boolean> => {
   return networkState.isConnected === true && networkState.isInternetReachable !== false;
 };
 
-// Helper function for exponential backoff retry logic
+// Helper function with optional retries for non-voice APIs only
 export const fetchWithRetry = async (
   url: string, 
   options: RequestInit, 
-  retries = MAX_RETRIES
+  retries = MAX_RETRIES,
+  customTimeout?: number
 ) => {
+  // Don't retry for voice API calls
+  const isVoiceAPI = url.includes('/voice-input');
+  if (isVoiceAPI) {
+    // For voice API, just use a longer timeout but no retries
+    const timeoutToUse = 60000; // 60s for voice API
+    console.log(`Voice API request to ${url} - using ${timeoutToUse}ms timeout without retries`);
+    return await fetchWithTimeout(url, options, timeoutToUse);
+  }
+  
+  // Standard retry logic for non-voice APIs
   let attempt = 0;
   let lastError: Error | null = null;
   
@@ -45,8 +56,11 @@ export const fetchWithRetry = async (
         throw new Error('No network connection');
       }
       
+      // Use standard timeout for non-voice APIs
+      const timeoutToUse = customTimeout || REQUEST_TIMEOUT;
+      
       // Implement timeout to prevent hanging requests
-      return await fetchWithTimeout(url, options);
+      return await fetchWithTimeout(url, options, timeoutToUse);
     } catch (error: any) {
       lastError = error;
       attempt++;
@@ -62,7 +76,7 @@ export const fetchWithRetry = async (
                            error.message === 'Network request timed out' ||
                            error.message?.includes('timeout');
       
-      // For timeout errors, don't retry at all - immediately fail
+      // For timeout errors, don't retry at all
       if (isTimeoutError) {
         console.log("🚫 Request timed out - stopping retry attempts");
         break;
@@ -75,7 +89,7 @@ export const fetchWithRetry = async (
       
       // Calculate exponential backoff delay with jitter
       const delay = BASE_DELAY * Math.pow(2, attempt - 1) + Math.random() * 1000;
-      console.log(`API retry attempt ${attempt} after ${delay}ms`);
+      console.log(`API retry attempt ${attempt} after ${delay}ms for ${url}`);
       
       // Wait for the backoff delay
       await new Promise(resolve => setTimeout(resolve, delay));

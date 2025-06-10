@@ -625,43 +625,43 @@ export const sendVoiceRecording = async ({
       formData.append('user_id', userId);
     }
 
-    // Use fetchWithRetry, but we need to handle form data differently
-    // since fetchWithRetry uses regular fetch under the hood
-    let response;
-    let retryCount = 0;
-    const maxRetries = 3;
+    // Voice uploads need special handling with longer timeouts but no retries
+    console.log("Starting voice upload with extended timeout...");
+    const VOICE_API_TIMEOUT = 60000; // 60 seconds for voice API
     
-    while (retryCount < maxRetries) {
-      try {
-        response = await fetch(`${API_URL}/voice-input`, {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            ...authHeaders
-          },
-        });
-        
-        // If successful, break the loop
-        break;
-      } catch (error: any) {
-        retryCount++;
-        
-        // Only retry network errors
-        if (error.message.includes('network') || error.message.includes('connection')) {
-          if (retryCount >= maxRetries) {
-            throw error;
-          }
-          
-          // Exponential backoff
-          const delay = 1000 * Math.pow(2, retryCount - 1) + Math.random() * 1000;
-          console.log(`Retrying voice upload (${retryCount}/${maxRetries}) after ${delay}ms`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        } else {
-          // Non-network errors should not be retried
-          throw error;
-        }
+    // Create an abort controller for the timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.log("Voice upload timeout triggered, aborting");
+      controller.abort();
+    }, VOICE_API_TIMEOUT);
+    
+    try {
+      // Make the fetch request with the abort signal - no retries
+      response = await fetch(`${API_URL}/voice-input`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...authHeaders
+        },
+        signal: controller.signal
+      });
+      
+      console.log(`Voice upload completed with status: ${response.status}`);
+    } catch (error: any) {
+      console.error("Voice upload error:", error);
+      
+      // Handle abort/timeout error specifically
+      if (error.name === 'AbortError') {
+        throw new Error('Voice upload timed out after 60 seconds. Please try again with a shorter recording.');
       }
+      
+      // For all errors, just throw - no retries
+      throw error;
+    } finally {
+      // Always clear the timeout
+      clearTimeout(timeoutId);
     }
 
     if (!response || !response.ok) {
