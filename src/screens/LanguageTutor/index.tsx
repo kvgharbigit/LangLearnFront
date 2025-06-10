@@ -387,17 +387,42 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   /**
    * Handle voice input result
    */
-  async function handleVoiceInput(transcript: string, confidence: number) {
-    console.log(`Transcript received: ${transcript} (confidence: ${confidence})`);
+  async function handleVoiceInput(transcript: string | any, confidence: number) {
+    console.log(`Transcript received:`, transcript, `(confidence: ${confidence})`);
+    
+    // Check for service unavailability responses (from our backend)
+    if (typeof transcript === 'object' && transcript.service_unavailable) {
+      // Display the error message to the user
+      setStatusMessage(transcript.message || 'Speech recognition service unavailable. Please try again later.');
+      
+      // Log the error type for analytics
+      console.warn(`Speech recognition service error: ${transcript.error_type}`);
+      
+      // Optionally show an alert for better visibility
+      Alert.alert(
+        "Voice Recognition Unavailable",
+        transcript.message || "Our speech recognition service is temporarily unavailable. Please try again later.",
+        [{ text: "OK" }]
+      );
+      
+      return;
+    }
     
     // If no speech was detected
-    if (transcript === '' || transcript.includes('__NO_SPEECH_DETECTED__') || transcript.includes('Amara.org')) {
+    if (transcript === '' || 
+        (typeof transcript === 'string' && 
+         (transcript.includes('__NO_SPEECH_DETECTED__') || transcript.includes('Amara.org')))) {
       setStatusMessage('No speech detected. Please try again.');
       return;
     }
     
-    // Send the transcribed message
-    await handleSendMessage(transcript);
+    // Send the transcribed message (ensure it's a string)
+    if (typeof transcript === 'string') {
+      await handleSendMessage(transcript);
+    } else {
+      console.error('Unexpected transcript format:', transcript);
+      setStatusMessage('Error processing speech. Please try again.');
+    }
   }
   
   /**

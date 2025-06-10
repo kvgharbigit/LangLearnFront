@@ -720,11 +720,18 @@ export const sendVoiceRecording = async ({
       console.warn('Whisper usage tracking failed but will continue:', trackingError);
     }
     
-    // Check if no speech was detected - this is a special response from our backend
+    // Check for special responses from our backend
     if (data.no_speech_detected) {
       // Pass this information back to the caller for handling
       // No usage tracking required as no API calls were made
       console.log("No speech detected in recording");
+      return data;
+    }
+    
+    // Check for service unavailability
+    if (data.service_unavailable) {
+      console.log("Speech recognition service unavailable:", data.error_type);
+      // Return the service unavailable response directly to the caller
       return data;
     }
     
