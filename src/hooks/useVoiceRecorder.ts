@@ -647,7 +647,7 @@ const useVoiceRecorder = (options: VoiceRecorderOptions = {}): VoiceRecorderResu
       const recording = new Audio.Recording();
       recordingRef.current = recording;  // Set ref before preparing to avoid race conditions
 
-      // Begin recording with HIGH_QUALITY preset for better metering
+      // /Begin recording with HIGH_QUALITY preset for better metering
       await recording.prepareToRecordAsync({
         ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
         android: {
