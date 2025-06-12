@@ -51,12 +51,12 @@ export interface MonthlyUsage {
 
 // Pricing constants for cost calculations (same as backend)
 const PRICING = {
-  TRANSCRIPTION_PER_MINUTE: 0.006,  // $0.006 per minute of audio
+  TRANSCRIPTION_PER_MINUTE: 0.00278,  // $0.00278 per minute of audio (Lemonfox pricing)
   LLM_INPUT_PER_MILLION: 0.1,    // $0.1 per million tokens for GPT-4.1 Nano (previously Claude: $0.25)
   LLM_OUTPUT_PER_MILLION: 0.4,   // $0.4 per million tokens for GPT-4.1 Nano (previously Claude: $1.25)
   OPENAI_INPUT_PER_MILLION: 0.1,    // $0.1 per million tokens for GPT-4.1 Nano
   OPENAI_OUTPUT_PER_MILLION: 0.4,   // $0.4 per million tokens for GPT-4.1 Nano
-  TTS_PER_MILLION: 4.0,             // $4.00 per million characters
+  TTS_PER_MILLION: 2.75,            // $2.75 per million characters
   TOKENS_PER_CHAR: 1/3,             // Estimate: 1 token ~ 3 characters
 };
 
