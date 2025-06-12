@@ -710,14 +710,16 @@ export const sendVoiceRecording = async ({
       }
     }
     
-    // Track Whisper usage locally (estimate audio duration from file size)
+    // Track LemonFox usage locally (estimate audio duration from file size)
     // Audio files are typically ~16KB per second of audio at standard quality
     try {
       const audioDurationEstimateSeconds = Math.max(1, Math.ceil(fileInfo.size / 16000));
+      // Send actual recording duration for more accurate pricing
+      formData.append('audio_duration_seconds', audioDurationEstimateSeconds.toString());
       await supabaseUsageService.trackTranscriptionUsage(audioDurationEstimateSeconds);
     } catch (trackingError) {
       // Log but don't fail the voice conversation if tracking fails
-      console.warn('Whisper usage tracking failed but will continue:', trackingError);
+      console.warn('Speech transcription usage tracking failed but will continue:', trackingError);
     }
     
     // Check for special responses from our backend
