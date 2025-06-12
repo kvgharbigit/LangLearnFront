@@ -97,6 +97,7 @@ const styles = StyleSheet.create({
   conversationContent: {
     padding: 16,
     paddingBottom: 24,
+    width: '100%', // Ensure content container has full width
   },
   loadingMessage: {
     alignSelf: 'flex-start',

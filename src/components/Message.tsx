@@ -780,6 +780,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
     width: 'auto', // Allow container to adjust based on content
+    flexDirection: 'row', // Force horizontal flow
+    flexWrap: 'wrap', // Ensure content wraps
   },
   userMessage: {
     backgroundColor: 'white',
@@ -798,6 +800,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
     borderLeftWidth: 4,
     borderLeftColor: '#5d6af8', // Accent border on the left
+    maxWidth: '90%', // Ensure assistant messages don't exceed 90% width
   },
   systemMessage: {
     backgroundColor: '#e9ecef', // gray-200
@@ -828,6 +831,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: '#212529', // dark
     flexWrap: 'wrap',
+    width: '100%', // Ensure text takes full width of its container
   },
   userMainText: {
     color: '#212529', // Dark text for user messages (on white background)
