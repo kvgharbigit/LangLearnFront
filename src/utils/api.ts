@@ -714,7 +714,7 @@ export const sendVoiceRecording = async ({
     // Audio files are typically ~16KB per second of audio at standard quality
     try {
       const audioDurationEstimateSeconds = Math.max(1, Math.ceil(fileInfo.size / 16000));
-      await supabaseUsageService.trackWhisperUsage(audioDurationEstimateSeconds);
+      await supabaseUsageService.trackTranscriptionUsage(audioDurationEstimateSeconds);
     } catch (trackingError) {
       // Log but don't fail the voice conversation if tracking fails
       console.warn('Whisper usage tracking failed but will continue:', trackingError);

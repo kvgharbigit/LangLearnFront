@@ -565,9 +565,9 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     
     // Calculate usage breakdown percentages
     const totalCost = usage.calculatedCosts?.totalCost || 0;
-    const whisperPercentage = totalCost > 0 ? (usage.calculatedCosts.whisperCost / totalCost) * 100 : 0;
-    const claudePercentage = totalCost > 0 ? 
-      ((usage.calculatedCosts.claudeInputCost + usage.calculatedCosts.claudeOutputCost) / totalCost) * 100 : 0;
+    const transcriptionPercentage = totalCost > 0 ? (usage.calculatedCosts.transcriptionCost / totalCost) * 100 : 0;
+    const llmPercentage = totalCost > 0 ? 
+      ((usage.calculatedCosts.llmInputCost + usage.calculatedCosts.llmOutputCost) / totalCost) * 100 : 0;
     const ttsPercentage = totalCost > 0 ? (usage.calculatedCosts.ttsCost / totalCost) * 100 : 0;
     
     return (
@@ -616,7 +616,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 <Ionicons name="mic-outline" size={16} color={colors.textSecondary} />
                 <Text style={styles.breakdownLabel}>Voice Transcription</Text>
               </View>
-              <Text style={styles.breakdownValue}>{whisperPercentage.toFixed(1)}%</Text>
+              <Text style={styles.breakdownValue}>{transcriptionPercentage.toFixed(1)}%</Text>
             </View>
             
             <View style={styles.breakdownItem}>
@@ -624,7 +624,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 <Ionicons name="chatbubbles-outline" size={16} color={colors.textSecondary} />
                 <Text style={styles.breakdownLabel}>Conversational Replies</Text>
               </View>
-              <Text style={styles.breakdownValue}>{claudePercentage.toFixed(1)}%</Text>
+              <Text style={styles.breakdownValue}>{llmPercentage.toFixed(1)}%</Text>
             </View>
             
             <View style={styles.breakdownItem}>
