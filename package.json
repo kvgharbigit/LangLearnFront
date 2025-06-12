@@ -34,7 +34,7 @@
     "events": "^3.3.0",
     "expo": "53.0.11",
     "expo-auth-session": "~6.2.0",
-    "expo-av": "~15.1.5",
+    "expo-av": "~15.1.6",
     "expo-crypto": "~14.1.5",
     "expo-dev-client": "~5.2.0",
     "expo-file-system": "~18.1.8",
