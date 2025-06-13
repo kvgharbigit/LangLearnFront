@@ -258,9 +258,17 @@ const TutorHeader: React.FC<Props> = ({
 
   // Update tempo and save it
   const handleTempoChange = (newTempo: number) => {
+    // Enforce minimum tempo value (60%)
+    const validTempo = Math.max(0.6, newTempo);
+    
+    // Log tempo change for debugging
+    if (validTempo !== newTempo) {
+      console.log(`🎵 TEMPO CHANGE ENFORCED MIN: ${newTempo} → ${validTempo}`);
+    }
+    
     // First update tempo state to ensure UI is responsive
-    setTempo(newTempo);
-    saveSettingChange('TEMPO', newTempo);
+    setTempo(validTempo);
+    saveSettingChange('TEMPO', validTempo);
     
     // Then stop any currently playing audio if user changes tempo
     // This ensures the audio state updates happen after the tempo change
@@ -410,7 +418,7 @@ const TutorHeader: React.FC<Props> = ({
       speechThreshold: platformDefaults.speech,
       silenceThreshold: platformDefaults.silence,
       silenceDuration: platformDefaults.duration,
-      tempo: 0.9, // Default tempo (90%)
+      tempo: 0.9, // Default tempo (90%) - above minimum of 60%
       isMuted: false
     });
   };
@@ -565,11 +573,15 @@ const TutorHeader: React.FC<Props> = ({
                   <View style={styles.sliderContainer}>
                     <Slider
                       style={styles.slider}
-                      minimumValue={0.5}  // 50%
+                      minimumValue={0.6}  // 60%
                       maximumValue={1.2}  // 120%
                       step={0.05}
-                      value={tempo}
-                      onValueChange={handleTempoChange}
+                      value={Math.max(0.6, tempo)}
+                      onValueChange={(value) => {
+                        // Ensure value is at least 0.6
+                        const validValue = Math.max(0.6, value);
+                        handleTempoChange(validValue);
+                      }}
                       minimumTrackTintColor={isMuted ? colors.gray400 : colors.primary}
                       maximumTrackTintColor={colors.gray300}
                       thumbTintColor={isMuted ? colors.gray400 : colors.primary}

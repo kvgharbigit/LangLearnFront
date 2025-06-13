@@ -10,8 +10,8 @@ interface Props {
 
 // Speed options with their labels and values
 const speedOptions = [
-  { label: 'Slow', value: 0.5 },
-  { label: 'Normal', value: 0.75 },
+  { label: 'Slow', value: 0.6 },
+  { label: 'Normal', value: 0.8 },
   { label: 'Fast', value: 1.0 },
   { label: 'Very Fast', value: 1.2 },
 ];

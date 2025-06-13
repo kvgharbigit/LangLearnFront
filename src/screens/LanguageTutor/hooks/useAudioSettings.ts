@@ -90,7 +90,7 @@ export default function useAudioSettings() {
   // Initialize global reference for audio settings if needed
   if (!(global as any).__SAVED_AUDIO_SETTINGS) {
     (global as any).__SAVED_AUDIO_SETTINGS = {
-      tempo: PLAYER_SETTINGS.DEFAULT_TEMPO,
+      tempo: Math.max(PLAYER_SETTINGS.DEFAULT_TEMPO, PLAYER_SETTINGS.MIN_TEMPO),
       speechThreshold: AUDIO_SETTINGS.SPEECH_THRESHOLD,
       silenceThreshold: AUDIO_SETTINGS.SILENCE_THRESHOLD,
       silenceDuration: AUDIO_SETTINGS.SILENCE_DURATION,
@@ -99,9 +99,9 @@ export default function useAudioSettings() {
     console.log('🔑 Initialized global audio settings reference');
   }
   
-  // State for audio settings
+  // State for audio settings - ensure tempo is at least MIN_TEMPO
   const [tempo, setTempo] = useState<number>(
-    (global as any).__SAVED_AUDIO_SETTINGS.tempo || PLAYER_SETTINGS.DEFAULT_TEMPO
+    Math.max((global as any).__SAVED_AUDIO_SETTINGS.tempo || PLAYER_SETTINGS.DEFAULT_TEMPO, PLAYER_SETTINGS.MIN_TEMPO)
   );
   const [speechThreshold, setSpeechThreshold] = useState<number>(
     (global as any).__SAVED_AUDIO_SETTINGS.speechThreshold || AUDIO_SETTINGS.SPEECH_THRESHOLD
@@ -164,10 +164,17 @@ export default function useAudioSettings() {
       
       // Apply each value from storage if it exists
       if (savedValues[PREFERENCE_KEYS.TEMPO] !== undefined) {
-        const savedTempo = Number(savedValues[PREFERENCE_KEYS.TEMPO]);
-        console.log(`🎵 Setting tempo from storage: ${savedTempo}`);
+        // Enforce minimum tempo value when loading from storage
+        const savedTempo = Math.max(Number(savedValues[PREFERENCE_KEYS.TEMPO]), PLAYER_SETTINGS.MIN_TEMPO);
+        console.log(`🎵 Setting tempo from storage: ${savedTempo} (enforcing minimum: ${PLAYER_SETTINGS.MIN_TEMPO})`);
         setTempo(savedTempo);
         (global as any).__SAVED_AUDIO_SETTINGS.tempo = savedTempo;
+        
+        // If the stored value was below the minimum, update it in storage
+        if (Number(savedValues[PREFERENCE_KEYS.TEMPO]) < PLAYER_SETTINGS.MIN_TEMPO) {
+          console.log(`🔄 Stored tempo (${savedValues[PREFERENCE_KEYS.TEMPO]}) was below minimum, updating to ${PLAYER_SETTINGS.MIN_TEMPO}`);
+          await saveSingleAudioSetting(PREFERENCE_KEYS.TEMPO, savedTempo);
+        }
       }
       
       if (savedValues[PREFERENCE_KEYS.SPEECH_THRESHOLD] !== undefined) {
@@ -241,19 +248,22 @@ export default function useAudioSettings() {
    * @param newTempo - New tempo value
    */
   const updateTempo = useCallback(async (newTempo: number) => {
+    // Enforce the minimum tempo value of 0.6 (60%)
+    const validTempo = Math.max(newTempo, PLAYER_SETTINGS.MIN_TEMPO);
+    
     // Only update if value has changed
-    if (tempo !== newTempo) {
-      console.log(`💾 Persisting tempo change: ${tempo} → ${newTempo} (${Math.round(newTempo * 100)}%)`);
-      setTempo(newTempo);
-      (global as any).__SAVED_AUDIO_SETTINGS.tempo = newTempo;
+    if (tempo !== validTempo) {
+      console.log(`💾 Persisting tempo change: ${tempo} → ${validTempo} (${Math.round(validTempo * 100)}%)`);
+      setTempo(validTempo);
+      (global as any).__SAVED_AUDIO_SETTINGS.tempo = validTempo;
       
       // For tempo, we'll still use immediate save for a single setting
       // because it's a critical setting that needs to be persisted immediately
-      await saveSingleAudioSetting(PREFERENCE_KEYS.TEMPO, newTempo);
-      console.log(`✅ Verify tempo saved: ${newTempo} (${Math.round(newTempo * 100)}%)`);
+      await saveSingleAudioSetting(PREFERENCE_KEYS.TEMPO, validTempo);
+      console.log(`✅ Verify tempo saved: ${validTempo} (${Math.round(validTempo * 100)}%)`);
       
       // Log state after save for debugging
-      console.log(`🔍 After save - State: ${newTempo}, Global: ${(global as any).__SAVED_AUDIO_SETTINGS.tempo}, AsyncStorage: ${tempo}`);
+      console.log(`🔍 After save - State: ${validTempo}, Global: ${(global as any).__SAVED_AUDIO_SETTINGS.tempo}, AsyncStorage: ${tempo}`);
     }
   }, [tempo]);
 

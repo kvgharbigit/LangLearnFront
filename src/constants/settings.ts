@@ -92,7 +92,7 @@ export const PLAYER_SETTINGS = {
   DEFAULT_TEMPO: 0.75,  // 75%
 
   // Min/max tempo range
-  MIN_TEMPO: 0.5,  // 50%
+  MIN_TEMPO: 0.6,  // 60%
   MAX_TEMPO: 1.2,  // 120%
 
   // Tempo step size

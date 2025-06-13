@@ -11,11 +11,11 @@ interface Props {
 const TempoSlider: React.FC<Props> = ({ tempo, setTempo }) => {
   // Helper function to get descriptive text based on tempo value
   const getTempoDescription = (value: number): string => {
-    if (value <= 0.55) return 'Very Slow';
-    if (value <= 0.7) return 'Slow';
-    if (value <= 0.85) return 'Normal';
-    if (value <= 1.0) return 'Fast';
-    if (value <= 1.1) return 'Very Fast';
+    if (value <= 0.65) return 'Very Slow';
+    if (value <= 0.8) return 'Slow';
+    if (value <= 0.95) return 'Normal';
+    if (value <= 1.05) return 'Fast';
+    if (value <= 1.15) return 'Very Fast';
     return 'Super Fast';
   };
 
@@ -24,11 +24,15 @@ const TempoSlider: React.FC<Props> = ({ tempo, setTempo }) => {
       <View style={styles.sliderContainer}>
         <Slider
           style={styles.slider}
-          minimumValue={0.5}
+          minimumValue={0.6}
           maximumValue={1.2}
           step={0.05}
           value={tempo}
-          onValueChange={setTempo}
+          onValueChange={(value) => {
+            // Ensure value is at least 0.6
+            const validValue = Math.max(0.6, value);
+            setTempo(validValue);
+          }}
           minimumTrackTintColor={colors.primary}
           maximumTrackTintColor={colors.gray300}
           thumbTintColor={colors.primary}
