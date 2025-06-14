@@ -308,27 +308,32 @@ const Message: React.FC<MessageProps> = ({
         {isUser && bothCorrectionsMatch ? (
           // NEW CASE: When both corrections match the user input, show only one message in green with both emoji indicators
           message.natural_translation ? (
-            <TouchableOpacity
-              onPress={toggleNativeTranslation}
-              activeOpacity={0.6}
+            <View
               style={styles.perfectMatchTouchable}
               onLayout={handleAnnotationContainerLayout}
             >
               <View style={styles.perfectMatchContainer}>
                 <Text style={styles.perfectMatchText}>
-                  {isShowingNativeTranslation ? message.natural_translation : message.corrected}
+                  {message.corrected}
                 </Text>
                 <View style={styles.emojiContainer}>
                   <Text style={styles.emojiIcon}>📝</Text>
                   <Text style={styles.emojiIcon}>🌍</Text>
                 </View>
               </View>
-              {isAssistant && (
-                <Text style={styles.nativeTranslationHint}>
-                  {isShowingNativeTranslation ? "Tap to see original" : "Tap to see translation"}
-                </Text>
+              
+              {/* Always show translation below */}
+              {message.natural_translation && (
+                <View style={styles.translationContainer}>
+                  <View style={styles.translationRow}>
+                    <Text style={styles.translationEmoji}>🌐</Text>
+                    <Text style={styles.translationText}>
+                      {message.natural_translation}
+                    </Text>
+                  </View>
+                </View>
               )}
-            </TouchableOpacity>
+            </View>
           ) : (
             <View style={styles.perfectMatchContainer}>
               <Text style={styles.perfectMatchText}>
@@ -362,9 +367,7 @@ const Message: React.FC<MessageProps> = ({
               onLayout={handleAnnotationContainerLayout}
             >
               {message.natural_translation ? (
-                <TouchableOpacity
-                  onPress={toggleNativeTranslation}
-                  activeOpacity={0.6}
+                <View
                   style={[
                     styles.nativeTranslationTouchable, 
                     isUser ? styles.nativeTranslationContainerUser : styles.nativeTranslationContainer
@@ -380,29 +383,31 @@ const Message: React.FC<MessageProps> = ({
                         🌍
                       </Text>
                       <View style={styles.annotationTextContainer}>
-                        {isShowingNativeTranslation ? (
-                          <Text style={[
-                            nativeBaseStyle, 
-                            styles.nativeTranslationText,
-                            { paddingBottom: textPadding.translation }
-                          ]}>
-                            {message.natural_translation}
-                          </Text>
-                        ) : (
-                          <View style={{ paddingBottom: textPadding.original }}>
-                            <HTML
-                              source={{ html: highlightedNative }}
-                              contentWidth={screenWidth * 0.75}
-                              tagsStyles={nativeTagsStyles}
-                              baseFontStyle={nativeBaseStyle}
-                              customHTMLElementModels={customHTMLElementModels}
-                            />
-                          </View>
-                        )}
+                        <View>
+                          <HTML
+                            source={{ html: highlightedNative }}
+                            contentWidth={screenWidth * 0.75}
+                            tagsStyles={nativeTagsStyles}
+                            baseFontStyle={nativeBaseStyle}
+                            customHTMLElementModels={customHTMLElementModels}
+                          />
+                        </View>
                       </View>
                     </View>
                   </View>
-                </TouchableOpacity>
+                  
+                  {/* Always show translation below */}
+                  {message.natural_translation && (
+                    <View style={styles.translationContainer}>
+                      <View style={styles.translationRow}>
+                        <Text style={styles.translationEmoji}>🌐</Text>
+                        <Text style={[nativeBaseStyle, styles.nativeTranslationText]}>
+                          {message.natural_translation}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
               ) : (
                 <View style={[styles.messageAnnotation, styles.nativeHint]}>
                   <View style={styles.annotationRow}>
@@ -621,9 +626,7 @@ const Message: React.FC<MessageProps> = ({
 
                 {message.natural && (
                   message.natural_translation ? (
-                    <TouchableOpacity
-                      onPress={toggleNativeTranslation}
-                      activeOpacity={0.6}
+                    <View
                       style={[
                         styles.nativeTranslationTouchable, 
                         isUser ? styles.nativeTranslationContainerUser : styles.nativeTranslationContainer
@@ -645,23 +648,15 @@ const Message: React.FC<MessageProps> = ({
                           </Text>
 
                           <View style={styles.annotationTextContainer}>
-                            {isShowingNativeTranslation ? (
-                              <Text style={[
-                                nativeBaseStyle, 
-                                styles.nativeTranslationText,
-                                { paddingBottom: textPadding.translation }
-                              ]}>
-                                {message.natural_translation}
-                              </Text>
-                            ) : isEquivalentToNative ? (
+                            {isEquivalentToNative ? (
                               // When perfectly correct, display in bold green
-                              <Text style={[styles.perfectMatchText, { paddingBottom: textPadding.original }]}>
+                              <Text style={[styles.perfectMatchText]}>
                                 {message.natural}
                                 <Text style={styles.matchIcon}>✓</Text>
                               </Text>
                             ) : (
                               // When not perfectly correct, use the highlighting approach
-                              <View style={{ paddingBottom: textPadding.original }}>
+                              <View>
                                 <HTML
                                   source={{ html: highlightedNative }}
                                   contentWidth={screenWidth * 0.75}
@@ -674,12 +669,19 @@ const Message: React.FC<MessageProps> = ({
                           </View>
                         </View>
                       </View>
-                      {isAssistant && (
-                        <Text style={styles.nativeTranslationHint}>
-                          {isShowingNativeTranslation ? "Tap to see original" : "Tap to see translation"}
-                        </Text>
+                      
+                      {/* Always show translation below */}
+                      {message.natural_translation && (
+                        <View style={styles.translationContainer}>
+                          <View style={styles.translationRow}>
+                            <Text style={styles.translationEmoji}>🌐</Text>
+                            <Text style={[nativeBaseStyle, styles.nativeTranslationText]}>
+                              {message.natural_translation}
+                            </Text>
+                          </View>
+                        </View>
                       )}
-                    </TouchableOpacity>
+                    </View>
                   ) : (
                     <View style={[
                       styles.messageAnnotation,
@@ -941,6 +943,34 @@ const styles = StyleSheet.create({
   translationText: {
     fontStyle: 'italic',
     color: '#555',
+    flex: 1,
+    flexShrink: 1,
+    flexWrap: 'wrap',
+  },
+  // Styles for translation container
+  translationContainer: {
+    marginTop: 8,
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+    width: '100%',
+  },
+  userTranslationContainer: {
+    marginTop: 4,
+    paddingTop: 2,
+  },
+  translationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flexWrap: 'nowrap',
+    width: '100%',
+  },
+  translationEmoji: {
+    fontSize: 14,
+    marginRight: 6,
+    marginTop: 3,
+    width: 20,
+    flexShrink: 0,
   },
   // New styles for native translation feature
   nativeTranslationTouchable: {
@@ -949,6 +979,9 @@ const styles = StyleSheet.create({
   nativeTranslationText: {
     fontStyle: 'italic',
     color: '#555',
+    flex: 1,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   nativeTranslationContainer: {
     minHeight: 50, // Ensure minimum height to prevent jumping
