@@ -63,7 +63,6 @@ const Message: React.FC<MessageProps> = ({
 }) => {
   // Add state for tracking if we're showing the translation
   const [isShowingTranslation, setIsShowingTranslation] = useState<boolean>(false);
-  const [isShowingNativeTranslation, setIsShowingNativeTranslation] = useState<boolean>(false);
   // Use message timestamp as unique key for height tracking
   const messageKey = `${message.timestamp}_${message.content}`;
   const [annotationContainerHeight, setAnnotationContainerHeight] = useState<number | null>(null);
@@ -90,7 +89,7 @@ const Message: React.FC<MessageProps> = ({
   // Reset height when message changes or translation state changes
   useEffect(() => {
     setAnnotationContainerHeight(null);
-  }, [messageKey, isShowingTranslation, isShowingNativeTranslation]);
+  }, [messageKey, isShowingTranslation]);
 
   // Calculate estimated height based on text content to minimize layout changes
   const estimatedHeight = useMemo(() => {
@@ -263,19 +262,7 @@ const Message: React.FC<MessageProps> = ({
     }
   };
 
-  // Toggle native translation function
-  const toggleNativeTranslation = () => {
-    console.log("toggleNativeTranslation called", {
-      has_natural_translation: !!message.natural_translation,
-      current_state: isShowingNativeTranslation,
-      natural_translation: message.natural_translation
-    });
-    if (message.natural_translation) {
-      // Reset the height measurement to ensure proper resizing
-      setAnnotationContainerHeight(null);
-      setIsShowingNativeTranslation(!isShowingNativeTranslation);
-    }
-  };
+  // Toggle translation function (only used for assistant messages with translation)
 
   // Handler to measure container height
   const handleAnnotationContainerLayout = (event: any) => {
@@ -326,7 +313,6 @@ const Message: React.FC<MessageProps> = ({
               {message.natural_translation && (
                 <View style={styles.translationContainer}>
                   <View style={styles.translationRow}>
-                    <Text style={styles.translationEmoji}>🌐</Text>
                     <Text style={styles.translationText}>
                       {message.natural_translation}
                     </Text>
@@ -400,7 +386,6 @@ const Message: React.FC<MessageProps> = ({
                   {message.natural_translation && (
                     <View style={styles.translationContainer}>
                       <View style={styles.translationRow}>
-                        <Text style={styles.translationEmoji}>🌐</Text>
                         <Text style={[nativeBaseStyle, styles.nativeTranslationText]}>
                           {message.natural_translation}
                         </Text>
@@ -478,9 +463,7 @@ const Message: React.FC<MessageProps> = ({
             {message.corrected && (naturalAndCorrectedIdentical ? (
               // When natural and corrected are identical, show only one line with both emojis
               message.natural_translation ? (
-                <TouchableOpacity
-                  onPress={toggleNativeTranslation}
-                  activeOpacity={0.6}
+                <View
                   style={[
                     styles.nativeTranslationTouchable, 
                     isUser ? styles.nativeTranslationContainerUser : styles.nativeTranslationContainer
@@ -511,23 +494,15 @@ const Message: React.FC<MessageProps> = ({
                       </View>
 
                       <View style={styles.annotationTextContainer}>
-                        {isShowingNativeTranslation ? (
-                          <Text style={[
-                            correctedBaseStyle, 
-                            styles.nativeTranslationText,
-                            { paddingBottom: textPadding.translation }
-                          ]}>
-                            {message.natural_translation}
-                          </Text>
-                        ) : isEquivalentToCorrected ? (
+                        {isEquivalentToCorrected ? (
                           // When perfectly correct, display in bold green
-                          <Text style={[styles.perfectMatchText, { paddingBottom: textPadding.original }]}>
+                          <Text style={styles.perfectMatchText}>
                             {message.corrected}
                             <Text style={styles.matchIcon}>✓</Text>
                           </Text>
                         ) : (
                           // When not perfectly correct, use the highlighting approach
-                          <View style={{ paddingBottom: textPadding.original }}>
+                          <View>
                             <HTML
                               source={{ html: highlightedCorrected }}
                               contentWidth={screenWidth * 0.75}
@@ -540,7 +515,18 @@ const Message: React.FC<MessageProps> = ({
                       </View>
                     </View>
                   </View>
-                </TouchableOpacity>
+                  
+                  {/* Always show translation below */}
+                  {message.natural_translation && (
+                    <View style={styles.translationContainer}>
+                      <View style={styles.translationRow}>
+                        <Text style={[correctedBaseStyle, styles.nativeTranslationText]}>
+                          {message.natural_translation}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
               ) : (
                 <View style={[
                   styles.messageAnnotation,
@@ -674,7 +660,6 @@ const Message: React.FC<MessageProps> = ({
                       {message.natural_translation && (
                         <View style={styles.translationContainer}>
                           <View style={styles.translationRow}>
-                            <Text style={styles.translationEmoji}>🌐</Text>
                             <Text style={[nativeBaseStyle, styles.nativeTranslationText]}>
                               {message.natural_translation}
                             </Text>
@@ -964,12 +949,28 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     flexWrap: 'nowrap',
     width: '100%',
+    paddingLeft: 2,
   },
   translationEmoji: {
     fontSize: 14,
-    marginRight: 6,
-    marginTop: 3,
-    width: 20,
+    marginRight: 0,
+    marginTop: 0,
+  },
+  emojiWrapper: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginTop: 2,
+    flexShrink: 0,
+    backgroundColor: 'transparent',
+    zIndex: 1,
+  },
+  emojiWrapper: {
+    width: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
   },
   // New styles for native translation feature
@@ -982,6 +983,8 @@ const styles = StyleSheet.create({
     flex: 1,
     flexShrink: 1,
     flexWrap: 'wrap',
+    fontSize: 12,
+    lineHeight: 16,
   },
   nativeTranslationContainer: {
     minHeight: 50, // Ensure minimum height to prevent jumping
