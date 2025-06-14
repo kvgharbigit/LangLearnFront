@@ -44,15 +44,15 @@ const SubscriptionCancelledBanner: React.FC<SubscriptionCancelledBannerProps> = 
   // Determine message based on days remaining
   let message = '';
   if (daysUntilExpiration > 30) {
-    message = `Your ${tier} subscription has been cancelled but will remain active until ${formatDate(expirationDate)}.`;
+    message = `Your ${tier} subscription has been cancelled but will remain active until ${formatDate(expirationDate)}. After that, you'll automatically return to the free tier.`;
   } else if (daysUntilExpiration > 7) {
-    message = `Your ${tier} subscription will expire on ${formatDate(expirationDate)}. You have ${daysUntilExpiration} days of access left.`;
+    message = `Your ${tier} subscription will expire on ${formatDate(expirationDate)}. You have ${daysUntilExpiration} days of access left. After that, you'll automatically return to the free tier.`;
   } else if (daysUntilExpiration > 1) {
-    message = `Your ${tier} subscription is ending soon! You have only ${daysUntilExpiration} days left until ${formatDate(expirationDate)}.`;
+    message = `Your ${tier} subscription is ending soon! You have only ${daysUntilExpiration} days left until ${formatDate(expirationDate)}. After that, you'll automatically return to the free tier.`;
   } else if (daysUntilExpiration === 1) {
-    message = `Your ${tier} subscription expires tomorrow! Renew now to avoid service interruption.`;
+    message = `Your ${tier} subscription expires tomorrow! After that, you'll automatically return to the free tier. Renew now to maintain premium access.`;
   } else {
-    message = `Your ${tier} subscription expires today! Renew now to avoid service interruption.`;
+    message = `Your ${tier} subscription expires today! After that, you'll automatically return to the free tier. Renew now to maintain premium access.`;
   }
   
   return (

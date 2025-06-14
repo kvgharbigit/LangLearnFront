@@ -49,37 +49,26 @@ export interface MonthlyUsage {
   subscriptionTier: string;
 }
 
-// Pricing constants for cost calculations (same as backend)
-const PRICING = {
-  TRANSCRIPTION_PER_MINUTE: 0.00278,  // $0.00278 per minute of audio (Lemonfox pricing)
-  LLM_INPUT_PER_MILLION: 0.1,    // $0.1 per million tokens for GPT-4.1 Nano (previously Claude: $0.25)
-  LLM_OUTPUT_PER_MILLION: 0.4,   // $0.4 per million tokens for GPT-4.1 Nano (previously Claude: $1.25)
-  OPENAI_INPUT_PER_MILLION: 0.1,    // $0.1 per million tokens for GPT-4.1 Nano
-  OPENAI_OUTPUT_PER_MILLION: 0.4,   // $0.4 per million tokens for GPT-4.1 Nano
-  TTS_PER_MILLION: 2.75,            // $2.75 per million characters
-  TOKENS_PER_CHAR: 1/3,             // Estimate: 1 token ~ 3 characters
-};
+// Import centralized pricing constants
+import { PRICING } from '../constants/pricing';
 
 /**
  * Calculate costs based on usage metrics
  * @param usage Usage metrics
- * @param useOpenAIPricing Whether to use OpenAI's pricing instead of Claude's
  */
-export function calculateCosts(usage: UsageDetails, useOpenAIPricing: boolean = true): UsageCosts {
-  const transcriptionCost = usage.transcriptionMinutes * PRICING.TRANSCRIPTION_PER_MINUTE;
+export function calculateCosts(usage: UsageDetails): UsageCosts {
+  // Import helper functions from pricing module
+  const { 
+    calculateTranscriptionCost, 
+    calculateLLMInputCost, 
+    calculateLLMOutputCost, 
+    calculateTTSCost 
+  } = require('../constants/pricing');
   
-  // Use the appropriate pricing based on the current LLM provider
-  const inputCostPerMillion = useOpenAIPricing 
-    ? PRICING.OPENAI_INPUT_PER_MILLION 
-    : PRICING.LLM_INPUT_PER_MILLION;
-    
-  const outputCostPerMillion = useOpenAIPricing 
-    ? PRICING.OPENAI_OUTPUT_PER_MILLION 
-    : PRICING.LLM_OUTPUT_PER_MILLION;
-  
-  const llmInputCost = (usage.llmInputTokens / 1000000) * inputCostPerMillion;
-  const llmOutputCost = (usage.llmOutputTokens / 1000000) * outputCostPerMillion;
-  const ttsCost = (usage.ttsCharacters / 1000000) * PRICING.TTS_PER_MILLION;
+  const transcriptionCost = calculateTranscriptionCost(usage.transcriptionMinutes);
+  const llmInputCost = calculateLLMInputCost(usage.llmInputTokens);
+  const llmOutputCost = calculateLLMOutputCost(usage.llmOutputTokens);
+  const ttsCost = calculateTTSCost(usage.ttsCharacters);
   const totalCost = transcriptionCost + llmInputCost + llmOutputCost + ttsCost;
   
   return {
@@ -138,8 +127,9 @@ export function tokensToCredits(tokens: number): number {
  * Estimate tokens based on text length
  */
 export function estimateTokens(text: string): number {
-  if (!text) return 0;
-  return Math.ceil(text.length * PRICING.TOKENS_PER_CHAR);
+  // Import helper function from pricing module
+  const { estimateTokens: estimateTokensFromPricing } = require('../constants/pricing');
+  return estimateTokensFromPricing(text);
 }
 
 /**

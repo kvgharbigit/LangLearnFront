@@ -12,14 +12,8 @@ export interface SubscriptionPlan {
   isPopular?: boolean;
 }
 
-// Pricing model constants for usage calculation
-export const PRICING = {
-  TRANSCRIPTION_PER_MINUTE: 0.00278,  // $0.00278 per minute of audio (Lemonfox pricing)
-  LLM_INPUT_PER_MILLION: 0.1,       // $0.1 per million input tokens (OpenAI GPT-4.1 Nano pricing)
-  LLM_OUTPUT_PER_MILLION: 0.4,      // $0.4 per million output tokens (OpenAI GPT-4.1 Nano pricing)
-  TTS_PER_MILLION: 2.75,            // $2.75 per million characters
-  TOKENS_PER_CHAR: 1/3,             // 1 token = 3 characters of text
-};
+// Import centralized pricing constants
+import { PRICING } from '../constants/pricing';
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {

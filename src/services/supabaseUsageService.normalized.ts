@@ -199,6 +199,9 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
       tts_characters: data.tts_characters
     });
     
+    // Log the full raw data object for debugging
+    console.log(`📊 USAGE DEBUG: Complete raw Supabase data:`, JSON.stringify(data));
+    
     // Parse the usage data from Supabase format to our MonthlyUsage format
     // First safely parse the daily_usage JSON string
     let parsedDailyUsage = {};
@@ -259,6 +262,35 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
     if (now > usage.currentPeriodEnd) {
       // If period has expired, reset usage for new period
       return await resetMonthlyUsage(userId);
+    }
+    
+    // Also check if subscription has expired but we still have premium tier data
+    if (userData.subscription_tier !== 'free') {
+      // Check subscription status from RevenueCat
+      try {
+        const { getCurrentSubscription } = await import('../services/revenueCatService');
+        const subscription = await getCurrentSubscription();
+        
+        // If subscription indicates free tier but our DB shows premium, reset to free tier
+        if (subscription.tier === 'free' && userData.subscription_tier !== 'free') {
+          console.log('📊 USAGE DEBUG: Subscription expired, resetting to free tier');
+          
+          // Update user table with free tier
+          await supabase
+            .from('users')
+            .update({
+              subscription_tier: 'free',
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', userId);
+            
+          // Reset usage for new period as free tier
+          return await resetMonthlyUsage(userId);
+        }
+      } catch (error) {
+        console.error('Error checking subscription status:', error);
+        // Continue with existing data if check fails
+      }
     }
     
     return usage;

@@ -24,8 +24,8 @@ const GracePeriodBanner: React.FC<GracePeriodBannerProps> = ({
 }) => {
   const navigation = useNavigation();
   
-  // If no expiration date, don't show the banner
-  if (!expirationDate) return null;
+  // We no longer use grace period - always return null
+  return null;
   
   // Format the date for display
   const formatDate = (date: Date): string => {

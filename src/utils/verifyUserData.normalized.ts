@@ -142,13 +142,24 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
     
     verificationResults.usageTable.success = !!usageData;
     if (usageData) {
-      // Calculate tokens used from raw usage metrics (simplified calculation)
-      const tokensUsed = Math.round(
-        (usageData.transcription_minutes * 0.006 + 
-        usageData.llm_input_tokens / 1000000 * 2.5 + 
-        usageData.llm_output_tokens / 1000000 * 7.5 + 
-        usageData.tts_characters / 1000000 * 4.0) * 100
-      );
+      // Import pricing constants and helpers
+      const { 
+        PRICING,
+        calculateTranscriptionCost,
+        calculateLLMInputCost,
+        calculateLLMOutputCost,
+        calculateTTSCost
+      } = require('../constants/pricing');
+      
+      // Calculate tokens used from raw usage metrics
+      const totalCost = 
+        calculateTranscriptionCost(usageData.transcription_minutes || 0) + 
+        calculateLLMInputCost(usageData.llm_input_tokens || 0) + 
+        calculateLLMOutputCost(usageData.llm_output_tokens || 0) + 
+        calculateTTSCost(usageData.tts_characters || 0);
+        
+      // Convert cost to tokens (1 credit = 100 tokens)
+      const tokensUsed = Math.round(totalCost * 100);
       
       verificationResults.usageTable.data = {
         userId: usageData.user_id,

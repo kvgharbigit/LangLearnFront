@@ -149,16 +149,13 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
         if (basicUsageData && basicUsageData.user_id) {
           verificationResults.usageTable.success = true;
           
-          // Calculate tokens used from raw metrics using pricing constants
-          const TRANSCRIPTION_PER_MINUTE = 0.006;
-          const LLM_INPUT_PER_MILLION = 2.5;
-          const LLM_OUTPUT_PER_MILLION = 7.5;
-          const TTS_PER_MILLION = 4.0;
+          // Import pricing constants
+          const { PRICING, calculateTranscriptionCost, calculateLLMInputCost, calculateLLMOutputCost, calculateTTSCost } = require('../constants/pricing');
           
-          const transcriptionCost = (basicUsageData.transcription_minutes || 0) * TRANSCRIPTION_PER_MINUTE;
-          const llmInputCost = ((basicUsageData.llm_input_tokens || 0) / 1000000) * LLM_INPUT_PER_MILLION;
-          const llmOutputCost = ((basicUsageData.llm_output_tokens || 0) / 1000000) * LLM_OUTPUT_PER_MILLION;
-          const ttsCost = ((basicUsageData.tts_characters || 0) / 1000000) * TTS_PER_MILLION;
+          const transcriptionCost = calculateTranscriptionCost(basicUsageData.transcription_minutes || 0);
+          const llmInputCost = calculateLLMInputCost(basicUsageData.llm_input_tokens || 0);
+          const llmOutputCost = calculateLLMOutputCost(basicUsageData.llm_output_tokens || 0);
+          const ttsCost = calculateTTSCost(basicUsageData.tts_characters || 0);
           const totalCost = transcriptionCost + llmInputCost + llmOutputCost + ttsCost;
           const tokensUsed = Math.round(totalCost * 100); // 1 credit = 100 tokens
           
@@ -203,16 +200,13 @@ export const verifyUserDataExists = async (userId: string): Promise<boolean> => 
     
     verificationResults.usageTable.success = !!usageData;
     if (usageData) {
-      // Calculate tokens used from raw metrics using pricing constants
-      const TRANSCRIPTION_PER_MINUTE = 0.006;
-      const LLM_INPUT_PER_MILLION = 2.5;
-      const LLM_OUTPUT_PER_MILLION = 7.5;
-      const TTS_PER_MILLION = 4.0;
+      // Import pricing constants
+      const { PRICING, calculateTranscriptionCost, calculateLLMInputCost, calculateLLMOutputCost, calculateTTSCost } = require('../constants/pricing');
       
-      const transcriptionCost = (usageData.transcription_minutes || 0) * TRANSCRIPTION_PER_MINUTE;
-      const llmInputCost = ((usageData.llm_input_tokens || 0) / 1000000) * LLM_INPUT_PER_MILLION;
-      const llmOutputCost = ((usageData.llm_output_tokens || 0) / 1000000) * LLM_OUTPUT_PER_MILLION;
-      const ttsCost = ((usageData.tts_characters || 0) / 1000000) * TTS_PER_MILLION;
+      const transcriptionCost = calculateTranscriptionCost(usageData.transcription_minutes || 0);
+      const llmInputCost = calculateLLMInputCost(usageData.llm_input_tokens || 0);
+      const llmOutputCost = calculateLLMOutputCost(usageData.llm_output_tokens || 0);
+      const ttsCost = calculateTTSCost(usageData.tts_characters || 0);
       const totalCost = transcriptionCost + llmInputCost + llmOutputCost + ttsCost;
       const tokensUsed = Math.round(totalCost * 100); // 1 credit = 100 tokens
       

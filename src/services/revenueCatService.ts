@@ -796,14 +796,30 @@ export const getCurrentSubscription = async (): Promise<{
       };
     }
     
+    // Check if any subscription has expired
+    const now = new Date();
+    const hasExpiredSubscription = Object.values(customerInfo.entitlements.all || {}).some(entitlement => {
+      // Check if this entitlement has an expiration date in the past
+      return entitlement.expirationDate && new Date(entitlement.expirationDate) < now;
+    });
+    
+    if (hasExpiredSubscription) {
+      console.log('[RevenueCat.getCurrentSubscription] Found expired subscription, reverting to free tier');
+      return {
+        tier: 'free' as SubscriptionTier,
+        expirationDate: null,
+        isActive: false
+      };
+    }
+    
     // Check for active entitlements starting with the highest tier
     if (customerInfo.entitlements.active[ENTITLEMENTS.GOLD]) {
       const activeEntitlement = customerInfo.entitlements.active[ENTITLEMENTS.GOLD];
       
       // Check if subscription is cancelled but not yet expired
       const isCancelled = activeEntitlement.willRenew === false;
-      // Check if the subscription is in a billing grace period
-      const isInGracePeriod = activeEntitlement.inGracePeriod === true;
+      // We no longer use grace period - users go directly to free tier
+      const isInGracePeriod = false;
       
       console.log('[RevenueCat.getCurrentSubscription] Found GOLD tier:', {
         productId: activeEntitlement.productIdentifier,
@@ -830,8 +846,8 @@ export const getCurrentSubscription = async (): Promise<{
       
       // Check if subscription is cancelled but not yet expired
       const isCancelled = activeEntitlement.willRenew === false;
-      // Check if the subscription is in a billing grace period
-      const isInGracePeriod = activeEntitlement.inGracePeriod === true;
+      // We no longer use grace period - users go directly to free tier
+      const isInGracePeriod = false;
       
       console.log('[RevenueCat.getCurrentSubscription] Found PREMIUM tier:', {
         productId: activeEntitlement.productIdentifier,
@@ -858,8 +874,8 @@ export const getCurrentSubscription = async (): Promise<{
       
       // Check if subscription is cancelled but not yet expired
       const isCancelled = activeEntitlement.willRenew === false;
-      // Check if the subscription is in a billing grace period
-      const isInGracePeriod = activeEntitlement.inGracePeriod === true;
+      // We no longer use grace period - users go directly to free tier
+      const isInGracePeriod = false;
       
       console.log('[RevenueCat.getCurrentSubscription] Found BASIC tier:', {
         productId: activeEntitlement.productIdentifier,
