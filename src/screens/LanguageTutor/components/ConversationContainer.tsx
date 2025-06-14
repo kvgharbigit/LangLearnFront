@@ -38,15 +38,22 @@ const ConversationContainer: React.FC<ConversationContainerProps> = ({
   // Reference to the scroll view for scrolling to bottom
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Scroll to bottom when history changes (new messages)
+  // Scroll to bottom only when new messages are added
   useEffect(() => {
-    if (scrollViewRef.current) {
+    if (scrollViewRef.current && history.length > 0) {
       // Use a timeout to ensure the layout is complete before scrolling
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      // Only scroll if this is a new message being added (not a translation toggle)
+      const isNewMessage = history.length > 0 && 
+                          history[history.length - 1].timestamp && 
+                          Date.now() - new Date(history[history.length - 1].timestamp).getTime() < 2000;
+      
+      if (isNewMessage) {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
     }
-  }, [history]);
+  }, [history.length]);
 
   return (
     <View style={styles.conversationContainer}>
