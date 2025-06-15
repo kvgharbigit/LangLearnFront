@@ -55,6 +55,9 @@ const DifficultyLevelSelector: React.FC<DifficultyLevelSelectorProps> = ({
         ]}>
           {item.label}
         </Text>
+        <Text style={styles.dropdownItemDescription}>
+          {item.description}
+        </Text>
       </View>
       {selectedLevel === item.level && (
         <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
@@ -239,6 +242,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.gray800,
+  },
+  dropdownItemDescription: {
+    fontSize: 12,
+    color: colors.gray600,
+    marginTop: 2,
   },
   selectedDropdownItemText: {
     color: colors.primary,

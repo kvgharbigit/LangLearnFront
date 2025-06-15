@@ -37,12 +37,28 @@ export interface Difficulty {
   level: DifficultyLevel;
   label: string;
   icon: string;
+  description: string;
 }
 
 export const DIFFICULTY_LEVELS: Difficulty[] = [
-  { level: 'beginner', label: 'Beginner', icon: '🌱' },
-  { level: 'intermediate', label: 'Intermediate', icon: '🌿' },
-  { level: 'advanced', label: 'Advanced', icon: '🌳' }
+  { 
+    level: 'beginner', 
+    label: 'Beginner', 
+    icon: '🌱',
+    description: 'Simpler vocabulary, shorter sentences, less complex grammar'
+  },
+  { 
+    level: 'intermediate', 
+    label: 'Intermediate', 
+    icon: '🌿',
+    description: 'More varied vocabulary, longer sentences, regular grammar concepts'
+  },
+  { 
+    level: 'advanced', 
+    label: 'Advanced', 
+    icon: '🌳',
+    description: 'Rich vocabulary, complex sentences, advanced grammar structures'
+  }
 ];
 
 // Get language info by code

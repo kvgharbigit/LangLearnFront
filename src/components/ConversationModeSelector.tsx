@@ -257,7 +257,7 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
 
         <View style={styles.promptInfoContainer}>
           <Text style={styles.promptInfoText}>
-            Choose ANY topic - from verbs to vermouth, from dating to dancing - Confluency can talk about anything!
+            Confluency can talk with you about any topic you can dream of - from dating advice to dancing, from Ancient Egypt to Taylor Swift!
           </Text>
         </View>
       </View>
