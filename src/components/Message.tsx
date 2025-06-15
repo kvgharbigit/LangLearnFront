@@ -86,10 +86,10 @@ const Message: React.FC<MessageProps> = ({
     return { original: originalPadding, translation: translationPadding };
   }, [message.natural, message.natural_translation]);
 
-  // Reset height when message changes or translation state changes
+  // Only reset height when message content changes, not on translation toggle
   useEffect(() => {
     setAnnotationContainerHeight(null);
-  }, [messageKey, isShowingTranslation]);
+  }, [messageKey]); // Removed isShowingTranslation dependency
 
   // Calculate estimated height based on text content to minimize layout changes
   const estimatedHeight = useMemo(() => {
@@ -256,9 +256,16 @@ const Message: React.FC<MessageProps> = ({
   // Toggle translation function
   const toggleTranslation = () => {
     if (message.translation) {
-      // Reset the height measurement to ensure proper resizing
-      setAnnotationContainerHeight(null);
+      // Toggle translation state without resetting height
+      // This prevents layout shifts that cause scrolling jumps
       setIsShowingTranslation(!isShowingTranslation);
+      
+      // Use requestAnimationFrame to update height after render
+      // instead of triggering it before the state change
+      requestAnimationFrame(() => {
+        // Only update height if needed, with a small delay to prevent jumps
+        setTimeout(() => setAnnotationContainerHeight(null), 50);
+      });
     }
   };
 
@@ -425,11 +432,21 @@ const Message: React.FC<MessageProps> = ({
             />
           </View>
         ) : isAssistant && message.translation ? (
-          // NEW CASE: Assistant message with translation available - add touchable to toggle
+          // Assistant message with translation available - improved to prevent scroll jumps
           <TouchableOpacity
             onPress={toggleTranslation}
             activeOpacity={0.6}
-            style={styles.translationTouchable}
+            style={[
+              styles.translationTouchable,
+              // Calculate fixed height based on both content lengths to prevent layout shifts
+              message.translation && {
+                minHeight: Math.max(
+                  (message.content.length / 30) * 20,
+                  (message.translation.length / 30) * 20,
+                  40
+                )
+              }
+            ]}
             onLayout={handleAnnotationContainerLayout}
           >
             <Text style={[

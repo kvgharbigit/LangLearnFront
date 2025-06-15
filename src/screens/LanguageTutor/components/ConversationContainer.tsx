@@ -62,6 +62,10 @@ const ConversationContainer: React.FC<ConversationContainerProps> = ({
         contentContainerStyle={styles.conversationContent}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10
+        }}
       >
         {/* Render all messages */}
         {history.map((message, index) => (
