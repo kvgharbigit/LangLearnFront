@@ -1153,14 +1153,12 @@ export const getRandomTopicLesson = (): string => {
 };
 
 /**
- * Get a random topic for free conversation (randomly chooses between conversation starters, topic lessons, or deep questions)
+ * Get a random topic for free conversation (randomly chooses between conversation starters or deep questions)
  */
 export const getRandomFreeConversationTopic = (): string => {
   const randomChoice = Math.random();
-  if (randomChoice < 0.33) {
+  if (randomChoice < 0.5) {
     return getRandomConversationStarter();
-  } else if (randomChoice < 0.66) {
-    return getRandomTopicLesson();
   } else {
     return getRandomDeepQuestion();
   }

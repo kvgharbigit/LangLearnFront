@@ -345,8 +345,8 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
       .update({
         billing_cycle_start: start,
         billing_cycle_end: end,
-        subscription_tier: tier,
-        credit_limit: creditLimit
+        subscription_tier: tier
+        // credit_limit is now derived from tier, not stored
       })
       .eq('user_id', userId);
       
