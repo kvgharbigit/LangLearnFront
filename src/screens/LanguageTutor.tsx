@@ -240,6 +240,7 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   const getNativeLanguage = () => route.params.nativeLanguage || 'en';
   const getDifficulty = () => route.params.difficulty || 'beginner';
   const getLearningObjective = () => route.params.learningObjective || '';
+  const getConversationMode = () => route.params.conversationMode || 'free_conversation';
   const hasProcessedCurrentRecordingRef = useRef<boolean>(false);
 
   // Get language display info
@@ -270,6 +271,15 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
   // Get current language info
   const getTargetInfo = () => {
     return getLanguageInfo(getTargetLanguage());
+  };
+
+  // Helper function to reset conversation state
+  const createNewConversation = () => {
+    setHistory([]);
+    setConversationId(null);
+    setShowStartButton(true);
+    setWelcomeReady(false);
+    setWelcomeData(null);
   };
 
   // Load saved audio settings - this runs ONCE on component mount
@@ -648,6 +658,14 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     resetWithCurrentParams();
     
   }, [route.params]); // This effect depends on route.params
+
+  // Session-only conversations: Always start fresh
+  useEffect(() => {
+    console.log('🆕 Starting fresh conversation session');
+  }, []); // Run once on mount
+
+  // Note: Conversation persistence removed - conversations are now session-only
+  // Conversations exist only in memory and are cleared when user leaves
 
   // Add keyboard event listeners
   useEffect(() => {
@@ -1591,7 +1609,9 @@ const handleSubmit = async (inputMessage: string) => {
       getNativeLanguage(),
       getTargetLanguage(),
       getLearningObjective(),
-      isMuted
+      isMuted,
+      getConversationMode(),
+      history // Include conversation history for stateless backend
     );
 
     if (!conversationId && response.conversation_id) {
@@ -1734,7 +1754,9 @@ const handleAudioData = async () => {
       nativeLanguage: getNativeLanguage(),
       targetLanguage: getTargetLanguage(),
       learningObjective: getLearningObjective(),
-      isMuted: isMuted
+      isMuted: isMuted,
+      conversationMode: getConversationMode(),
+      history: history // Include conversation history for stateless backend
     });
 
     setStatusMessage('Received response from server');

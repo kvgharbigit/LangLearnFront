@@ -11,6 +11,7 @@ export interface Message {
   isTemporary?: boolean;
   hasAudio?: boolean; // Whether audio is available for this message
   tts_status?: 'completed' | 'running' | 'failed' | 'skipped'; // TTS generation status
+  conversationId?: string; // Optional conversation ID for consistency
 }
 
 export interface MessageComponentProps {

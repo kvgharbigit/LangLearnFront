@@ -112,9 +112,13 @@ const Message: React.FC<MessageProps> = ({
   const isAssistant = message.role === 'assistant';
   const isSystem = message.role === 'system';
 
+  // Count words in the user's message
+  const wordCount = message.content.trim().split(/\s+/).filter(word => word.length > 0).length;
+  
   // Determine if this message should show corrections
   // Only user messages will have corrections directly attached to them now
-  const showCorrections = isUser && (message.corrected || message.natural);
+  // Don't show corrections for single-word replies
+  const showCorrections = isUser && (message.corrected || message.natural) && wordCount > 1;
 
   // Helper for checking if suggestions match the original message
   const isEquivalentToOriginal = (suggestion: string) => {

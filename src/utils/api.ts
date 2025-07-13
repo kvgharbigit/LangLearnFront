@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { ConversationMode } from '../components/ConversationModeSelector';
+import { Message } from '../types/messages';
 import supabaseUsageService from '../services/usageService'; // Changed to use normalized service
 import { getCurrentUser, getIdToken } from '../services/supabaseAuthService';
 import { fetchWithRetry, classifyApiError, parseErrorResponse } from './apiHelpers';
@@ -11,10 +12,10 @@ import { estimateTokens } from '../constants/pricing';
 import userPreferences from './userPreferences';
 
 // Update this to your actual API URL
-export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
+//export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
 //const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
 //export const API_URL ="http://10.0.0.116:8004" //desktop
-///export const API_URL = "http://192.168.86.247:8004"
+export const API_URL = "http://192.168.86.247:8004"
 
 
 
@@ -82,7 +83,7 @@ export const preconnectToAPI = async (): Promise<void> => {
   return warmupPromise;
 };
 
-// Update the ChatParams interface to include isMuted and conversationMode
+// Update the ChatParams interface to include isMuted, conversationMode, and history
 interface ChatParams {
   message: string;
   conversation_id?: string | null;
@@ -93,9 +94,10 @@ interface ChatParams {
   learning_objective?: string;
   is_muted?: boolean;
   conversation_mode?: ConversationMode;
+  history?: Message[]; // Add conversation history for stateless backend
 }
 
-// Update the VoiceParams interface to include isMuted and conversationMode
+// Update the VoiceParams interface to include isMuted, conversationMode, and history
 interface VoiceParams {
   audioUri: string;
   conversationId?: string | null;
@@ -106,6 +108,7 @@ interface VoiceParams {
   learningObjective?: string;
   isMuted?: boolean;
   conversationMode?: ConversationMode;
+  history?: Message[]; // Add conversation history for stateless backend
 }
 
 // Key for the offline message queue
@@ -213,7 +216,8 @@ export const sendTextMessage = async (
   targetLanguage: string = 'es',
   learningObjective: string = '',
   isMuted: boolean = false,
-  conversationMode: ConversationMode = 'free_conversation'
+  conversationMode: ConversationMode = 'free_conversation',
+  history: Message[] = [] // Add conversation history parameter
 ) => {
   try {
     // Check for network connectivity first
@@ -271,7 +275,8 @@ export const sendTextMessage = async (
       target_language: targetLanguage,
       learning_objective: learningObjective,
       is_muted: isMuted,
-      conversation_mode: conversationMode
+      conversation_mode: conversationMode,
+      history: history // Include conversation history for stateless backend
     };
 
     // Add minimal debug logging in dev mode
@@ -520,7 +525,8 @@ export const sendVoiceRecording = async ({
   targetLanguage = 'es',
   learningObjective = '',
   isMuted = false,
-  conversationMode = 'free_conversation'
+  conversationMode = 'free_conversation',
+  history = [] // Add conversation history parameter
 }: VoiceParams) => {
   try {
     // Check for network connectivity first
@@ -618,6 +624,11 @@ export const sendVoiceRecording = async ({
       }
     }
     formData.append('conversation_mode', finalConversationMode);
+    
+    // Add conversation history for stateless backend
+    if (history && history.length > 0) {
+      formData.append('history', JSON.stringify(history));
+    }
 
     // Add auth headers to formData for user identification
     const userId = authHeaders['X-User-ID'];

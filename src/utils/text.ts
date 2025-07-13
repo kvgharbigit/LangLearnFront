@@ -117,83 +117,149 @@ export const highlightDifferences = (
     return result.join(' ');
   } 
   else if (mode === 'corrected') {
-    // For corrected message, highlight words not from user message in red+bold
+    // For corrected message, highlight words in RED if they are new OR used in different context
     const correctedWords = suggestion.split(/\s+/);
     const userWords = original.split(/\s+/);
     
-    // Create a normalized set of user words for faster lookup
-    const normalizedUserWords = new Set(
-      userWords.map(word => normalizeText(word))
-    );
+    // Create normalized versions for comparison
+    const normalizedCorrectedWords = correctedWords.map(w => normalizeText(w));
+    const normalizedUserWords = userWords.map(w => normalizeText(w));
     
-    // Mark words that don't appear in the user text as new
-    const result = correctedWords.map(word => {
+    // Create a set for quick lookup of user words
+    const normalizedUserWordSet = new Set(normalizedUserWords);
+    
+    // Helper function to get context window around a word
+    const getWordContext = (words: string[], index: number, windowSize: number = 1) => {
+      const before = words.slice(Math.max(0, index - windowSize), index).join(' ');
+      const after = words.slice(index + 1, Math.min(words.length, index + windowSize + 1)).join(' ');
+      return { before, after };
+    };
+    
+    // Helper function to check if word appears in similar context
+    const hasSimilarContext = (word: string, correctedIndex: number): boolean => {
       const normalizedWord = normalizeText(word);
       
-      // Words not in user message are red and bold
-      if (!normalizedUserWords.has(normalizedWord)) {
+      // Find all occurrences of this word in the user message
+      const userOccurrences: number[] = [];
+      normalizedUserWords.forEach((userWord, index) => {
+        if (userWord === normalizedWord) {
+          userOccurrences.push(index);
+        }
+      });
+      
+      if (userOccurrences.length === 0) return false;
+      
+      // Get context in corrected message
+      const correctedContext = getWordContext(normalizedCorrectedWords, correctedIndex);
+      
+      // Check if any occurrence in user message has similar context
+      for (const userIndex of userOccurrences) {
+        const userContext = getWordContext(normalizedUserWords, userIndex);
+        
+        // Check if either before or after context matches (allowing for some flexibility)
+        if (correctedContext.before === userContext.before || 
+            correctedContext.after === userContext.after ||
+            (correctedContext.before.includes(userContext.before) && userContext.before !== '') ||
+            (correctedContext.after.includes(userContext.after) && userContext.after !== '')) {
+          return true;
+        }
+      }
+      
+      return false;
+    };
+    
+    // Mark words based on whether they exist and their context
+    const result = correctedWords.map((word, index) => {
+      const normalizedWord = normalizeText(word);
+      
+      // If the word doesn't exist in user message at all
+      if (!normalizedUserWordSet.has(normalizedWord)) {
+        // Using red+bold for completely new words
         return `<strong>${word}</strong>`;
       }
       
-      // Words in user message are green
-      return `<greentext>${word}</greentext>`;
+      // Word exists - check if it's used in different context
+      if (!hasSimilarContext(word, index)) {
+        // Word exists but in different context - highlight in red+bold
+        return `<strong>${word}</strong>`;
+      }
+      
+      // Word exists in similar context - keep as regular text
+      return word;
     });
     
     return result.join(' ');
   }
   else {
-    // For natural message, highlight words in similar positions in GREEN and non-matching words in ORANGE
+    // For natural message, highlight words in ORANGE if they are new OR used in different context
     const naturalWords = suggestion.split(/\s+/);
     const userWords = original.split(/\s+/);
     
-    // Convert to normalized forms for comparison
+    // Create normalized versions for comparison
     const normalizedNaturalWords = naturalWords.map(w => normalizeText(w));
     const normalizedUserWords = userWords.map(w => normalizeText(w));
     
-    // Create a map of word positions in user text
-    const userWordPositions = new Map();
-    normalizedUserWords.forEach((word, index) => {
-      if (!userWordPositions.has(word)) {
-        userWordPositions.set(word, []);
-      }
-      userWordPositions.get(word).push(index);
-    });
+    // Create a set for quick lookup of user words
+    const normalizedUserWordSet = new Set(normalizedUserWords);
     
-    // Mark words based on matching and position
+    // Helper function to get context window around a word
+    const getWordContext = (words: string[], index: number, windowSize: number = 1) => {
+      const before = words.slice(Math.max(0, index - windowSize), index).join(' ');
+      const after = words.slice(index + 1, Math.min(words.length, index + windowSize + 1)).join(' ');
+      return { before, after };
+    };
+    
+    // Helper function to check if word appears in similar context
+    const hasSimilarContext = (word: string, naturalIndex: number): boolean => {
+      const normalizedWord = normalizeText(word);
+      
+      // Find all occurrences of this word in the user message
+      const userOccurrences: number[] = [];
+      normalizedUserWords.forEach((userWord, index) => {
+        if (userWord === normalizedWord) {
+          userOccurrences.push(index);
+        }
+      });
+      
+      if (userOccurrences.length === 0) return false;
+      
+      // Get context in natural message
+      const naturalContext = getWordContext(normalizedNaturalWords, naturalIndex);
+      
+      // Check if any occurrence in user message has similar context
+      for (const userIndex of userOccurrences) {
+        const userContext = getWordContext(normalizedUserWords, userIndex);
+        
+        // Check if either before or after context matches (allowing for some flexibility)
+        if (naturalContext.before === userContext.before || 
+            naturalContext.after === userContext.after ||
+            (naturalContext.before.includes(userContext.before) && userContext.before !== '') ||
+            (naturalContext.after.includes(userContext.after) && userContext.after !== '')) {
+          return true;
+        }
+      }
+      
+      return false;
+    };
+    
+    // Mark words based on whether they exist and their context
     const result = naturalWords.map((word, index) => {
       const normalizedWord = normalizeText(word);
       
       // If the word doesn't exist in user message at all
-      if (!userWordPositions.has(normalizedWord)) {
-        // Using orangetext for words not in user message
+      if (!normalizedUserWordSet.has(normalizedWord)) {
+        // Using orangetext for completely new words
         return `<orangetext>${word}</orangetext>`;
       }
       
-      // Check if the word appears in a similar position
-      const positionsInUser = userWordPositions.get(normalizedWord);
-      
-      // Find the closest position match
-      let bestPositionMatch = -1;
-      let minPositionDiff = Infinity;
-      
-      positionsInUser.forEach(position => {
-        const positionDiff = Math.abs(position - index);
-        if (positionDiff < minPositionDiff) {
-          minPositionDiff = positionDiff;
-          bestPositionMatch = position;
-        }
-      });
-      
-      // If position is within a reasonable threshold (allow for some words to be added/removed)
-      // The threshold of 2 allows words to be up to 2 positions away and still match
-      const POSITION_THRESHOLD = 2;
-      if (minPositionDiff <= POSITION_THRESHOLD) {
-        // Words in correct position are green - same as corrected messages
-        return `<greentext>${word}</greentext>`;
-      } else {
-        // Words that exist in user message but in different positions - keep as regular text
-        return word;
+      // Word exists - check if it's used in different context
+      if (!hasSimilarContext(word, index)) {
+        // Word exists but in different context - highlight in orange
+        return `<orangetext>${word}</orangetext>`;
       }
+      
+      // Word exists in similar context - keep as regular text
+      return word;
     });
     
     const joinedResult = result.join(' ');
