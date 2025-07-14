@@ -17,7 +17,7 @@ import { RootStackParamList } from '../types/navigation';
 import { LANGUAGES } from '../constants/languages';
 import { useLanguage } from '../contexts/LanguageContext';
 import colors from '../styles/colors';
-import { isNativeLanguageSupported } from '../config/nativeLanguages';
+import { isNativeLanguageSupported, getEnabledNativeLanguages } from '../config/nativeLanguages';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AppLanguage'>;
 
@@ -25,6 +25,10 @@ const AppLanguageScreen: React.FC<Props> = ({ navigation }) => {
   const { appLanguage, setAppLanguage, translate } = useLanguage();
   const [selectedLanguage, setSelectedLanguage] = useState<string>(appLanguage);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  
+  // Filter languages to only show enabled native languages
+  const enabledLanguageCodes = getEnabledNativeLanguages();
+  const availableLanguages = LANGUAGES.filter(lang => enabledLanguageCodes.includes(lang.code));
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -132,7 +136,7 @@ const AppLanguageScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           
           <FlatList
-            data={LANGUAGES}
+            data={availableLanguages}
             keyExtractor={(item) => item.code}
             contentContainerStyle={styles.listContent}
             renderItem={renderLanguageItem}

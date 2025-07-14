@@ -33,18 +33,23 @@ export const SUPPORTED_NATIVE_LANGUAGES: NativeLanguageSupport = {
     fallbackLanguage: 'en',
   },
   fr: {
-    enabled: false, // Future support
-    uiComplete: false,
+    enabled: true,
+    uiComplete: true,
+    fallbackLanguage: 'en',
+  },
+  pt: {
+    enabled: true,
+    uiComplete: true,
     fallbackLanguage: 'en',
   },
   it: {
-    enabled: false, // Future support
-    uiComplete: false,
+    enabled: true,
+    uiComplete: true,
     fallbackLanguage: 'en',
   },
   de: {
-    enabled: false, // Future support
-    uiComplete: false,
+    enabled: true,
+    uiComplete: true,
     fallbackLanguage: 'en',
   },
   zh: {
