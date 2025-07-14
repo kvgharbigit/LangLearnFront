@@ -16,6 +16,7 @@ import colors from '../styles/colors';
 import { supabase } from '../supabase/config';
 import { standardizeAuthError } from '../utils/authErrors';
 import NetInfo from '@react-native-community/netinfo';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface EmailVerificationModalProps {
   visible: boolean;
@@ -41,13 +42,16 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   const [countdown, setCountdown] = useState<number>(0);
   const [isOffline, setIsOffline] = useState<boolean>(false);
 
+  // Get translation function
+  const { translate } = useLanguage();
+
   // When the modal becomes visible, show instructions alert
   useEffect(() => {
     if (visible) {
       Alert.alert(
-        'Email Verification Required',
-        'Your email address needs to be verified before you can continue. Please check your inbox (including spam folder) for a verification email, or use the "Resend Email" button below.',
-        [{ text: 'OK' }]
+        translate('email.verification.title'),
+        translate('email.verification.message'),
+        [{ text: translate('email.verification.ok') }]
       );
     }
   }, [visible]);
@@ -131,13 +135,13 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
         
         // Show success message
         Alert.alert(
-          'Email Sent',
-          'Verification email has been resent. Please check your inbox and click the verification link. After verification, you\'ll be redirected to a confirmation page.',
-          [{ text: 'OK' }]
+          translate('email.verification.emailSent'),
+          translate('email.verification.emailSentMessage'),
+          [{ text: translate('email.verification.ok') }]
         );
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError(translate('error.auth.generic'));
       console.error('Error resending verification email:', err);
     } finally {
       setIsLoading(false);
@@ -166,7 +170,7 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
               error.message?.includes('not confirmed') ||
               error.message?.includes('not verified') ||
               error.message?.includes('Email verification required')) {
-            setError('Your email is not verified yet. Please check your inbox and click the verification link.');
+            setError(translate('email.verification.notVerified') || 'Your email is not verified yet. Please check your inbox and click the verification link.');
           } else {
             // For other errors, show the original error message
             const standardError = standardizeAuthError(error);
@@ -183,17 +187,17 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       } else {
         // If we don't have a password (coming from auth refresh), just check status
         // Open email app or suggest user to check email
-        setError('Please check your email and click the verification link to activate your account.');
+        setError(translate('email.verification.checkEmail') || 'Please check your email and click the verification link to activate your account.');
         
         // Show alert to guide user
         Alert.alert(
-          'Check Your Email',
-          'Please check your email inbox and click the verification link to activate your account. After verification, you\'ll be automatically signed in.',
-          [{ text: 'OK' }]
+          translate('email.verification.checkEmailTitle') || 'Check Your Email',
+          translate('email.verification.checkEmailMessage') || 'Please check your email inbox and click the verification link to activate your account. After verification, you\'ll be automatically signed in.',
+          [{ text: translate('email.verification.ok') }]
         );
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError(translate('error.auth.generic'));
       console.error('Error checking verification:', err);
     } finally {
       setIsCheckingVerification(false);
@@ -217,9 +221,9 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
         Linking.openURL(url);
       } else {
         Alert.alert(
-          'Cannot Open Email',
-          'Unable to open your email app. Please check your email inbox manually.',
-          [{ text: 'OK' }]
+          translate('email.verification.cannotOpenEmail') || 'Cannot Open Email',
+          translate('email.verification.cannotOpenEmailMessage') || 'Unable to open your email app. Please check your email inbox manually.',
+          [{ text: translate('email.verification.ok') }]
         );
       }
     });
@@ -256,14 +260,13 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
             </View>
             
             {/* Title and instructions */}
-            <Text style={styles.title}>Verify Your Email</Text>
+            <Text style={styles.title}>{translate('email.verification.verifyTitle') || 'Verify Your Email'}</Text>
             <Text style={styles.description}>
-              We've sent a verification email to:
+              {translate('email.verification.sentTo') || 'We\'ve sent a verification email to:'}
             </Text>
             <Text style={styles.emailText}>{email}</Text>
             <Text style={styles.instructions}>
-              Please check your inbox and click the verification link to activate your account.
-              Don't forget to check your spam or junk folder.
+              {translate('email.verification.instructions') || 'Please check your inbox and click the verification link to activate your account. Don\'t forget to check your spam or junk folder.'}
             </Text>
             
             {/* Show error message if any */}
@@ -279,7 +282,7 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
               <View style={styles.warningContainer}>
                 <Ionicons name="cloud-offline" size={20} color="#F57C00" />
                 <Text style={styles.warningText}>
-                  You are offline. Please connect to the internet to verify your email.
+                  {translate('email.verification.offlineWarning') || 'You are offline. Please connect to the internet to verify your email.'}
                 </Text>
               </View>
             )}
@@ -294,7 +297,7 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
                 accessibilityLabel="Open Email App"
               >
                 <Ionicons name="mail-open" size={20} color="white" style={styles.buttonIcon} />
-                <Text style={styles.buttonText}>Open Email App</Text>
+                <Text style={styles.buttonText}>{translate('email.verification.openEmailApp') || 'Open Email App'}</Text>
               </TouchableOpacity>
               
               {/* Resend verification email button */}
@@ -314,8 +317,8 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
                     <Ionicons name="refresh" size={20} color={colors.primary} style={styles.buttonIcon} />
                     <Text style={styles.resendButtonText}>
                       {resendDisabled 
-                        ? `Resend Email (${countdown}s)` 
-                        : 'Resend Email'}
+                        ? `${translate('email.verification.resendEmail')} (${countdown}s)` 
+                        : translate('email.verification.resendEmail')}
                     </Text>
                   </>
                 )}
@@ -336,7 +339,7 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
                 ) : (
                   <>
                     <Ionicons name="checkmark-circle" size={20} color="white" style={styles.buttonIcon} />
-                    <Text style={styles.buttonText}>I've Verified My Email</Text>
+                    <Text style={styles.buttonText}>{translate('email.verification.verifiedButton') || 'I\'ve Verified My Email'}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -344,7 +347,7 @@ const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
             
             {/* Help text */}
             <Text style={styles.helpText}>
-              Having trouble? Check your spam folder or contact our support team for assistance.
+              {translate('email.verification.helpText') || 'Having trouble? Check your spam folder or contact our support team for assistance.'}
             </Text>
           </ScrollView>
         </View>

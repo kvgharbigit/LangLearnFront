@@ -84,8 +84,110 @@ const translations: Record<string, Record<string, string>> = {
     'language.start.button': 'Start Learning',
     'language.app.title': 'App Language',
 
+    // Conversation Mode Translations
+    'conversation.categories.conversations': 'Conversations',
+    'conversation.categories.languageLessons': 'Language Lessons',
+    'conversation.freeConversation.label': 'Free Conversation',
+    'conversation.freeConversation.description': 'Engage in natural, unstructured conversations about any topic that interests you.',
+    'conversation.freeConversation.placeholder': '• Game of Thrones\n• Golfing Tips\n• Holiday Destinations',
+    'conversation.topicLesson.label': 'Special Topic Lesson',
+    'conversation.topicLesson.description': 'Explore fascinating topics in your target language - history, culture, sport, geopolitics...',
+    'conversation.topicLesson.placeholder': '• History of Rome\n• Dog Training Tips\n• Modern Art Movements',
+    'conversation.interview.label': 'Interview',
+    'conversation.interview.description': 'Express yourself naturally while answering questions about your interests, experiences and opinions.',
+    'conversation.interview.placeholder': '• Your Hobbies\n• Travel Experiences\n• Life Goals',
+    'conversation.situationSimulation.label': 'Situation Simulation',
+    'conversation.situationSimulation.description': 'Practice real-life conversations in common scenarios like restaurants, travel, and shopping.',
+    'conversation.situationSimulation.placeholder': '• At a restaurant\n• Job interview\n• Airport check-in\n• Shopping for clothes',
+    'conversation.verbChallenge.label': 'Verb Challenge',
+    'conversation.verbChallenge.description': 'Practice constructing sentences with essential verbs in different tenses and moods.',
+    'conversation.verbChallenge.placeholder': '• Specific verb tenses to practice\n• Difficulty level preferences\n• Types of verbs',
+    'conversation.verbChallenge.comingSoon': 'Coming Soon',
+    'conversation.topicTheme.label': 'Topic/Theme',
+    'conversation.generateRandomTopic': 'Generate Random Topic',
+    'conversation.selectMode': 'Select Conversation Mode',
+    'conversation.topicInfo': 'Confluency can talk with you about any topic you can dream of - from dating advice to dancing, from Ancient Egypt to Taylor Swift!',
+    'loading.generating': 'Generating...',
+
+    // Email Verification
+    'email.verification.title': 'Email Verification Required',
+    'email.verification.message': 'Your email address needs to be verified before you can continue. Please check your inbox (including spam folder) for a verification email, or use the "Resend Email" button below.',
+    'email.verification.ok': 'OK',
+    'email.verification.resendEmail': 'Resend Email',
+    'email.verification.checkingVerification': 'Checking verification...',
+    'email.verification.emailSent': 'Email Sent',
+    'email.verification.emailSentMessage': 'A new verification email has been sent. Please check your inbox.',
+    'email.verification.errorSending': 'Error Sending',
+    'email.verification.errorSendingMessage': 'Failed to send verification email. Please try again.',
+    'email.verification.verificationComplete': 'Verification Complete',
+    'email.verification.verificationCompleteMessage': 'Your email has been successfully verified.',
+    'email.verification.networkError': 'Connection Error',
+    'email.verification.networkErrorMessage': 'Please check your internet connection and try again.',
+    'email.verification.notVerified': 'Your email is not verified yet. Please check your inbox and click the verification link.',
+    'email.verification.checkEmail': 'Please check your email and click the verification link to activate your account.',
+    'email.verification.checkEmailTitle': 'Check Your Email',
+    'email.verification.checkEmailMessage': 'Please check your email inbox and click the verification link to activate your account. After verification, you\'ll be automatically signed in.',
+    'email.verification.cannotOpenEmail': 'Cannot Open Email',
+    'email.verification.cannotOpenEmailMessage': 'Unable to open your email app. Please check your email inbox manually.',
+    'email.verification.verifyTitle': 'Verify Your Email',
+    'email.verification.sentTo': 'We\'ve sent a verification email to:',
+    'email.verification.instructions': 'Please check your inbox and click the verification link to activate your account. Don\'t forget to check your spam or junk folder.',
+    'email.verification.offlineWarning': 'You are offline. Please connect to the internet to verify your email.',
+    'email.verification.openEmailApp': 'Open Email App',
+    'email.verification.verifiedButton': 'I\'ve Verified My Email',
+    'email.verification.helpText': 'Having trouble? Check your spam folder or contact our support team for assistance.',
+
+    // Quota Exceeded Modal
+    'quota.exceeded.title': 'Token Limit Reached',
+    'quota.exceeded.message': 'You\'ve reached your monthly token limit for language learning. Upgrade your subscription to continue learning without limits.',
+    'quota.exceeded.upgradeNow': 'Upgrade Now',
+    'quota.exceeded.notNow': 'Not Now',
+
+    // Loading States
+    'loading.general': 'Loading...',
+    'loading.savingPreferences': 'Saving preferences...',
+    'loading.connecting': 'Connecting...',
+    'loading.verifying': 'Verifying...',
+    'loading.sendingEmail': 'Sending email...',
+
+    // Status Messages
+    'status.offline': 'Offline',
+    'status.connecting': 'Connecting...',
+    'status.connected': 'Connected',
+    'status.disconnected': 'Disconnected',
+
+    // Error Messages
+    'error.network.title': 'Connection Error',
+    'error.network.message': 'Could not connect to server. Please check your internet connection.',
+    'error.auth.generic': 'Authentication error. Please try again.',
+    'error.auth.network': 'Network error during authentication.',
+    'error.subscription.failed': 'Subscription processing failed.',
+    'error.verification.failed': 'Email verification failed.',
+
+    // Placeholders
+    'placeholder.learningObjective': 'e.g. Roman history, Japanese culture...',
+    'placeholder.searchLanguages': 'Search languages...',
+    'placeholder.email': 'your@email.com',
+    'placeholder.password': 'Password',
+
+    // Accessibility Labels
+    'accessibility.closeModal': 'Close modal',
+    'accessibility.selectLanguage': 'Select language',
+    'accessibility.backButton': 'Back button',
+    'accessibility.menuButton': 'Menu button',
+
+    // Additional Button Labels
+    'button.upgradeNow': 'Upgrade Now',
+    'button.notNow': 'Not Now',
+    'button.resendEmail': 'Resend Email',
+    'button.tryAgain': 'Try Again',
+    'button.ok': 'OK',
+
     // Common
     'common.error': 'Error',
+    'common.success': 'Success',
+    'common.warning': 'Warning',
+    'common.info': 'Info',
     
     // Buttons
     'button.cancel': 'Cancel',
@@ -150,8 +252,110 @@ const translations: Record<string, Record<string, string>> = {
     'language.start.button': 'Comenzar a Aprender',
     'language.app.title': 'Idioma de la Aplicación',
 
+    // Conversation Mode Translations
+    'conversation.categories.conversations': 'Conversaciones',
+    'conversation.categories.languageLessons': 'Lecciones de Idioma',
+    'conversation.freeConversation.label': 'Conversación Libre',
+    'conversation.freeConversation.description': 'Participa en conversaciones naturales y no estructuradas sobre cualquier tema que te interese.',
+    'conversation.freeConversation.placeholder': '• Juego de Tronos\n• Consejos de Golf\n• Destinos de Vacaciones',
+    'conversation.topicLesson.label': 'Lección de Tema Especial',
+    'conversation.topicLesson.description': 'Explora temas fascinantes en tu idioma objetivo: historia, cultura, deportes, geopolítica...',
+    'conversation.topicLesson.placeholder': '• Historia de Roma\n• Consejos de Entrenamiento de Perros\n• Movimientos de Arte Moderno',
+    'conversation.interview.label': 'Entrevista',
+    'conversation.interview.description': 'Exprésate naturalmente mientras respondes preguntas sobre tus intereses, experiencias y opiniones.',
+    'conversation.interview.placeholder': '• Tus Pasatiempos\n• Experiencias de Viaje\n• Objetivos de Vida',
+    'conversation.situationSimulation.label': 'Simulación de Situaciones',
+    'conversation.situationSimulation.description': 'Practica conversaciones de la vida real en escenarios comunes como restaurantes, viajes y compras.',
+    'conversation.situationSimulation.placeholder': '• En un restaurante\n• Entrevista de trabajo\n• Registro en el aeropuerto\n• Compras de ropa',
+    'conversation.verbChallenge.label': 'Desafío de Verbos',
+    'conversation.verbChallenge.description': 'Practica construyendo oraciones con verbos esenciales en diferentes tiempos y modos.',
+    'conversation.verbChallenge.placeholder': '• Tiempos verbales específicos para practicar\n• Preferencias de nivel de dificultad\n• Tipos de verbos',
+    'conversation.verbChallenge.comingSoon': 'Próximamente',
+    'conversation.topicTheme.label': 'Tema/Asunto',
+    'conversation.generateRandomTopic': 'Generar Tema Aleatorio',
+    'conversation.selectMode': 'Seleccionar Modo de Conversación',
+    'conversation.topicInfo': '¡Confluency puede conversar contigo sobre cualquier tema que puedas imaginar: desde consejos de citas hasta baile, desde el Antiguo Egipto hasta Taylor Swift!',
+    'loading.generating': 'Generando...',
+
+    // Email Verification
+    'email.verification.title': 'Verificación de Email Requerida',
+    'email.verification.message': 'Tu dirección de email debe ser verificada antes de continuar. Por favor revisa tu bandeja de entrada (incluyendo la carpeta de spam) para un email de verificación, o usa el botón "Reenviar Email" abajo.',
+    'email.verification.ok': 'OK',
+    'email.verification.resendEmail': 'Reenviar Email',
+    'email.verification.checkingVerification': 'Verificando...',
+    'email.verification.emailSent': 'Email Enviado',
+    'email.verification.emailSentMessage': 'Se ha enviado un nuevo email de verificación. Por favor revisa tu bandeja de entrada.',
+    'email.verification.errorSending': 'Error al Enviar',
+    'email.verification.errorSendingMessage': 'No se pudo enviar el email de verificación. Por favor inténtalo de nuevo.',
+    'email.verification.verificationComplete': 'Verificación Completa',
+    'email.verification.verificationCompleteMessage': 'Tu email ha sido verificado exitosamente.',
+    'email.verification.networkError': 'Error de Conexión',
+    'email.verification.networkErrorMessage': 'Por favor verifica tu conexión a internet e inténtalo de nuevo.',
+    'email.verification.notVerified': 'Tu email aún no está verificado. Por favor revisa tu bandeja de entrada y haz clic en el enlace de verificación.',
+    'email.verification.checkEmail': 'Por favor revisa tu email y haz clic en el enlace de verificación para activar tu cuenta.',
+    'email.verification.checkEmailTitle': 'Revisa Tu Email',
+    'email.verification.checkEmailMessage': 'Por favor revisa tu bandeja de entrada y haz clic en el enlace de verificación para activar tu cuenta. Después de la verificación, serás conectado automáticamente.',
+    'email.verification.cannotOpenEmail': 'No Se Puede Abrir Email',
+    'email.verification.cannotOpenEmailMessage': 'No se pudo abrir tu aplicación de email. Por favor revisa tu bandeja de entrada manualmente.',
+    'email.verification.verifyTitle': 'Verifica Tu Email',
+    'email.verification.sentTo': 'Hemos enviado un email de verificación a:',
+    'email.verification.instructions': 'Por favor revisa tu bandeja de entrada y haz clic en el enlace de verificación para activar tu cuenta. No olvides revisar tu carpeta de spam.',
+    'email.verification.offlineWarning': 'Estás sin conexión. Por favor conéctate a internet para verificar tu email.',
+    'email.verification.openEmailApp': 'Abrir App de Email',
+    'email.verification.verifiedButton': 'He Verificado Mi Email',
+    'email.verification.helpText': '¿Tienes problemas? Revisa tu carpeta de spam o contacta a nuestro equipo de soporte.',
+
+    // Quota Exceeded Modal
+    'quota.exceeded.title': 'Límite de Tokens Alcanzado',
+    'quota.exceeded.message': 'Has alcanzado tu límite mensual de tokens para aprendizaje de idiomas. Actualiza tu suscripción para continuar aprendiendo sin límites.',
+    'quota.exceeded.upgradeNow': 'Actualizar Ahora',
+    'quota.exceeded.notNow': 'Ahora No',
+
+    // Loading States
+    'loading.general': 'Cargando...',
+    'loading.savingPreferences': 'Guardando preferencias...',
+    'loading.connecting': 'Conectando...',
+    'loading.verifying': 'Verificando...',
+    'loading.sendingEmail': 'Enviando email...',
+
+    // Status Messages
+    'status.offline': 'Sin conexión',
+    'status.connecting': 'Conectando...',
+    'status.connected': 'Conectado',
+    'status.disconnected': 'Desconectado',
+
+    // Error Messages
+    'error.network.title': 'Error de Conexión',
+    'error.network.message': 'No se pudo conectar al servidor. Por favor verifica tu conexión a internet.',
+    'error.auth.generic': 'Error de autenticación. Por favor inténtalo de nuevo.',
+    'error.auth.network': 'Error de conexión durante la autenticación.',
+    'error.subscription.failed': 'Error al procesar la suscripción.',
+    'error.verification.failed': 'Error en la verificación del email.',
+
+    // Placeholders
+    'placeholder.learningObjective': 'Ej: Historia romana, cultura japonesa...',
+    'placeholder.searchLanguages': 'Buscar idiomas...',
+    'placeholder.email': 'tu@email.com',
+    'placeholder.password': 'Contraseña',
+
+    // Accessibility Labels
+    'accessibility.closeModal': 'Cerrar modal',
+    'accessibility.selectLanguage': 'Seleccionar idioma',
+    'accessibility.backButton': 'Botón de regresar',
+    'accessibility.menuButton': 'Botón de menú',
+
+    // Additional Button Labels
+    'button.upgradeNow': 'Actualizar Ahora',
+    'button.notNow': 'Ahora No',
+    'button.resendEmail': 'Reenviar Email',
+    'button.tryAgain': 'Intentar de Nuevo',
+    'button.ok': 'OK',
+
     // Common
     'common.error': 'Error',
+    'common.success': 'Éxito',
+    'common.warning': 'Advertencia',
+    'common.info': 'Información',
     
     'button.cancel': 'Cancelar',
     'button.save': 'Guardar',

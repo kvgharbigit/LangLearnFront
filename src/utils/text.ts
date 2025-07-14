@@ -1,11 +1,29 @@
 /**
  * Normalizes text by removing accents, punctuation, and extra spacing
+ * Handles German umlauts and ß character properly
  */
-export const normalizeText = (text: string): string => {
+export const normalizeText = (text: string, language?: string): string => {
   if (!text) return '';
-  return text
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents (á -> a, é -> e, etc.)
+  
+  let normalized = text.toLowerCase();
+  
+  // Handle German text specially to preserve umlauts and ß
+  if (language === 'de') {
+    // For German, create equivalences but preserve original forms
+    normalized = normalized
+      .replace(/ä/g, 'ae').replace(/ae/g, 'ae') // ä ↔ ae
+      .replace(/ö/g, 'oe').replace(/oe/g, 'oe') // ö ↔ oe  
+      .replace(/ü/g, 'ue').replace(/ue/g, 'ue') // ü ↔ ue
+      .replace(/ß/g, 'ss'); // ß → ss
+  } else if (language === 'pt') {
+    // For Portuguese, handle special characters but maintain accent equivalences
+    normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  } else {
+    // For other languages, remove accents as before
+    normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  
+  return normalized
     .replace(/[.,;:¿?!¡'"()[\]{}\-_@#$%^&*+=<>]/g, '') // Remove all punctuation including Spanish punctuation
     .replace(/\s+/g, ' ') // Replace multiple spaces with single space
     .trim();

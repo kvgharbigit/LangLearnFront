@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from '../types/navigation';
 import colors from '../styles/colors';
+import { useLanguage } from '../contexts/LanguageContext';
 
 type NavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -23,6 +24,7 @@ interface QuotaExceededModalProps {
 
 const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({ visible, onClose }) => {
   const navigation = useNavigation<NavigationProp>();
+  const { translate } = useLanguage();
   
   const handleUpgradePress = () => {
     onClose();
@@ -44,11 +46,10 @@ const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({ visible, onClos
                 <Ionicons name="alert-circle" size={60} color={colors.primary} />
               </View>
               
-              <Text style={styles.title}>Token Limit Reached</Text>
+              <Text style={styles.title}>{translate('quota.exceeded.title')}</Text>
               
               <Text style={styles.message}>
-                You've reached your monthly token limit for language learning.
-                Upgrade your subscription to continue learning without limits.
+                {translate('quota.exceeded.message')}
               </Text>
               
               <View style={styles.buttonContainer}>
@@ -56,14 +57,14 @@ const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({ visible, onClos
                   style={styles.upgradeButton}
                   onPress={handleUpgradePress}
                 >
-                  <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+                  <Text style={styles.upgradeButtonText}>{translate('quota.exceeded.upgradeNow')}</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
                   style={styles.laterButton}
                   onPress={onClose}
                 >
-                  <Text style={styles.laterButtonText}>Not Now</Text>
+                  <Text style={styles.laterButtonText}>{translate('quota.exceeded.notNow')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

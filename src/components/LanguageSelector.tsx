@@ -14,10 +14,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LANGUAGES, Language } from '../constants/languages';
 import colors from '../styles/colors';
+import { getEnabledNativeLanguages } from '../config/nativeLanguages';
 
-// Define available languages by context
-const NATIVE_LANGUAGES = ['en']; // Only English for native language
-const TARGET_LANGUAGES = ['es', 'fr', 'it']; // Spanish, French, and Italian for target language
+// Define available languages by context - now using dynamic configuration
+const NATIVE_LANGUAGES = getEnabledNativeLanguages(); // Dynamic native languages from config
+const TARGET_LANGUAGES = ['en', 'es', 'fr', 'it', 'de', 'pt']; // English, Spanish, French, Italian, German, and Portuguese for target language
 
 interface LanguageSelectorProps {
   selectedLanguage: string;

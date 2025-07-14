@@ -27,6 +27,8 @@ import { DIFFICULTY_LEVELS, DifficultyLevel } from '../constants/languages';
 import { getLanguagePreferences, saveLanguagePreferences } from '../utils/languageStorage';
 import { getLanguageInfo } from '../constants/languages';
 import userPreferences from '../utils/userPreferences';
+import { getDefaultNativeLanguage, isNativeLanguageSupported } from '../config/nativeLanguages';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Get screen dimensions for responsive design
 const { width, height } = Dimensions.get('window');
@@ -36,9 +38,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'LanguageLanding'>;
 const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   // Auth state
   const { user } = useAuth();
+  
+  // Language context for app UI language
+  const { setAppLanguage } = useLanguage();
 
-  // State - Initialize native language to English since it's the only option
-  const [nativeLanguage, setNativeLanguage] = useState<string>('en');
+  // State - Initialize native language to default from configuration
+  const [nativeLanguage, setNativeLanguage] = useState<string>(getDefaultNativeLanguage());
   const [targetLanguage, setTargetLanguage] = useState<string>('');
   const [difficulty, setDifficulty] = useState<DifficultyLevel>('beginner');
   const [conversationMode, setConversationMode] = useState<ConversationMode>('free_conversation');
@@ -90,6 +95,16 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
 
       if (savedNative) {
         setNativeLanguage(savedNative.code);
+        
+        // Also sync app UI language with saved native language
+        if (isNativeLanguageSupported(savedNative.code)) {
+          try {
+            await setAppLanguage(savedNative.code);
+            console.log(`🌍 App UI language synced from saved preferences: ${savedNative.code}`);
+          } catch (error) {
+            console.error('Error syncing app language from saved preferences:', error);
+          }
+        }
       }
 
       if (savedTarget) {
@@ -154,12 +169,23 @@ const LanguageLanding: React.FC<Props> = ({ navigation }) => {
   };
 
   // Handle native language selection
-  const handleNativeLanguageSelect = (code: string) => {
+  const handleNativeLanguageSelect = async (code: string) => {
     // If selecting the same language that's currently the target, swap them
     if (code === targetLanguage) {
       setTargetLanguage(nativeLanguage);
     }
     setNativeLanguage(code);
+    
+    // Automatically sync app UI language with native language selection
+    // Only sync if the selected language is supported for UI
+    if (isNativeLanguageSupported(code)) {
+      try {
+        await setAppLanguage(code);
+        console.log(`🌍 App UI language automatically changed to: ${code}`);
+      } catch (error) {
+        console.error('Error setting app language:', error);
+      }
+    }
   };
 
   // Handle target language selection

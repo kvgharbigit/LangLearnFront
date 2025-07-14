@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, StyleSheet, TextInput, Modal, FlatList, P
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../styles/colors';
 import { getRandomTopicForMode } from '../utils/randomTopics';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Define conversation mode types
 export type ConversationMode = 'topic_lesson' | 'free_conversation' | 'interview' | 'verb_challenge' | 'situation_simulation';
@@ -27,50 +28,53 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const [isGeneratingTopic, setIsGeneratingTopic] = useState(false);
 
-  // Categorized options for conversation modes
+  // Get translation function
+  const { translate } = useLanguage();
+
+  // Categorized options for conversation modes - now using translations
   const conversationCategories = [
     {
-      title: 'Conversations',
+      title: translate('conversation.categories.conversations'),
       modes: [
         {
           id: 'free_conversation' as ConversationMode,
-          label: 'Free Conversation',
+          label: translate('conversation.freeConversation.label'),
           icon: 'chatbubbles-outline',
-          description: 'Engage in natural, unstructured conversations about any topic that interests you.',
-          placeholder: '• Game of Thrones\n• Golfing Tips\n• Holiday Destinations'
+          description: translate('conversation.freeConversation.description'),
+          placeholder: translate('conversation.freeConversation.placeholder')
         },
         {
           id: 'topic_lesson' as ConversationMode,
-          label: 'Special Topic Lesson',
+          label: translate('conversation.topicLesson.label'),
           icon: 'school-outline',
-          description: 'Explore fascinating topics in your target language - history, culture, sport, geopolitics...',
-          placeholder: '• History of Rome\n• Dog Training Tips\n• Modern Art Movements'
+          description: translate('conversation.topicLesson.description'),
+          placeholder: translate('conversation.topicLesson.placeholder')
         },
         {
           id: 'interview' as ConversationMode,
-          label: 'Interview',
+          label: translate('conversation.interview.label'),
           icon: 'person-outline',
-          description: 'Express yourself naturally while answering questions about your interests, experiences and opinions.',
-          placeholder: '• Your Hobbies\n• Travel Experiences\n• Life Goals'
+          description: translate('conversation.interview.description'),
+          placeholder: translate('conversation.interview.placeholder')
         },
         {
           id: 'situation_simulation' as ConversationMode,
-          label: 'Situation Simulation',
+          label: translate('conversation.situationSimulation.label'),
           icon: 'game-controller-outline',
-          description: 'Practice real-life conversations in common scenarios like restaurants, travel, and shopping.',
-          placeholder: '• At a restaurant\n• Job interview\n• Airport check-in\n• Shopping for clothes'
+          description: translate('conversation.situationSimulation.description'),
+          placeholder: translate('conversation.situationSimulation.placeholder')
         }
       ]
     },
     {
-      title: 'Language Lessons',
+      title: translate('conversation.categories.languageLessons'),
       modes: [
         {
           id: 'verb_challenge' as ConversationMode,
-          label: 'Verb Challenge',
+          label: translate('conversation.verbChallenge.label'),
           icon: 'flash-outline',
-          description: 'Practice constructing sentences with essential verbs in different tenses and moods.',
-          placeholder: '• Specific verb tenses to practice\n• Difficulty level preferences\n• Types of verbs',
+          description: translate('conversation.verbChallenge.description'),
+          placeholder: translate('conversation.verbChallenge.placeholder'),
           comingSoon: true
         },
       ]
@@ -198,7 +202,7 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
 
       {/* Topic/Theme input */}
       <View style={styles.promptContainer}>
-        <Text style={styles.promptLabel}>Topic/Theme</Text>
+        <Text style={styles.promptLabel}>{translate('conversation.topicTheme.label') || 'Topic/Theme'}</Text>
         <View style={styles.textAreaContainer}>
           <TextInput
             style={[
@@ -250,14 +254,14 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
               styles.randomTopicButtonText,
               isGeneratingTopic && styles.randomTopicButtonTextDisabled
             ]}>
-              {isGeneratingTopic ? 'Generating...' : 'Generate Random Topic'}
+              {isGeneratingTopic ? translate('loading.generating') || 'Generating...' : translate('conversation.generateRandomTopic') || 'Generate Random Topic'}
             </Text>
           </TouchableOpacity>
         )}
 
         <View style={styles.promptInfoContainer}>
           <Text style={styles.promptInfoText}>
-            Confluency can talk with you about any topic you can dream of - from dating advice to dancing, from Ancient Egypt to Taylor Swift!
+{translate('conversation.topicInfo') || 'Confluency can talk with you about any topic you can dream of - from dating advice to dancing, from Ancient Egypt to Taylor Swift!'}
           </Text>
         </View>
       </View>
@@ -276,7 +280,7 @@ const ConversationModeSelector: React.FC<ConversationModeSelectorProps> = ({
         >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Conversation Mode</Text>
+              <Text style={styles.modalTitle}>{translate('conversation.selectMode') || 'Select Conversation Mode'}</Text>
               <TouchableOpacity onPress={() => setIsDropdownVisible(false)}>
                 <Ionicons name="close" size={24} color={colors.gray600} />
               </TouchableOpacity>

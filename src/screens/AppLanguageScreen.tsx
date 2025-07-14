@@ -7,7 +7,8 @@ import {
   FlatList,
   ActivityIndicator,
   Animated,
-  Platform
+  Platform,
+  Alert
 } from 'react-native';
 import SafeView from '../components/SafeView';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { RootStackParamList } from '../types/navigation';
 import { LANGUAGES } from '../constants/languages';
 import { useLanguage } from '../contexts/LanguageContext';
 import colors from '../styles/colors';
+import { isNativeLanguageSupported } from '../config/nativeLanguages';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AppLanguage'>;
 
@@ -120,6 +122,14 @@ const AppLanguageScreen: React.FC<Props> = ({ navigation }) => {
               Select your preferred app interface language
             </Text>
           </View>
+
+          {/* Info notice about consolidated language setting */}
+          <View style={styles.infoNotice}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+            <Text style={styles.infoText}>
+              💡 Tip: When you select "I speak" on the main screen, the app language will automatically change to match your native language.
+            </Text>
+          </View>
           
           <FlatList
             data={LANGUAGES}
@@ -218,6 +228,24 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 10,
     flex: 1,
+  },
+  infoNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#E8F4FD',
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+  },
+  infoText: {
+    color: colors.gray700,
+    fontSize: 14,
+    fontWeight: '400',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 20,
   },
   listContent: {
     paddingBottom: 16,
