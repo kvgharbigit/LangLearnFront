@@ -681,6 +681,13 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
     };
   }, [navigation, getTargetLanguage, cleanupRecorder]);
   
+  // Simple global function assignment for audio player status updates
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.updateMessageTTSStatus = updateMessageTTSStatus;
+    }
+  }, [updateMessageTTSStatus]);
+
   // Add navigation event listeners to stop audio when exiting the screen
   useEffect(() => {
     // Function to stop audio playback
@@ -708,23 +715,13 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
       return false; // Don't prevent default back button behavior
     });
     
-    // Expose the updateMessageTTSStatus function globally
-    if (typeof window !== 'undefined') {
-      window.updateMessageTTSStatus = updateMessageTTSStatus;
-    }
-    
     // Cleanup listeners when component unmounts
     return () => {
       unsubscribeBlur();
       unsubscribeFocus();
       backHandler.remove();
-      
-      // Remove global function on unmount
-      if (typeof window !== 'undefined') {
-        window.updateMessageTTSStatus = undefined;
-      }
     };
-  }, [navigation, isPlaying, stopAudio, updateMessageTTSStatus]);
+  }, [navigation, isPlaying, stopAudio]);
   
   return (
     <SafeView>
