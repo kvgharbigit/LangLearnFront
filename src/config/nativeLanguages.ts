@@ -28,27 +28,27 @@ export const SUPPORTED_NATIVE_LANGUAGES: NativeLanguageSupport = {
     uiComplete: true,
   },
   es: {
-    enabled: true,
-    uiComplete: true, // Will be true after our implementation
+    enabled: false, // Temporarily disabled - examples are designed for English speakers
+    uiComplete: true,
     fallbackLanguage: 'en',
   },
   fr: {
-    enabled: true,
+    enabled: false, // Temporarily disabled - examples are designed for English speakers
     uiComplete: true,
     fallbackLanguage: 'en',
   },
   pt: {
-    enabled: true,
+    enabled: false, // Temporarily disabled - examples are designed for English speakers
     uiComplete: true,
     fallbackLanguage: 'en',
   },
   it: {
-    enabled: true,
+    enabled: false, // Temporarily disabled - examples are designed for English speakers
     uiComplete: true,
     fallbackLanguage: 'en',
   },
   de: {
-    enabled: true,
+    enabled: false, // Temporarily disabled - examples are designed for English speakers
     uiComplete: true,
     fallbackLanguage: 'en',
   },
