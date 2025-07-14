@@ -272,7 +272,7 @@ export const highlightDifferences = (
  * Highlights words that appear in the user/corrected message but not in the native message
  * Used for the "grammar correct but not native" case
  */
-export const highlightNonNativeWords = (userMessage: string, nativeMessage: string): string => {
+export const highlightNonNativeWords = (userMessage: string, nativeMessage: string, addGreenBold: boolean = false): string => {
   if (!userMessage || !nativeMessage) return userMessage;
 
   const userWords = userMessage.split(/\s+/);
@@ -287,13 +287,13 @@ export const highlightNonNativeWords = (userMessage: string, nativeMessage: stri
   const result = userWords.map(word => {
     const normalizedWord = normalizeText(word);
     
-    // If word doesn't exist in native message, underline it in light orange
+    // If word doesn't exist in native message, use a combined style
     if (!normalizedNativeWords.has(normalizedWord)) {
-      return `<underlineorange>${word}</underlineorange>`;
+      return addGreenBold ? `<greenboldunderline>${word}</greenboldunderline>` : `<underlineorange>${word}</underlineorange>`;
     }
     
-    // Word exists in native message - keep as regular text
-    return word;
+    // Word exists in native message - apply green/bold if requested
+    return addGreenBold ? `<greenbold>${word}</greenbold>` : word;
   });
   
   return result.join(' ');

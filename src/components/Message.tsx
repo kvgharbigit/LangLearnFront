@@ -27,6 +27,14 @@ const customHTMLElementModels = {
   underlineorange: HTMLElementModel.fromCustomModel({
     tagName: 'underlineorange',
     contentModel: HTMLContentModel.textual
+  }),
+  greenbold: HTMLElementModel.fromCustomModel({
+    tagName: 'greenbold',
+    contentModel: HTMLContentModel.textual
+  }),
+  greenboldunderline: HTMLElementModel.fromCustomModel({
+    tagName: 'greenboldunderline',
+    contentModel: HTMLContentModel.textual
   })
 };
 
@@ -218,6 +226,17 @@ const Message: React.FC<MessageProps> = ({
       textDecorationLine: 'underline',
       textDecorationStyle: 'solid',
       textDecorationColor: '#FF9800',
+    },
+    greenbold: {
+      fontWeight: 'bold',
+      color: '#4CAF50', // Green color
+    },
+    greenboldunderline: {
+      fontWeight: 'bold',
+      color: '#4CAF50', // Green color
+      textDecorationLine: 'underline',
+      textDecorationStyle: 'solid',
+      textDecorationColor: '#FF9800', // Orange underline
     }
   }), []);
 
@@ -245,6 +264,17 @@ const Message: React.FC<MessageProps> = ({
       textDecorationLine: 'underline',
       textDecorationStyle: 'solid',
       textDecorationColor: '#FF9800',
+    },
+    greenbold: {
+      fontWeight: 'bold',
+      color: '#4CAF50', // Green color
+    },
+    greenboldunderline: {
+      fontWeight: 'bold',
+      color: '#4CAF50', // Green color
+      textDecorationLine: 'underline',
+      textDecorationStyle: 'solid',
+      textDecorationColor: '#FF9800', // Orange underline
     }
   }), []);
 
@@ -364,11 +394,11 @@ const Message: React.FC<MessageProps> = ({
             {/* Show grammatically correct message in green/bold with orange underlines for non-native words */}
             <View style={styles.perfectMatchContainer}>
               <HTML
-                source={{ html: `<greentext><strong>${highlightNonNativeWords(message.corrected || '', message.natural || '')}</strong></greentext>` }}
+                source={{ html: highlightNonNativeWords(message.corrected || '', message.natural || '', true) }}
                 contentWidth={screenWidth * 0.8}
-                elementsModels={customHTMLElementModels}
+                customHTMLElementModels={customHTMLElementModels}
                 tagsStyles={correctedTagsStyles}
-                baseStyle={correctedBaseStyle}
+                baseFontStyle={correctedBaseStyle}
               />
               <View style={styles.emojiContainer}>
                 <Text style={styles.emojiIcon}>📝</Text>
