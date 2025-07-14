@@ -40,7 +40,7 @@ export const areMessagesEquivalent = (original: string, suggestion: string): boo
 };
 
 /**
- * Highlights differences between original text and suggestion based on the specified mode
+ * Highlights differences between original text and suggestion based on the specified mode/
  */
 export const highlightDifferences = (
   original: string, 
