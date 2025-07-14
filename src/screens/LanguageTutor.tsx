@@ -1048,8 +1048,18 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
         setLastAudioMessageIndex(null);
       }
       
-      // Force a message list re-render
-      setHistory(prev => [...prev]);
+      // Update the TTS status of any running messages to completed when audio is stopped
+      setHistory(prev => {
+        return prev.map(msg => {
+          if (msg.role === 'assistant' && 
+              msg.hasAudio && 
+              msg.tts_status === 'running') {
+            console.log(`🔇 Updating message TTS status to completed on manual stop`);
+            return { ...msg, tts_status: 'completed' as const };
+          }
+          return msg;
+        });
+      });
       
       // Then handle the actual audio stopping
       if (soundRef.current) {
@@ -2107,12 +2117,12 @@ const handleAudioData = async () => {
           const likelyFinished =
             status.isLoaded &&
             !status.isPlaying &&
-            status.positionMillis > 1000 && // Must have played for at least 1 second to avoid false positives
+            status.positionMillis > 100 && // Must have played for at least 100ms to avoid false positives
             (
               // Either we know the duration and are near the end
               (status.durationMillis && status.positionMillis >= status.durationMillis - 100) ||
               // Or we don't know duration but audio has stopped after reasonable playback time
-              (!status.durationMillis && elapsed > 1000) // At least 1 second elapsed time
+              (!status.durationMillis && elapsed > 100) // At least 100ms elapsed time
             );
 
           if (likelyFinished && !isCompletionHandled) {
