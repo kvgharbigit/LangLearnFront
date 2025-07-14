@@ -500,25 +500,12 @@ const LanguageTutor: React.FC<Props> = ({ route, navigation }) => {
             return;
           }
 
-          // For now, we'll just update to 'completed' after a reasonable time
-          // In a real implementation, you'd check the backend for actual status
+          // TTS status is now managed by the backend and audio player
+          // No need for forced completion after time delay
           console.log('[TTS Polling] Checking for TTS completion...');
           
-          // Update messages that have been running for more than 3 seconds to completed
-          setHistory(currentHistory => {
-            return currentHistory.map(msg => {
-              if (msg.role === 'assistant' && 
-                  msg.tts_status === 'running' && 
-                  msg.hasAudio) {
-                const messageAge = Date.now() - new Date(msg.timestamp).getTime();
-                if (messageAge > 3000) { // 3 seconds
-                  console.log(`[TTS Polling] Updating message to completed after ${messageAge}ms`);
-                  return { ...msg, tts_status: 'completed' as const };
-                }
-              }
-              return msg;
-            });
-          });
+          // Simply log the count of running messages for debugging
+          console.log(`[TTS Polling] Found ${stillRunning.length} messages with running TTS status`);
 
         } catch (error) {
           console.error('[TTS Polling] Error during polling:', error);
@@ -1981,11 +1968,13 @@ const handleAudioData = async () => {
         lastPositionMillis = status.positionMillis;
 
         // Check for both explicit finish and our "likely finished" condition
+        // Only consider it finished if we have a duration and are near the end, or if it explicitly finished
         const isLikelyFinished =
           status.isLoaded &&
           !status.isPlaying &&
-          status.positionMillis > 0 &&
-          (!status.durationMillis || status.positionMillis >= status.durationMillis - 100);
+          status.positionMillis > 1000 && // Must have played for at least 1 second
+          status.durationMillis && // Must have a known duration
+          status.positionMillis >= status.durationMillis - 100; // Must be within 100ms of the end
 
         const nearEnd = status.durationMillis && status.positionMillis > status.durationMillis - 500;
         if (nearEnd) {
@@ -2003,6 +1992,19 @@ const handleAudioData = async () => {
 
           setIsPlaying(false);
           setStatusMessage('Ready'); // Update status when playback completes
+
+          // Update the TTS status of all running messages to completed
+          setHistory(currentHistory => {
+            return currentHistory.map(msg => {
+              if (msg.role === 'assistant' && 
+                  msg.hasAudio && 
+                  msg.tts_status === 'running') {
+                console.log(`🎵 [AUDIO] Updating message TTS status to completed`);
+                return { ...msg, tts_status: 'completed' as const };
+              }
+              return msg;
+            });
+          });
 
           // Clean up polling if it exists
           if (pollIntervalId) {
@@ -2105,8 +2107,13 @@ const handleAudioData = async () => {
           const likelyFinished =
             status.isLoaded &&
             !status.isPlaying &&
-            status.positionMillis > 0 &&
-            (!status.durationMillis || status.positionMillis >= status.durationMillis - 100);
+            status.positionMillis > 1000 && // Must have played for at least 1 second to avoid false positives
+            (
+              // Either we know the duration and are near the end
+              (status.durationMillis && status.positionMillis >= status.durationMillis - 100) ||
+              // Or we don't know duration but audio has stopped after reasonable playback time
+              (!status.durationMillis && elapsed > 1000) // At least 1 second elapsed time
+            );
 
           if (likelyFinished && !isCompletionHandled) {
             // Set flag to ensure we only handle completion once
@@ -2117,6 +2124,19 @@ const handleAudioData = async () => {
 
             setIsPlaying(false);
             setStatusMessage('Ready'); // Update status when polling detects completion
+
+            // Update the TTS status of all running messages to completed
+            setHistory(currentHistory => {
+              return currentHistory.map(msg => {
+                if (msg.role === 'assistant' && 
+                    msg.hasAudio && 
+                    msg.tts_status === 'running') {
+                  console.log(`🎵 [AUDIO] Backup mechanism updating message TTS status to completed`);
+                  return { ...msg, tts_status: 'completed' as const };
+                }
+                return msg;
+              });
+            });
 
             // Also handle auto record here as a backup
             if (autoRecordEnabled && voiceInputEnabled && !isRecording && !isProcessing

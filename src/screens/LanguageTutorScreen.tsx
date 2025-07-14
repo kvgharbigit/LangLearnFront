@@ -1,11 +1,11 @@
 /**
  * LanguageTutorScreen.tsx
  * 
- * A wrapper component that exports the refactored LanguageTutor component.
+ * A wrapper component that exports the LanguageTutor component.
  * This maintains backward compatibility with existing imports.
  */
 
-// Import the refactored LanguageTutor component
+// Import the LanguageTutor component
 import LanguageTutor from './LanguageTutor';
 
 // Export it as the default export to maintain compatibility
