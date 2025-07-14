@@ -136,8 +136,8 @@ const Message: React.FC<MessageProps> = ({
   const isEquivalentToOriginal = (suggestion: string) => {
     if (!suggestion) return false;
     
-    // Debug: Log natural and corrected fields for debugging visibility issues
-    if (message.natural) {
+    // Debug: Log natural and corrected fields for debugging visibility issues (only for multi-word messages)
+    if (message.natural && wordCount > 1) {
       console.log("Natural field content:", message.natural);
       console.log("Natural field highlighting:", highlightDifferences(message.content, message.natural, 'natural'));
     }
