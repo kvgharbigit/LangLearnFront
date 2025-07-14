@@ -268,8 +268,40 @@ export const highlightDifferences = (
   }
 };
 
+/**
+ * Highlights words that appear in the user/corrected message but not in the native message
+ * Used for the "grammar correct but not native" case
+ */
+export const highlightNonNativeWords = (userMessage: string, nativeMessage: string): string => {
+  if (!userMessage || !nativeMessage) return userMessage;
+
+  const userWords = userMessage.split(/\s+/);
+  const nativeWords = nativeMessage.split(/\s+/);
+  
+  // Create a normalized set of native words for quick lookup
+  const normalizedNativeWords = new Set(
+    nativeWords.map(word => normalizeText(word))
+  );
+  
+  // Mark words that don't appear in the native message
+  const result = userWords.map(word => {
+    const normalizedWord = normalizeText(word);
+    
+    // If word doesn't exist in native message, underline it in light orange
+    if (!normalizedNativeWords.has(normalizedWord)) {
+      return `<underlineorange>${word}</underlineorange>`;
+    }
+    
+    // Word exists in native message - keep as regular text
+    return word;
+  });
+  
+  return result.join(' ');
+};
+
 export default {
   normalizeText,
   areMessagesEquivalent,
-  highlightDifferences
+  highlightDifferences,
+  highlightNonNativeWords
 };

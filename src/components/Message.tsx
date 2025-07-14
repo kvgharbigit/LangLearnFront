@@ -4,7 +4,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import HTML, { HTMLElementModel, HTMLContentModel } from 'react-native-render-html';
 import { Ionicons } from '@expo/vector-icons';
-import { normalizeText, areMessagesEquivalent, highlightDifferences } from '../utils/text';
+import { normalizeText, areMessagesEquivalent, highlightDifferences, highlightNonNativeWords } from '../utils/text';
 
 // Define custom element models for colored text
 const customHTMLElementModels = {
@@ -22,6 +22,10 @@ const customHTMLElementModels = {
   }),
   positionerror: HTMLElementModel.fromCustomModel({
     tagName: 'positionerror',
+    contentModel: HTMLContentModel.textual
+  }),
+  underlineorange: HTMLElementModel.fromCustomModel({
+    tagName: 'underlineorange',
     contentModel: HTMLContentModel.textual
   })
 };
@@ -208,6 +212,12 @@ const Message: React.FC<MessageProps> = ({
       textDecorationLine: 'underline', // Underline position errors as requested
       textDecorationStyle: 'solid',
       textDecorationColor: '#FF5722',
+    },
+    underlineorange: {
+      color: '#FF9800', // Light orange color
+      textDecorationLine: 'underline',
+      textDecorationStyle: 'solid',
+      textDecorationColor: '#FF9800',
     }
   }), []);
 
@@ -229,6 +239,12 @@ const Message: React.FC<MessageProps> = ({
       textDecorationLine: 'underline', // Underline position errors as requested
       textDecorationStyle: 'solid',
       textDecorationColor: '#FF5722',
+    },
+    underlineorange: {
+      color: '#FF9800', // Light orange color
+      textDecorationLine: 'underline',
+      textDecorationStyle: 'solid',
+      textDecorationColor: '#FF9800',
     }
   }), []);
 
@@ -345,11 +361,15 @@ const Message: React.FC<MessageProps> = ({
         ) : isUser && onlyGrammarCorrect ? (
           // NEW CASE: Grammatically correct but not natively correct
           <View>
-            {/* Show grammatically correct message in green with grammar emoji */}
+            {/* Show grammatically correct message in green/bold with orange underlines for non-native words */}
             <View style={styles.perfectMatchContainer}>
-              <Text style={styles.perfectMatchText}>
-                {message.corrected} {/* Use the corrected version with proper punctuation */}
-              </Text>
+              <HTML
+                source={{ html: `<greentext><strong>${highlightNonNativeWords(message.corrected || '', message.natural || '')}</strong></greentext>` }}
+                contentWidth={screenWidth * 0.8}
+                elementsModels={customHTMLElementModels}
+                tagsStyles={correctedTagsStyles}
+                baseStyle={correctedBaseStyle}
+              />
               <View style={styles.emojiContainer}>
                 <Text style={styles.emojiIcon}>📝</Text>
               </View>
