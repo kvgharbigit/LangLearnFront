@@ -206,10 +206,8 @@ export default function useAudioPlayer({
       await sound.playAsync();
       setStatusMessage('');
       
-      // Update the message's TTS status to completed
-      if (window && window.updateMessageTTSStatus) {
-        window.updateMessageTTSStatus(conversationId, messageIndex, 'completed');
-      }
+      // Note: TTS status will be updated to 'completed' when audio actually finishes
+      // in the playback status callback (createPlaybackStatusCallback)
       
     } catch (error) {
       console.error('Error playing audio:', error);
