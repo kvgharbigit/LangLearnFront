@@ -520,9 +520,9 @@ export const purchasePackage = async (
           const newTier = getTierFromProductIdentifier(pckg.product.identifier);
           console.log('[RevenueCat.purchasePackage] Updating usage limits for tier:', newTier);
           
-          // Update the usage limits for the new tier - use dynamic import to avoid circular dependency
-          const { updateSubscriptionTier } = await import('./supabaseUsageService');
-          await updateSubscriptionTier(newTier);
+          // Update the usage limits for the new tier - use safe wrapper to handle race conditions
+          const { updateSubscriptionTierSafe } = await import('./subscriptionUpdateSafe');
+          await updateSubscriptionTierSafe(newTier);
           console.log(`[RevenueCat.purchasePackage] ✅ Usage limits updated for tier: ${newTier}`);
         } catch (err) {
           console.error('[RevenueCat.purchasePackage] ⚠️ Failed to update usage limits:', err.message || err);
@@ -1056,7 +1056,9 @@ export const syncSubscriptionWithDatabase = async (): Promise<boolean> => {
     // If tiers are different, update database
     if (dbTier !== revenueCatSubscription.tier) {
       console.log(`[RevenueCat] Subscription tier mismatch. Updating database from '${dbTier}' to '${revenueCatSubscription.tier}'`);
-      await updateSubscriptionTier(revenueCatSubscription.tier);
+      // Use safe update to handle race conditions
+      const { updateSubscriptionTierSafe } = await import('./subscriptionUpdateSafe');
+      await updateSubscriptionTierSafe(revenueCatSubscription.tier);
       console.log('[RevenueCat] Database updated with current subscription tier');
       return true;
     } else {
