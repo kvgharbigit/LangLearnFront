@@ -621,22 +621,49 @@ export const updateSubscriptionTier = async (newTier: string): Promise<void> => 
       return;
     }
     
-    // Update ONLY the users table according to normalized schema
-    // Fields: subscription_tier, updated_at (credit_limit is now derived)
-    const { error: userError } = await supabase
+    // Read current state for optimistic locking
+    const { data: currentData, error: readError } = await supabase
+      .from('users')
+      .select('subscription_tier, updated_at')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (readError) {
+      console.error('Error reading current subscription tier:', readError);
+      throw readError;
+    }
+    
+    // Skip if already correct tier
+    if (currentData?.subscription_tier === newTier) {
+      console.log(`User already has tier ${newTier}, no update needed`);
+      return;
+    }
+    
+    // Update with timestamp check to prevent race conditions
+    const now = new Date().toISOString();
+    const { data: updateData, error: userError } = await supabase
       .from('users')
       .update({
         subscription_tier: newTier,
-        updated_at: new Date().toISOString()
+        updated_at: now
       })
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('updated_at', currentData?.updated_at)
+      .select();
+    
+    // If no rows updated, another process modified the record
+    if (!updateData || updateData.length === 0) {
+      console.warn('Race condition detected, retrying subscription update...');
+      await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay
+      return updateSubscriptionTier(newTier); // Recursive retry
+    }
     
     if (userError) {
       console.error('Error updating subscription tier in users table:', userError);
       throw userError;
     }
     
-    console.log(`Subscription updated to ${newTier} tier with ${plan.monthlyCredits} credit limit (derived value)`);
+    console.log(`Subscription updated from ${currentData?.subscription_tier} to ${newTier} tier with ${plan.monthlyCredits} credit limit (derived value)`);
   } catch (error) {
     console.error('Error updating subscription tier:', error);
     throw error;
