@@ -1,5 +1,6 @@
 // src/services/revenueCatService.ts
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { SubscriptionTier, SUBSCRIPTION_PLANS } from '../types/subscription';
 import { USE_SIMULATED_REVENUECAT } from '../utils/revenueCatConfig';
 
@@ -30,10 +31,11 @@ export type CustomerInfo = {
   originalPurchaseDate: string;
 };
 
-// RevenueCat API keys
+// RevenueCat API keys - get from environment
+const extraConfig = Constants.expoConfig?.extra || {};
 const API_KEYS = {
-  ios: 'appl_UkqSKmpgpYcEwGsRLwROiWopqQj',
-  android: 'goog_CqytRKXWMJjpxZrlAjZLycGdFHy'
+  ios: extraConfig.revenueCatIosKey || process.env.REVENUECAT_IOS_KEY || 'appl_UkqSKmpgpYcEwGsRLwROiWopqQj',
+  android: extraConfig.revenueCatAndroidKey || process.env.REVENUECAT_ANDROID_KEY || 'goog_CqytRKXWMJjpxZrlAjZLycGdFHy'
 };
 
 // Map RevenueCat entitlement IDs to our subscription tiers
