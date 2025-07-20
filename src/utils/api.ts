@@ -12,8 +12,8 @@ import { estimateTokens } from '../constants/pricing';
 import userPreferences from './userPreferences';
 
 // Update this to your actual API URL
-//export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
-const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
+export const API_URL = 'https://language-tutor-984417336702.us-central1.run.app';
+//const API_URL =  "http://172.20.10.2:8004" //iphone hotspot eduroam
 //export const API_URL ="http://10.0.0.116:8004" //desktop
 //export const API_URL = "http://192.168.86.247:8004"
 
