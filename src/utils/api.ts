@@ -1252,6 +1252,73 @@ export const createConversation = async ({
   }
 };
 
+/**
+ * Sync current user's subscription status with RevenueCat
+ */
+export const syncUserSubscription = async (userId: string): Promise<{ success: boolean; message: string }> => {
+  try {
+    console.log(`[API] Syncing subscription for user: ${userId}`);
+    
+    const headers = await getUserAuthHeaders();
+    
+    const response = await fetchWithRetry(`${API_URL}/sync-user-subscription`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      },
+      body: JSON.stringify({ user_id: userId })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Sync failed: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log(`[API] Sync result:`, data);
+    
+    return {
+      success: data.success,
+      message: data.message
+    };
+  } catch (error: any) {
+    console.error('[API] Sync error:', error);
+    
+    // Return non-throwing result for graceful handling
+    return {
+      success: false,
+      message: `Sync failed: ${error.message || 'Unknown error'}`
+    };
+  }
+};
+
+/**
+ * Get RevenueCat sync service status
+ */
+export const getSyncStatus = async (): Promise<{ service_available: boolean; status: string }> => {
+  try {
+    const response = await fetchWithRetry(`${API_URL}/sync-status`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Status check failed: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error: any) {
+    console.error('[API] Sync status check error:', error);
+    
+    return {
+      service_available: false,
+      status: 'error'
+    };
+  }
+};
+
 export default {
   sendTextMessage,
   sendVoiceRecording,
@@ -1259,4 +1326,6 @@ export default {
   createConversation,
   preconnectToAPI,
   getAudioStreamUrl,
+  syncUserSubscription,
+  getSyncStatus,
 };

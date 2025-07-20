@@ -40,6 +40,8 @@ import {
 } from '../utils/deviceInfo';
 import { shouldUseSimulatedData } from '../services/revenueCatService';
 import { DEBUG_TOOLS_TOGGLE } from '../constants/debug';
+import { syncUserSubscription } from '../utils/api';
+import { getCurrentUser } from '../services/supabaseAuthService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 const { width } = Dimensions.get('window');
@@ -143,7 +145,23 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const translateY = React.useRef(new Animated.Value(15)).current;
 
   useEffect(() => {
-    loadData();
+    const syncAndLoadData = async () => {
+      try {
+        // Sync subscription status with RevenueCat when entering screen
+        const currentUser = getCurrentUser();
+        if (currentUser?.id) {
+          console.log('[SubscriptionScreen] Syncing subscription status on enter...');
+          await syncUserSubscription(currentUser.id);
+        }
+      } catch (error) {
+        console.error('[SubscriptionScreen] Sync failed, continuing with load:', error);
+      }
+      
+      // Load subscription data
+      await loadData();
+    };
+    
+    syncAndLoadData();
     
     // Log environment info for debugging
     logEnvironmentInfo();
