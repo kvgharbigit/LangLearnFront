@@ -1,4 +1,5 @@
 // src/services/supabaseUsageService.ts
+// Database schema reference: ../../../LangPartnerBackend/DATABASE_REFERENCE.md
 import { supabase } from '../supabase/config';
 import { getCurrentUser, getIdToken } from './supabaseAuthService';
 import { 
@@ -89,16 +90,7 @@ export const initializeMonthlyUsage = async (userId: string): Promise<MonthlyUsa
         llm_input_tokens: 0,
         llm_output_tokens: 0,
         tts_characters: 0,
-        transcription_cost: 0,
-        llm_input_cost: 0,
-        llm_output_cost: 0,
-        tts_cost: 0,
-        total_cost: 0,
-        credit_limit: creditLimit,
-        token_limit: tokenLimit, // This is now plan?.monthlyTokens
-        percentage_used: 0,
-        daily_usage: JSON.stringify(emptyDailyUsage),
-        subscription_tier: tier
+        daily_usage: JSON.stringify(emptyDailyUsage)
       }]);
     
     if (error) throw error;
@@ -187,16 +179,36 @@ export const getUserUsage = async (userId?: string): Promise<MonthlyUsage | null
       ttsCharacters: data.tts_characters || 0
     };
     
+    // Get the current subscription tier from the users table
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('subscription_tier')
+      .eq('user_id', userId)
+      .single();
+    
+    const currentTier = userData?.subscription_tier || 'free';
+    
+    // Find the plan to get the correct limits based on current subscription
+    const plan = SUBSCRIPTION_PLANS.find(p => p.tier === currentTier);
+    const creditLimit = plan?.monthlyCredits || 0;
+    const tokenLimit = plan?.monthlyTokens || 0;
+    
+    // Calculate costs and percentage
+    const calculatedCosts = calculateCosts(usageDetails);
+    const percentageUsed = creditLimit > 0 
+      ? Math.min((calculatedCosts.totalCost / creditLimit) * 100, 100)
+      : 100;
+    
     const usage: MonthlyUsage = {
       currentPeriodStart: data.current_period_start,
       currentPeriodEnd: data.current_period_end,
       usageDetails: usageDetails,
-      calculatedCosts: calculateCosts(usageDetails),
-      creditLimit: data.credit_limit || 0,
-      tokenLimit: data.token_limit || 0,
-      percentageUsed: data.percentage_used || 0,
+      calculatedCosts: calculatedCosts,
+      creditLimit: creditLimit,  // Use calculated limit
+      tokenLimit: tokenLimit,    // Use calculated limit
+      percentageUsed: percentageUsed,  // Calculate dynamically
       dailyUsage: parsedDailyUsage,
-      subscriptionTier: data.subscription_tier || 'free'
+      subscriptionTier: currentTier  // Use tier from users table
     };
     
     // Check if billing period has expired and needs to be reset
@@ -266,19 +278,8 @@ export const resetMonthlyUsage = async (userId: string): Promise<MonthlyUsage> =
         llm_output_tokens: 0,
         tts_characters: 0,
         
-        // Reset cost fields
-        transcription_cost: 0,
-        llm_input_cost: 0,
-        llm_output_cost: 0,
-        tts_cost: 0,
-        total_cost: 0,
-        
         // Other fields
-        credit_limit: creditLimit,
-        token_limit: tokenLimit, // This is now plan?.monthlyTokens
-        percentage_used: 0,
-        daily_usage: '{}',
-        subscription_tier: tier
+        daily_usage: '{}'
       })
       .eq('user_id', userId);
     
@@ -379,15 +380,7 @@ export const trackApiUsage = async (
         llm_output_tokens: monthlyUsage.llmOutputTokens,
         tts_characters: monthlyUsage.ttsCharacters,
         
-        // Cost fields (calculated based on current usage)
-        transcription_cost: currentUsage.calculatedCosts.transcriptionCost,
-        llm_input_cost: currentUsage.calculatedCosts.llmInputCost,
-        llm_output_cost: currentUsage.calculatedCosts.llmOutputCost,
-        tts_cost: currentUsage.calculatedCosts.ttsCost,
-        total_cost: currentUsage.calculatedCosts.totalCost,
-        
         // Other fields
-        percentage_used: currentUsage.percentageUsed,
         daily_usage: JSON.stringify(currentUsage.dailyUsage)
       })
       .eq('user_id', userId);
@@ -556,13 +549,25 @@ export const forceQuotaExceeded = async (): Promise<void> => {
     const user = getCurrentUser();
     if (!user) return;
     
-    // Update percentage used to 100% in Supabase
+    // Since we calculate percentage dynamically, we need to force usage to exceed limits
+    // Get current subscription tier to know the limits
+    const { data: userData } = await supabase
+      .from('users')
+      .select('subscription_tier')
+      .eq('user_id', user.id)
+      .single();
+    
+    const tier = userData?.subscription_tier || 'free';
+    const plan = SUBSCRIPTION_PLANS.find(p => p.tier === tier);
+    const tokenLimit = plan?.monthlyTokens || 0;
+    
+    // Set usage to exceed the limit
     const { error } = await supabase
       .from('usage')
       .update({ 
-        percentage_used: 100,
-        // Also update total_cost to match credit_limit for consistency
-        total_cost: 999 // A high value that will ensure quota exceeded
+        // Set tokens to exceed limit to force quota exceeded
+        llm_input_tokens: tokenLimit + 1000,
+        llm_output_tokens: tokenLimit + 1000
       })
       .eq('user_id', user.id);
     

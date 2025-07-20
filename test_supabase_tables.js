@@ -79,12 +79,11 @@ async function testSupabaseTables() {
         // Set global variable to track token_limit status
         global.tokenLimitExists = tokenLimitExists;
         
-        // Required columns for usage table
+        // Required columns for usage table (updated to match actual schema)
         const requiredColumns = [
           'user_id', 'current_period_start', 'current_period_end', 
           'transcription_minutes', 'llm_input_tokens', 'llm_output_tokens', 
-          'tts_characters', 'credit_limit', 'token_limit', 
-          'percentage_used', 'daily_usage', 'subscription_tier'
+          'tts_characters', 'daily_usage'
         ];
         
         const missingColumns = requiredColumns.filter(col => !columns.includes(col));
@@ -104,21 +103,22 @@ async function testSupabaseTables() {
     // --------------------------------------------------
     // 4. Test Explicit Column Access - token_limit
     // --------------------------------------------------
-    console.log('\n🔍 [TEST 4] Explicit token_limit Column Test');
+    console.log('\n🔍 [TEST 4] Schema Compatibility Test');
     
     try {
-      const { data, error } = await supabase.from('usage').select('token_limit').limit(1);
+      // Test if we can query the actual schema columns
+      const { data, error } = await supabase.from('usage').select('user_id, transcription_minutes, llm_input_tokens, llm_output_tokens, tts_characters, daily_usage').limit(1);
       
       if (error) {
-        console.error('❌ Error selecting token_limit column:', error.message);
-        console.log('ℹ️ This confirms token_limit column is missing or inaccessible');
+        console.error('❌ Error selecting core usage columns:', error.message);
         global.tokenLimitExists = false;
       } else {
-        console.log('✅ token_limit column exists and can be queried');
-        global.tokenLimitExists = true;
+        console.log('✅ Core usage columns exist and can be queried');
+        console.log('ℹ️ Limits are now calculated dynamically from subscription_tier in users table');
+        global.tokenLimitExists = false; // Set to false since token_limit is no longer stored
       }
     } catch (error) {
-      console.error('❌ Error testing token_limit column:', error);
+      console.error('❌ Error testing usage columns:', error);
       global.tokenLimitExists = false;
     }
 
