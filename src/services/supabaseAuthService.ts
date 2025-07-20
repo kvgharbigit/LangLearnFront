@@ -250,6 +250,16 @@ export const loginUser = async (
     if (data.user) {
       updateCachedUser(data.user);
       
+      // CRITICAL: Sync RevenueCat user ID immediately after successful login
+      try {
+        const { syncRevenueCatUserId } = await import('./revenueCatService');
+        await syncRevenueCatUserId();
+        console.log('✅ RevenueCat user ID synced after login');
+      } catch (syncError) {
+        console.error('⚠️ Failed to sync RevenueCat user ID after login:', syncError);
+        // Don't fail login if RevenueCat sync fails
+      }
+      
       // Check if email is verified
       if (!data.user.email_confirmed_at) {
         return {
@@ -274,6 +284,16 @@ export const logoutUser = async (): Promise<AuthResponse> => {
     
     // Clear cached user
     clearCachedUser();
+    
+    // CRITICAL: Set RevenueCat to anonymous mode after logout
+    try {
+      const { syncRevenueCatUserId } = await import('./revenueCatService');
+      await syncRevenueCatUserId(); // This will set anonymous mode since no user is logged in
+      console.log('✅ RevenueCat set to anonymous after logout');
+    } catch (syncError) {
+      console.error('⚠️ Failed to sync RevenueCat after logout:', syncError);
+      // Don't fail logout if RevenueCat sync fails
+    }
     
     return { success: true };
   } catch (error) {

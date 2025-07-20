@@ -296,6 +296,62 @@ export const initializeRevenueCat = async (userId?: string) => {
   }
 };
 
+// NEW: Sync RevenueCat user ID with authenticated user
+export const syncRevenueCatUserId = async (): Promise<void> => {
+  try {
+    console.log('[RevenueCat.syncUserId] Starting user ID sync...');
+    
+    // Check if we should use simulated data
+    const useSimulatedData = await shouldUseSimulatedData();
+    if (useSimulatedData) {
+      console.log('[RevenueCat.syncUserId] ✅ Simulated mode - user ID sync skipped');
+      return;
+    }
+    
+    // Get the current authenticated user
+    const { getCurrentUser } = await import('./supabaseAuthService');
+    const currentUser = getCurrentUser();
+    
+    if (currentUser?.id) {
+      console.log(`[RevenueCat.syncUserId] 🔄 Syncing RevenueCat with user ID: ${currentUser.id}`);
+      
+      // Load RevenueCat SDK
+      let Purchases;
+      try {
+        Purchases = require('react-native-purchases').default;
+      } catch (sdkError) {
+        console.error('[RevenueCat.syncUserId] ❌ SDK not available:', sdkError.message);
+        return;
+      }
+      
+      // Log in the user to RevenueCat
+      await Purchases.logIn(currentUser.id);
+      
+      // Verify the sync worked
+      const customerInfo = await Purchases.getCustomerInfo();
+      if (customerInfo.originalAppUserId === currentUser.id) {
+        console.log(`[RevenueCat.syncUserId] ✅ User ID synced successfully: ${currentUser.id}`);
+      } else {
+        console.warn(`[RevenueCat.syncUserId] ⚠️ Sync verification failed. Expected: ${currentUser.id}, Got: ${customerInfo.originalAppUserId}`);
+      }
+    } else {
+      console.log('[RevenueCat.syncUserId] 📤 No authenticated user - setting anonymous mode');
+      
+      // Load RevenueCat SDK
+      let Purchases;
+      try {
+        Purchases = require('react-native-purchases').default;
+        await Purchases.logOut();
+        console.log('[RevenueCat.syncUserId] ✅ Set to anonymous mode');
+      } catch (sdkError) {
+        console.error('[RevenueCat.syncUserId] ❌ SDK not available for logout:', sdkError.message);
+      }
+    }
+  } catch (error) {
+    console.error('[RevenueCat.syncUserId] ❌ Error syncing user ID:', error);
+  }
+};
+
 // Import utilities at the top level
 let shouldUseMockData: any;
 let logDataSource: any;

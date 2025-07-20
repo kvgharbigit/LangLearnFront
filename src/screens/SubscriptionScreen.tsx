@@ -29,7 +29,8 @@ import {
   getCurrentSubscription, 
   getOfferings, 
   purchasePackage,
-  restorePurchases
+  restorePurchases,
+  syncSubscriptionWithDatabase
 } from '../services/revenueCatService';
 import { getUserUsage, getUserUsageInTokens } from '../services/usageService';
 import { 
@@ -257,6 +258,38 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
 
   const handlePurchase = async (plan: SubscriptionPlan) => {
     try {
+      // CRITICAL: Verify user is authenticated before purchase
+      const currentUser = getCurrentUser();
+      if (!currentUser?.id) {
+        Alert.alert(
+          'Authentication Required',
+          'Please log in before making a purchase to ensure your subscription is properly linked to your account.',
+          [
+            {
+              text: 'Log In',
+              onPress: () => navigation.navigate('Login'),
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+        return;
+      }
+      
+      // CRITICAL: Ensure RevenueCat user ID is synced before purchase
+      try {
+        const { syncRevenueCatUserId } = await import('../services/revenueCatService');
+        await syncRevenueCatUserId();
+        console.log('✅ RevenueCat user ID synced before purchase');
+      } catch (syncError) {
+        console.error('⚠️ Failed to sync RevenueCat user ID before purchase:', syncError);
+        Alert.alert(
+          'Sync Error', 
+          'Unable to prepare your account for purchase. Please try again or contact support.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
       // Check if this is the current plan
       if (currentTier === plan.tier) {
         Alert.alert('Already Subscribed', `You are already subscribed to the ${plan.name} plan.`);
@@ -389,6 +422,42 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   // Extracted purchase logic to separate function
   const processPurchase = async (plan: SubscriptionPlan) => {
     try {
+      // CRITICAL: Double-check authentication and sync before proceeding
+      const currentUser = getCurrentUser();
+      if (!currentUser?.id) {
+        Alert.alert('Authentication Error', 'User session expired. Please log in again.');
+        return;
+      }
+      
+      // CRITICAL: Ensure RevenueCat user ID is still synced
+      try {
+        const { syncRevenueCatUserId } = await import('../services/revenueCatService');
+        await syncRevenueCatUserId();
+        
+        // Verify the sync worked by checking customer info
+        const { shouldUseSimulatedData } = await import('../services/revenueCatService');
+        const useSimulatedData = await shouldUseSimulatedData();
+        
+        if (!useSimulatedData) {
+          let Purchases;
+          try {
+            Purchases = require('react-native-purchases').default;
+            const customerInfo = await Purchases.getCustomerInfo();
+            if (customerInfo.originalAppUserId !== currentUser.id) {
+              console.warn(`⚠️ User ID mismatch before purchase: expected ${currentUser.id}, got ${customerInfo.originalAppUserId}`);
+              // Force sync again
+              await Purchases.logIn(currentUser.id);
+            }
+          } catch (verifyError) {
+            console.error('RevenueCat verification error:', verifyError);
+          }
+        }
+      } catch (syncError) {
+        console.error('Failed to sync before purchase:', syncError);
+        Alert.alert('Sync Error', 'Unable to prepare purchase. Please try again.');
+        return;
+      }
+      
       // For real builds, proceed with actual purchase
       setPurchasing(true);
       
@@ -854,6 +923,8 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 try {
                   setLoading(true);
                   await restorePurchases(); // Call the actual restore function
+                  // CRITICAL: Sync restored subscription with database
+                  await syncSubscriptionWithDatabase();
                   await loadData();
                   Alert.alert('Success', 'Your purchases have been successfully restored!');
                 } catch (error) {

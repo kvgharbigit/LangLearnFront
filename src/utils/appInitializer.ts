@@ -5,7 +5,8 @@ import { Platform } from 'react-native';
 import { 
   initializeRevenueCat, 
   syncSubscriptionWithDatabase,
-  syncCrossPlatformEntitlements
+  syncCrossPlatformEntitlements,
+  syncRevenueCatUserId
 } from '../services/revenueCatService';
 
 /**
@@ -16,9 +17,29 @@ export const initializeApp = async (): Promise<void> => {
   console.log('🚀 Initializing application...');
   
   try {
-    // Set up Supabase auth listener - only for logging purposes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // Set up Supabase auth listener with RevenueCat sync
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`Auth state changed: ${event}`);
+      
+      // CRITICAL: Sync RevenueCat user ID on auth state changes
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('🔄 User signed in - syncing RevenueCat user ID');
+        try {
+          await syncRevenueCatUserId();
+          console.log('✅ RevenueCat user ID synced after sign in');
+        } catch (syncError) {
+          console.error('⚠️ Failed to sync RevenueCat user ID after sign in:', syncError);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('📤 User signed out - setting RevenueCat to anonymous');
+        try {
+          await syncRevenueCatUserId(); // This will set anonymous mode
+          console.log('✅ RevenueCat set to anonymous after sign out');
+        } catch (syncError) {
+          console.error('⚠️ Failed to set RevenueCat anonymous after sign out:', syncError);
+        }
+      }
+      
       // User initialization is now handled by AuthContext
     });
     
@@ -32,6 +53,15 @@ export const initializeApp = async (): Promise<void> => {
       try {
         await initializeRevenueCat(user.id);
         console.log('✅ RevenueCat initialized successfully');
+        
+        // CRITICAL: Sync user ID immediately after initialization
+        console.log('🔄 Initial RevenueCat user ID sync...');
+        try {
+          await syncRevenueCatUserId();
+          console.log('✅ Initial RevenueCat user ID sync completed');
+        } catch (syncError) {
+          console.error('⚠️ Failed initial RevenueCat user ID sync:', syncError);
+        }
         
         // Sync cross-platform entitlements
         console.log('🔄 Syncing cross-platform entitlements...');
