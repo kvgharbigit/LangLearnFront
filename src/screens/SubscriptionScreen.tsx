@@ -208,13 +208,11 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       // Don't clear errors for debugging purposes
       // setRevenueCatError(null);
       
-      // Load current subscription for purchasing purposes
-      // (we'll get cancellation status from the hook)
-      const subscriptionData = await getCurrentSubscription();
-      const { tier, expirationDate } = subscriptionData;
-      console.log('[SubscriptionScreen] loadData - setting tier to:', tier);
-      setCurrentTier(tier);
-      setExpirationDate(expirationDate);
+      // 🔧 FIX: Use subscription data from the hook instead of direct API call
+      // This ensures consistency across all UI elements
+      console.log('[SubscriptionScreen] loadData - using subscriptionStatus from hook:', subscriptionStatus);
+      setCurrentTier(subscriptionStatus.tier);
+      setExpirationDate(subscriptionStatus.expirationDate);
       
       // Load usage data
       const usageData = await getUserUsage();
@@ -291,32 +289,32 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       }
       
       // Check if this is the current plan
-      if (currentTier === plan.tier) {
+      if (subscriptionStatus.tier === plan.tier) {
         Alert.alert('Already Subscribed', `You are already subscribed to the ${plan.name} plan.`);
         return;
       }
       
       // Let user know about subscription changes
-      if (currentTier !== 'free' && plan.tier !== 'free') {
+      if (subscriptionStatus.tier !== 'free' && plan.tier !== 'free') {
         // Check if this is an upgrade or downgrade
         const isUpgrade = 
-          (currentTier === 'basic' && (plan.tier === 'premium' || plan.tier === 'gold')) ||
-          (currentTier === 'premium' && plan.tier === 'gold');
+          (subscriptionStatus.tier === 'basic' && (plan.tier === 'premium' || plan.tier === 'gold')) ||
+          (subscriptionStatus.tier === 'premium' && plan.tier === 'gold');
           
         const isDowngrade = 
-          (currentTier === 'gold' && (plan.tier === 'premium' || plan.tier === 'basic')) ||
-          (currentTier === 'premium' && plan.tier === 'basic');
+          (subscriptionStatus.tier === 'gold' && (plan.tier === 'premium' || plan.tier === 'basic')) ||
+          (subscriptionStatus.tier === 'premium' && plan.tier === 'basic');
         
         // Customize message based on upgrade or downgrade
         let title = isUpgrade ? 'Subscription Upgrade' : 'Subscription Downgrade';
         let message = '';
         
         if (isUpgrade) {
-          message = `You're about to upgrade from ${currentTier} to ${plan.tier}. Your billing will be adjusted immediately and your token limit will be increased to ${plan.monthlyTokens} right away. Continue?`;
+          message = `You're about to upgrade from ${subscriptionStatus.tier} to ${plan.tier}. Your billing will be adjusted immediately and your token limit will be increased to ${plan.monthlyTokens} right away. Continue?`;
         } else if (isDowngrade) {
-          message = `You're about to downgrade from ${currentTier} to ${plan.tier}.\n\nIMPORTANT: You will continue to have access to your current tier until the end of your current billing cycle, then your subscription will switch to the ${plan.tier} tier with ${plan.monthlyTokens} tokens.\n\nYour renewal date is: ${formatDate(expirationDate)}\n\nContinue with downgrade?`;
+          message = `You're about to downgrade from ${subscriptionStatus.tier} to ${plan.tier}.\n\nIMPORTANT: You will continue to have access to your current tier until the end of your current billing cycle, then your subscription will switch to the ${plan.tier} tier with ${plan.monthlyTokens} tokens.\n\nYour renewal date is: ${formatDate(expirationDate)}\n\nContinue with downgrade?`;
         } else {
-          message = `You're about to change your subscription from ${currentTier} to ${plan.tier}. Your billing will be adjusted and your token limit will be updated to ${plan.monthlyTokens}. Continue?`;
+          message = `You're about to change your subscription from ${subscriptionStatus.tier} to ${plan.tier}. Your billing will be adjusted and your token limit will be updated to ${plan.monthlyTokens}. Continue?`;
         }
         
         Alert.alert(
@@ -522,20 +520,20 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       
       // Show appropriate message based on whether it was an upgrade or downgrade
       const isUpgrade = 
-        (currentTier === 'free' && plan.tier !== 'free') || 
-        (currentTier === 'basic' && (plan.tier === 'premium' || plan.tier === 'gold')) ||
-        (currentTier === 'premium' && plan.tier === 'gold');
+        (subscriptionStatus.tier === 'free' && plan.tier !== 'free') || 
+        (subscriptionStatus.tier === 'basic' && (plan.tier === 'premium' || plan.tier === 'gold')) ||
+        (subscriptionStatus.tier === 'premium' && plan.tier === 'gold');
           
       const isDowngrade = 
-        (currentTier === 'gold' && (plan.tier === 'premium' || plan.tier === 'basic')) ||
-        (currentTier === 'premium' && plan.tier === 'basic');
+        (subscriptionStatus.tier === 'gold' && (plan.tier === 'premium' || plan.tier === 'basic')) ||
+        (subscriptionStatus.tier === 'premium' && plan.tier === 'basic');
       
       let title = isUpgrade ? 'Subscription Upgraded' : isDowngrade ? 'Subscription Downgraded' : 'Subscription Updated';
       let message = '';
       
       if (isUpgrade) {
         // Calculate the additional tokens they get (new - old)
-        const oldTokens = SUBSCRIPTION_PLANS.find(p => p.tier === currentTier)?.monthlyTokens || 0;
+        const oldTokens = SUBSCRIPTION_PLANS.find(p => p.tier === subscriptionStatus.tier)?.monthlyTokens || 0;
         const additionalTokens = plan.monthlyTokens - oldTokens;
         
         message = `Your subscription has been upgraded to the ${plan.name} plan!\n\n` +
@@ -754,8 +752,8 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     };
     
     return SUBSCRIPTION_PLANS.map((plan) => {
-      const isCurrentPlan = currentTier === plan.tier;
-      const isLowerThanCurrent = isLowerTier(plan.tier, currentTier);
+      const isCurrentPlan = subscriptionStatus.tier === plan.tier;
+      const isLowerThanCurrent = isLowerTier(plan.tier, subscriptionStatus.tier);
       
       // Try to find matching RevenueCat package to get dynamic price
       const matchingPackage = findPackageForTier(plan.tier);
@@ -845,7 +843,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       </View>
       
       {/* Show subscription cancelled banner if applicable */}
-      {!loading && currentTier !== 'free' && subscriptionStatus.isCancelled && subscriptionStatus.expirationDate && (
+      {!loading && subscriptionStatus.tier !== 'free' && subscriptionStatus.isCancelled && subscriptionStatus.expirationDate && (
         <SubscriptionCancelledBanner
           expirationDate={subscriptionStatus.expirationDate}
           tier={subscriptionStatus.tier}
@@ -853,7 +851,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       )}
 
       {/* Show grace period banner if applicable */}
-      {!loading && currentTier !== 'free' && subscriptionStatus.isInGracePeriod && subscriptionStatus.expirationDate && (
+      {!loading && subscriptionStatus.tier !== 'free' && subscriptionStatus.isInGracePeriod && subscriptionStatus.expirationDate && (
         <GracePeriodBanner
           expirationDate={subscriptionStatus.expirationDate}
           tier={subscriptionStatus.tier}
@@ -885,7 +883,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.currentPlanInfo}>
                 <View style={styles.currentPlanDetails}>
                   <Text style={styles.currentPlanName}>
-                    {SUBSCRIPTION_PLANS.find(p => p.tier === currentTier)?.name || 'Free'}
+                    {SUBSCRIPTION_PLANS.find(p => p.tier === subscriptionStatus.tier)?.name || 'Free'}
                   </Text>
                   {expirationDate && (
                     <Text style={styles.expirationText}>
@@ -893,7 +891,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                     </Text>
                   )}
                 </View>
-                {currentTier !== 'free' && (
+                {subscriptionStatus.tier !== 'free' && (
                   <View style={styles.currentPlanBadge}>
                     <Text style={styles.currentPlanBadgeText}>ACTIVE</Text>
                   </View>
@@ -1033,13 +1031,13 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                   <View style={styles.revenueCatStatusItem}>
                     <Text style={styles.revenueCatStatusLabel}>Current Tier:</Text>
-                    <Text style={styles.revenueCatStatusValue}>{currentTier.toUpperCase()}</Text>
+                    <Text style={styles.revenueCatStatusValue}>{subscriptionStatus.tier.toUpperCase()}</Text>
                   </View>
                   <View style={styles.revenueCatStatusItem}>
                     <Text style={styles.revenueCatStatusLabel}>Expiration:</Text>
                     <Text style={styles.revenueCatStatusValue}>{formatDate(expirationDate)}</Text>
                   </View>
-                  {currentTier !== 'free' && (
+                  {subscriptionStatus.tier !== 'free' && (
                     <View style={styles.revenueCatStatusItem}>
                       <Text style={styles.revenueCatStatusLabel}>Cancellation Status:</Text>
                       <Text style={[
@@ -1094,11 +1092,11 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   <View style={styles.revenueCatStatusItemFlex}>
                     <View style={[
                       styles.statusIndicator, 
-                      {backgroundColor: currentTier !== 'free' ? '#22C55E' : '#9CA3AF'}
+                      {backgroundColor: subscriptionStatus.tier !== 'free' ? '#22C55E' : '#9CA3AF'}
                     ]} />
                     <Text style={styles.revenueCatStatusLabel}>Active Subscription:</Text>
                     <Text style={styles.revenueCatStatusValue}>
-                      {currentTier !== 'free' ? `YES (${currentTier})` : 'NO'}
+                      {subscriptionStatus.tier !== 'free' ? `YES (${subscriptionStatus.tier})` : 'NO'}
                     </Text>
                   </View>
                   
@@ -1191,7 +1189,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                           deploymentEnvironment: getDeploymentEnvironment()
                         },
                         revenueCat: {
-                          currentTier,
+                          currentTier: subscriptionStatus.tier,
                           expirationDate: expirationDate ? formatDate(expirationDate) : 'N/A',
                           packages: packages.length,
                           tokenUsage: tokenUsage ? {
