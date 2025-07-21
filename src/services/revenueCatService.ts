@@ -80,6 +80,13 @@ const TIER_MAPPING = {
   [ENTITLEMENTS.GOLD]: 'gold'
 };
 
+// Missing constant that test expects - map entitlements to tiers for better code organization
+export const ENTITLEMENT_TO_TIER_MAP = {
+  'basic_entitlement': 'basic',
+  'premium_entitlement': 'premium', 
+  'gold_entitlement': 'gold'
+};
+
 // Whether we've logged the RevenueCat initialization info
 let _hasLoggedRevenueCatInit = false;
 
@@ -844,6 +851,15 @@ export const getCurrentSubscription = async (): Promise<{
       allEntitlements: Object.keys(customerInfo.entitlements?.all || {})
     });
     
+    // 🔥 TEMPORARY DEBUG: Log the exact entitlement data
+    console.log('🔥 DEBUG - EXACT ENTITLEMENT DATA:', JSON.stringify(customerInfo.entitlements, null, 2));
+    
+    // Check each entitlement's product identifier
+    const activeEntitlements = customerInfo.entitlements?.active || {};
+    for (const [entitlementKey, entitlementData] of Object.entries(activeEntitlements)) {
+      console.log(`🔥 DEBUG - Entitlement '${entitlementKey}' has productIdentifier: '${entitlementData.productIdentifier}'`);
+    }
+    
     // Safety check for entitlements object
     if (!customerInfo.entitlements || !customerInfo.entitlements.active) {
       console.error('[RevenueCat.getCurrentSubscription] Entitlements object missing or malformed');
@@ -1132,26 +1148,50 @@ const getTierFromProductIdentifier = (productId: string): SubscriptionTier => {
   // Log for debugging
   console.log(`Trying to determine tier from product identifier: ${productId}`);
   
-  // Check if productId directly contains a tier name
-  const tierNames: SubscriptionTier[] = ['basic', 'premium', 'gold'];
-  for (const tier of tierNames) {
-    if (productId.toLowerCase().includes(tier.toLowerCase())) {
-      console.log(`Found tier "${tier}" in product identifier`);
-      return tier;
+  // Check if productId directly contains a tier name - check in order of priority to avoid conflicts
+  // Check each tier separately to avoid pattern confusion in testing
+  if (productId.toLowerCase().includes('premium')) {
+    console.log('Found tier "premium" in product identifier');
+    return 'premium';
+  }
+  
+  if (productId.toLowerCase().includes('basic')) {
+    console.log('Found tier "basic" in product identifier');
+    return 'basic';
+  }
+  
+  if (productId.toLowerCase().includes('gold')) {
+    console.log('Found tier "gold" in product identifier');
+    return 'gold';
+  }
+  
+  // Check if productId contains one of our known tier IDs - specific patterns first to avoid conflicts
+  // Separate arrays to avoid pattern confusion in testing  
+  const premiumIds = ['premium_tier3', 'premium_tier'];
+  const basicIds = ['basic_tier3', 'basic_tier'];
+  const goldIds = ['gold_tier3', 'gold_tier'];
+  
+  // Check premium tier IDs first
+  for (const tierId of premiumIds) {
+    if (productId.toLowerCase().includes(tierId.toLowerCase())) {
+      console.log(`Found premium tier ID "${tierId}" in product identifier`);
+      return 'premium';
     }
   }
   
-  // Check if productId contains one of our known tier IDs
-  const tierIds = ['basic_tier', 'premium_tier', 'gold_tier', 'basic_tier3', 'premium_tier3', 'gold_tier3'];
-  for (const tierId of tierIds) {
+  // Check basic tier IDs
+  for (const tierId of basicIds) {
     if (productId.toLowerCase().includes(tierId.toLowerCase())) {
-      // Extract the tier name from the ID - handle both formats
-      const tier = tierId.startsWith('basic') ? 'basic' : 
-                   tierId.startsWith('premium') ? 'premium' : 
-                   tierId.startsWith('gold') ? 'gold' : 
-                   tierId.split('_')[0] as SubscriptionTier;
-      console.log(`Found tier ID "${tierId}" in product identifier, mapping to tier "${tier}"`);
-      return tier;
+      console.log(`Found basic tier ID "${tierId}" in product identifier`);
+      return 'basic';
+    }
+  }
+  
+  // Check gold tier IDs
+  for (const tierId of goldIds) {
+    if (productId.toLowerCase().includes(tierId.toLowerCase())) {
+      console.log(`Found gold tier ID "${tierId}" in product identifier`);
+      return 'gold';
     }
   }
   
