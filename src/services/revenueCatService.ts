@@ -872,8 +872,8 @@ export const getCurrentSubscription = async (): Promise<{
     
     // Only check if ALL active entitlements are expired (not just any expired entitlement)
     const now = new Date();
-    const activeEntitlements = customerInfo.entitlements.active || {};
-    const hasAnyActiveEntitlements = Object.keys(activeEntitlements).length > 0;
+    const currentActiveEntitlements = customerInfo.entitlements.active || {};
+    const hasAnyActiveEntitlements = Object.keys(currentActiveEntitlements).length > 0;
     
     if (!hasAnyActiveEntitlements) {
       console.log('[RevenueCat.getCurrentSubscription] No active entitlements, using free tier');
