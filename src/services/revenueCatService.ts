@@ -870,15 +870,13 @@ export const getCurrentSubscription = async (): Promise<{
       };
     }
     
-    // Check if any subscription has expired
+    // Only check if ALL active entitlements are expired (not just any expired entitlement)
     const now = new Date();
-    const hasExpiredSubscription = Object.values(customerInfo.entitlements.all || {}).some(entitlement => {
-      // Check if this entitlement has an expiration date in the past
-      return entitlement.expirationDate && new Date(entitlement.expirationDate) < now;
-    });
+    const activeEntitlements = customerInfo.entitlements.active || {};
+    const hasAnyActiveEntitlements = Object.keys(activeEntitlements).length > 0;
     
-    if (hasExpiredSubscription) {
-      console.log('[RevenueCat.getCurrentSubscription] Found expired subscription, reverting to free tier');
+    if (!hasAnyActiveEntitlements) {
+      console.log('[RevenueCat.getCurrentSubscription] No active entitlements, using free tier');
       return {
         tier: 'free' as SubscriptionTier,
         expirationDate: null,
