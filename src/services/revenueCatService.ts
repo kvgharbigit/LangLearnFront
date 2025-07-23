@@ -576,33 +576,42 @@ export const purchasePackage = async (
         activeEntitlements: Object.keys(purchaseResult.customerInfo.entitlements.active)
       });
       
-      // If successful purchase, update the subscription tier in our usage tracking system
+      // NEW: Trigger hybrid sync after successful purchase
       if (purchaseResult.customerInfo) {
         try {
-          // Determine the tier from the purchased package
-          const newTier = getTierFromProductIdentifier(pckg.product.identifier);
-          console.log('[RevenueCat.purchasePackage] Updating usage limits for tier:', newTier);
+          // Get current user ID for sync
+          const { getCurrentUser } = await import('./supabaseAuthService');
+          const currentUser = getCurrentUser();
           
-          // Update the usage limits for the new tier - use safe wrapper to handle race conditions
-          const { updateSubscriptionTierSafe } = await import('./subscriptionUpdateSafe');
-          await updateSubscriptionTierSafe(newTier);
-          console.log(`[RevenueCat.purchasePackage] ✅ Usage limits updated for tier: ${newTier}`);
-        } catch (err) {
-          console.error('[RevenueCat.purchasePackage] ⚠️ Failed to update usage limits:', err.message || err);
-          console.error('[RevenueCat.purchasePackage] Will try syncing subscription with database as a fallback');
-          
-          // As a fallback, try to sync with database to ensure consistency
-          try {
-            const syncResult = await syncSubscriptionWithDatabase();
-            if (syncResult) {
-              console.log('[RevenueCat.purchasePackage] ✅ Database synced successfully as fallback');
-            } else {
-              console.log('[RevenueCat.purchasePackage] ✓ Database already in sync with RevenueCat');
-            }
-          } catch (syncError) {
-            console.error('[RevenueCat.purchasePackage] ❌ Both direct update and sync failed:', syncError);
-            // Continue with the purchase flow even if both update methods fail
+          if (currentUser?.id) {
+            console.log('[RevenueCat.purchasePackage] 🔄 Triggering hybrid sync after purchase...');
+            
+            // Import the new hybrid sync function
+            const { triggerHybridSync } = await import('../utils/api');
+            await triggerHybridSync(currentUser.id, purchaseResult.customerInfo);
+            
+            console.log('[RevenueCat.purchasePackage] ✅ Hybrid sync completed after purchase');
+          } else {
+            console.warn('[RevenueCat.purchasePackage] ⚠️ No authenticated user - skipping hybrid sync');
           }
+          
+          // FALLBACK: Also try the original sync methods for compatibility
+          try {
+            // Determine the tier from the purchased package
+            const newTier = getTierFromProductIdentifier(pckg.product.identifier);
+            console.log('[RevenueCat.purchasePackage] Updating usage limits for tier:', newTier);
+            
+            // Update the usage limits for the new tier - use safe wrapper to handle race conditions
+            const { updateSubscriptionTierSafe } = await import('./subscriptionUpdateSafe');
+            await updateSubscriptionTierSafe(newTier);
+            console.log(`[RevenueCat.purchasePackage] ✅ Usage limits updated for tier: ${newTier}`);
+          } catch (fallbackError) {
+            console.error('[RevenueCat.purchasePackage] ⚠️ Fallback sync also failed:', fallbackError.message || fallbackError);
+            // Continue - hybrid sync should have worked
+          }
+        } catch (syncError) {
+          console.error('[RevenueCat.purchasePackage] ❌ Hybrid sync failed:', syncError);
+          // Continue with the purchase flow even if sync fails
         }
       }
       
@@ -1267,8 +1276,25 @@ export const restorePurchases = async (): Promise<CustomerInfo> => {
         hasActiveSubscriptions: Object.keys(restoreResult.customerInfo.entitlements.active || {}).length > 0
       });
       
-      // After successful restore, sync subscription data with database
+      // NEW: Trigger hybrid sync after successful restore
       try {
+        // Get current user ID for sync
+        const { getCurrentUser } = await import('./supabaseAuthService');
+        const currentUser = getCurrentUser();
+        
+        if (currentUser?.id) {
+          console.log('[RevenueCat.restorePurchases] 🔄 Triggering hybrid sync after restore...');
+          
+          // Import the new hybrid sync function
+          const { triggerHybridSync } = await import('../utils/api');
+          await triggerHybridSync(currentUser.id, restoreResult.customerInfo);
+          
+          console.log('[RevenueCat.restorePurchases] ✅ Hybrid sync completed after restore');
+        } else {
+          console.warn('[RevenueCat.restorePurchases] ⚠️ No authenticated user - skipping hybrid sync');
+        }
+        
+        // FALLBACK: Also try the original sync method for compatibility
         console.log('[RevenueCat.restorePurchases] Syncing restored purchases with database...');
         const wasUpdated = await syncSubscriptionWithDatabase();
         if (wasUpdated) {
@@ -1277,7 +1303,7 @@ export const restorePurchases = async (): Promise<CustomerInfo> => {
           console.log('[RevenueCat.restorePurchases] ✓ No database update needed after restore');
         }
       } catch (syncError) {
-        console.error('[RevenueCat.restorePurchases] ⚠️ Failed to sync with database after restore:', syncError);
+        console.error('[RevenueCat.restorePurchases] ⚠️ Failed to sync after restore:', syncError);
         // Continue despite sync error - we'll try again later
       }
       
@@ -1310,5 +1336,58 @@ export const restorePurchases = async (): Promise<CustomerInfo> => {
     // In real mode, always throw the error
     console.error('[RevenueCat.restorePurchases] In real mode, propagating error');
     throw error;
+  }
+};
+
+/**
+ * NEW: Sync subscription on app resume/launch
+ * This ensures the backend is always up-to-date with the latest subscription status
+ */
+export const syncSubscriptionOnAppResume = async (): Promise<void> => {
+  try {
+    console.log('[RevenueCat] 🔄 Syncing subscription on app resume...');
+    
+    // Skip if using simulated data
+    const useSimulatedData = await shouldUseSimulatedData();
+    if (useSimulatedData) {
+      console.log('[RevenueCat] Skipping app resume sync - using simulated data');
+      return;
+    }
+    
+    // Get current user
+    const { getCurrentUser } = await import('./supabaseAuthService');
+    const currentUser = getCurrentUser();
+    
+    if (!currentUser?.id) {
+      console.log('[RevenueCat] No authenticated user for app resume sync');
+      return;
+    }
+    
+    // Get current subscription info from RevenueCat
+    let customerInfo;
+    try {
+      const Purchases = require('react-native-purchases').default;
+      
+      if (typeof Purchases.getCustomerInfo !== 'function') {
+        console.log('[RevenueCat] getCustomerInfo not available - skipping app resume sync');
+        return;
+      }
+      
+      customerInfo = await Purchases.getCustomerInfo();
+      console.log('[RevenueCat] Got customer info for app resume sync');
+    } catch (error) {
+      console.error('[RevenueCat] Failed to get customer info on app resume:', error);
+      return;
+    }
+    
+    // Trigger hybrid sync
+    const { triggerHybridSync } = await import('../utils/api');
+    await triggerHybridSync(currentUser.id, customerInfo);
+    
+    console.log('[RevenueCat] ✅ App resume sync completed');
+    
+  } catch (error) {
+    console.error('[RevenueCat] ⚠️ App resume sync failed:', error);
+    // Don't throw - this is background sync
   }
 };

@@ -1319,6 +1319,164 @@ export const getSyncStatus = async (): Promise<{ service_available: boolean; sta
   }
 };
 
+/**
+ * NEW: Sync subscription from frontend using the hybrid webhook approach
+ * This pushes subscription data from the mobile app to the backend
+ */
+export const syncSubscriptionFromFrontend = async (
+  userId: string, 
+  subscriptionData: {
+    tier: string;
+    isActive: boolean;
+    productId?: string;
+    expirationDate?: string | null;
+    entitlements?: Record<string, any>;
+  }
+): Promise<{ success: boolean; message: string; tier: string }> => {
+  try {
+    console.log('[API] 🔄 Syncing subscription via new hybrid webhook endpoint...');
+    console.log('[API] Subscription data:', subscriptionData);
+    
+    // Prepare payload for new backend endpoint
+    const syncPayload = {
+      user_id: userId,
+      subscription_tier: subscriptionData.tier,
+      is_active: subscriptionData.isActive,
+      product_id: subscriptionData.productId || '',
+      expires_date: subscriptionData.expirationDate,
+      entitlements: subscriptionData.entitlements || {}
+    };
+    
+    console.log('[API] Hybrid sync payload:', syncPayload);
+    
+    // Call the new webhook endpoint
+    const response = await fetchWithRetry(`${API_URL}/webhooks/sync-subscription-from-frontend`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': `${Platform.OS === 'ios' ? 'iOS' : 'Android'}/17.0 LangPartner Mobile App/1.0`
+      },
+      body: JSON.stringify(syncPayload)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    
+    console.log('[API] ✅ Hybrid sync successful:', result);
+    
+    return {
+      success: true,
+      message: result.message || 'Sync successful',
+      tier: result.new_tier || subscriptionData.tier
+    };
+    
+  } catch (error: any) {
+    console.error('[API] ❌ Hybrid sync failed:', error);
+    return {
+      success: false,
+      message: `Sync failed: ${error.message || 'Unknown error'}`,
+      tier: 'unknown'
+    };
+  }
+};
+
+/**
+ * Helper function to trigger hybrid sync after subscription changes
+ * This is called after purchases, restores, and app resume
+ */
+export const triggerHybridSync = async (userId: string, customerInfo: any) => {
+  try {
+    console.log('[API] 🔄 Triggering hybrid sync after subscription change...');
+    
+    // Extract subscription data from RevenueCat CustomerInfo
+    const entitlements = customerInfo.entitlements?.active || {};
+    const activeEntitlementIds = Object.keys(entitlements);
+    
+    // Determine subscription tier from active entitlements
+    let subscriptionTier = 'free';
+    let isActive = false;
+    let productId = '';
+    let expirationDate = null;
+    
+    if (activeEntitlementIds.length > 0) {
+      isActive = true;
+      
+      // Check for gold tier (highest priority)
+      if (entitlements['gold_entitlement']) {
+        subscriptionTier = 'gold';
+        productId = entitlements['gold_entitlement'].productIdentifier;
+        expirationDate = entitlements['gold_entitlement'].expirationDate;
+      }
+      // Check for premium tier
+      else if (entitlements['premium_entitlement']) {
+        subscriptionTier = 'premium';
+        productId = entitlements['premium_entitlement'].productIdentifier;
+        expirationDate = entitlements['premium_entitlement'].expirationDate;
+      }
+      // Check for basic tier
+      else if (entitlements['basic_entitlement']) {
+        subscriptionTier = 'basic';
+        productId = entitlements['basic_entitlement'].productIdentifier;
+        expirationDate = entitlements['basic_entitlement'].expirationDate;
+      }
+      // Fallback: try to determine from first available entitlement
+      else {
+        const firstEntitlement = entitlements[activeEntitlementIds[0]];
+        productId = firstEntitlement.productIdentifier;
+        expirationDate = firstEntitlement.expirationDate;
+        
+        // Try to determine tier from product ID
+        if (productId.toLowerCase().includes('gold')) {
+          subscriptionTier = 'gold';
+        } else if (productId.toLowerCase().includes('premium')) {
+          subscriptionTier = 'premium';
+        } else if (productId.toLowerCase().includes('basic')) {
+          subscriptionTier = 'basic';
+        }
+      }
+    }
+    
+    console.log('[API] Extracted subscription data:', {
+      tier: subscriptionTier,
+      isActive,
+      productId,
+      expirationDate
+    });
+    
+    const syncResult = await syncSubscriptionFromFrontend(userId, {
+      tier: subscriptionTier,
+      isActive,
+      productId,
+      expirationDate,
+      entitlements: Object.fromEntries(
+        Object.entries(entitlements).map(([key, entitlement]) => [
+          key,
+          {
+            expires_date: entitlement.expirationDate,
+            product_identifier: entitlement.productIdentifier
+          }
+        ])
+      )
+    });
+    
+    if (syncResult.success) {
+      console.log('[API] ✅ Hybrid sync successful - tier:', syncResult.tier);
+    } else {
+      console.warn('[API] ⚠️ Hybrid sync failed but continuing:', syncResult.message);
+    }
+    
+    return syncResult;
+    
+  } catch (error) {
+    console.error('[API] 💥 Hybrid sync error:', error);
+    // Don't throw - this is a background sync, shouldn't break user flow
+    return { success: false, message: 'Sync error', tier: 'unknown' };
+  }
+};
+
 export default {
   sendTextMessage,
   sendVoiceRecording,
@@ -1328,4 +1486,6 @@ export default {
   getAudioStreamUrl,
   syncUserSubscription,
   getSyncStatus,
+  syncSubscriptionFromFrontend,
+  triggerHybridSync,
 };
