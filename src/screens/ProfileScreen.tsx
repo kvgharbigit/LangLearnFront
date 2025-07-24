@@ -44,7 +44,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   
   // Delete account confirmation state
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [confirmationText, setConfirmationText] = useState('');
+  const [confirmationAcknowledged, setConfirmationAcknowledged] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   
   // Get subscription status from hook
@@ -199,16 +199,18 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   
   // Handle delete account button press
   const handleDeleteAccount = () => {
+    // Reset confirmation state
+    setConfirmationAcknowledged(false);
     // Show confirmation dialog
     setShowDeleteConfirmation(true);
   };
   
   // Handle account deletion confirmation
   const confirmDeleteAccount = async () => {
-    if (confirmationText.toLowerCase() !== 'delete') {
+    if (!confirmationAcknowledged) {
       Alert.alert(
-        'Confirmation Failed',
-        'Please type "delete" to confirm account deletion.'
+        'Confirmation Required',
+        'Please acknowledge that you understand this action cannot be undone.'
       );
       return;
     }
@@ -222,7 +224,7 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         // Account deleted successfully
         // Close the confirmation modal
         setShowDeleteConfirmation(false);
-        setConfirmationText('');
+        setConfirmationAcknowledged(false);
         
         // Clear any cached user data
         const { clearCachedUser } = await import('../services/supabaseAuthService');
@@ -536,25 +538,31 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
               Important: Your email address cannot be used to register a new account for 6 months after deletion.
             </Text>
             
-            <Text style={styles.confirmText}>
-              To confirm, type "delete" below:
-            </Text>
-            
-            <TextInput
-              style={styles.confirmInput}
-              value={confirmationText}
-              onChangeText={setConfirmationText}
-              placeholder="Type 'delete' to confirm"
-              autoCapitalize="none"
-              editable={!isDeletingAccount}
-            />
+            <TouchableOpacity
+              style={styles.confirmationCheckbox}
+              onPress={() => setConfirmationAcknowledged(!confirmationAcknowledged)}
+              disabled={isDeletingAccount}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                styles.checkbox, 
+                confirmationAcknowledged && styles.checkboxChecked
+              ]}>
+                {confirmationAcknowledged && (
+                  <Ionicons name="checkmark" size={16} color="white" />
+                )}
+              </View>
+              <Text style={styles.checkboxText}>
+                I understand this action is permanent and cannot be undone
+              </Text>
+            </TouchableOpacity>
             
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={() => {
                   setShowDeleteConfirmation(false);
-                  setConfirmationText('');
+                  setConfirmationAcknowledged(false);
                 }}
                 disabled={isDeletingAccount}
               >
@@ -564,10 +572,10 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
               <TouchableOpacity
                 style={[
                   styles.confirmButton,
-                  confirmationText.toLowerCase() === 'delete' ? styles.confirmButtonEnabled : styles.confirmButtonDisabled
+                  confirmationAcknowledged ? styles.confirmButtonEnabled : styles.confirmButtonDisabled
                 ]}
                 onPress={confirmDeleteAccount}
-                disabled={confirmationText.toLowerCase() !== 'delete' || isDeletingAccount}
+                disabled={!confirmationAcknowledged || isDeletingAccount}
               >
                 {isDeletingAccount ? (
                   <ActivityIndicator size="small" color="white" />
@@ -850,36 +858,63 @@ const styles = StyleSheet.create({
     color: colors.gray800,
     marginBottom: 10,
   },
-  confirmInput: {
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 20,
+  confirmationCheckbox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: colors.gray400,
+    borderRadius: 4,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkboxText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.gray700,
+    lineHeight: 20,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 12,
   },
   cancelButton: {
     flex: 1,
     backgroundColor: colors.gray200,
-    padding: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginRight: 10,
+    justifyContent: 'center',
+    minHeight: 44,
   },
   cancelButtonText: {
     color: colors.gray800,
     fontWeight: '600',
     fontSize: 16,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   confirmButton: {
     flex: 1,
-    padding: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   confirmButtonEnabled: {
     backgroundColor: '#22c55e', // Green color
@@ -891,6 +926,8 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
     fontSize: 16,
+    lineHeight: 20,
+    textAlign: 'center',
   },
 });
 

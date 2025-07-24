@@ -55,13 +55,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { verifyAndInitUser } = useUserInitialization();
   const { user } = useAuth();
   
-  // No email verification needed - direct login flow
-  useEffect(() => {
-    // If there's a user, AuthContext will automatically handle navigation to main app
-    if (user) {
-      console.log('User is logged in, AuthContext will handle navigation');
-    }
-  }, [user]);
+  // Trust AuthContext to handle all navigation - no need for manual navigation from LoginScreen
   
   // Monitor network connectivity
   useEffect(() => {
@@ -213,82 +207,27 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           console.log('User data verification result:', verified);
           
           if (!verified) {
-            // Handle verification failure
-            console.error('Failed to verify or initialize user data after login');
-            setErrorMessage('Unable to access your account data. Please contact support.');
-            
-            // Sign out the user to prevent them from proceeding with incomplete data
-            try {
-              const { supabase } = await import('../supabase/config');
-              await supabase.auth.signOut();
-              console.log('Signed out user due to verification failure');
-            } catch (signOutError) {
-              console.error('Error signing out after verification failure:', signOutError);
-            }
+            // Handle verification failure - keep user authenticated, let InitializationGate handle retry
+            console.error('Failed to verify or initialize user data after login, but keeping user authenticated');
+            console.log('User data verification failed, InitializationGate will handle retry');
             
             setIsLoading(false);
-            return; // Stop the login flow
+            // Allow AuthContext to handle navigation - InitializationGate will show retry UI
           }
           
           // Successful verification - all tables exist or were re-initialized
           console.log('User data verification/initialization completed successfully after login');
           
-          // Login successful, set loading to false
+          // Login successful - let AuthContext handle all navigation
           setIsLoading(false);
-          console.log('Login successful - navigation will be handled by auth state observer');
-          
-          // Force a manual navigation to ensure we get to the main screen
-          try {
-            // Get the current session to ensure auth state is up to date
-            const { supabase } = await import('../supabase/config');
-            const { data: sessionData } = await supabase.auth.getSession();
-            
-            console.log('Login complete with verified user. User ID:', user.id);
-            console.log('Session exists:', !!sessionData.session);
-            
-            // Wait a moment for any state updates to propagate
-            setTimeout(() => {
-              // Create a simple async function to reload the auth state
-              // This will update the UI and ensure proper navigation
-              const forceAuthReload = async () => {
-                try {
-                  // Force a new session data fetch
-                  await supabase.auth.getSession();
-                  console.log('Auth session reloaded, navigation should update via AuthContext');
-                  
-                  // Force auth change event by getting the user again
-                  const { data } = await supabase.auth.getUser();
-                  if (data?.user) {
-                    console.log('User authenticated with ID:', data.user.id);
-                    console.log('Waiting for AuthContext to update and handle navigation');
-                  }
-                } catch (error) {
-                  console.error('Error forcing auth reload:', error);
-                }
-              };
-              
-              // Execute the reload
-              forceAuthReload();
-            }, 500);
-          } catch (navError) {
-            console.error('Error during navigation after login:', navError);
-          }
+          console.log('Login successful - AuthContext will handle navigation automatically');
         } catch (err) {
           console.error('Error verifying user data after login:', err);
           
-          // Block login if verification fails
-          setErrorMessage('Unable to verify your account. Please try again or contact support.');
-          // Sign out the user to prevent them from proceeding with incomplete data
-          try {
-            const { supabase } = await import('../supabase/config');
-            await supabase.auth.signOut();
-            console.log('Signed out user due to verification failure');
-          } catch (signOutError) {
-            console.error('Error signing out after verification failure:', signOutError);
-          }
-          
+          // Allow login to proceed - InitializationGate will handle retries
+          console.log('User data verification failed, but user remains authenticated for retry');
           setIsLoading(false);
-          return; // Stop the login flow
+          // AuthContext will handle navigation, InitializationGate will show retry options
         }
       } else {
         // No user but no error - this shouldn't happen

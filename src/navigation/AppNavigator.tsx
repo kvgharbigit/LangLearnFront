@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import * as Linking from 'expo-linking';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { navigationRef } from './NavigationService';
+import { navigationRef, setNavigationReady } from './NavigationService';
 
 // Auth Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -26,6 +26,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 // Components
 import NetworkStatusBar from '../components/NetworkStatusBar';
+import InitializationGate from '../components/InitializationGate';
 
 // Types
 import {
@@ -130,6 +131,7 @@ const AppNavigator = () => {
   const { isAuthenticated, loading, user } = useAuth();
   const [shouldShowResetPassword, setShouldShowResetPassword] = useState(false);
   const [resetTokenHash, setResetTokenHash] = useState<string>('');
+  const [navigationReady, setNavigationReady] = useState(false);
 
   // Check for reset password deep link on app start
   useEffect(() => {
@@ -177,14 +179,14 @@ const AppNavigator = () => {
   
   // Show a splash screen or loading indicator while auth state is being determined
   if (loading && !shouldShowResetPassword) {
-    console.log('RootNavigator: Loading auth state');
-    // You should replace this with a proper splash/loading screen
+    console.log('AppNavigator: Loading auth state, showing loading screen');
+    // TODO: Replace with a proper splash/loading screen component
     return null;
   }
   
   // Special case: if reset password was triggered, always show auth navigator
   if (shouldShowResetPassword) {
-    console.log('RootNavigator: Showing reset password screen with hash:', resetTokenHash);
+    console.log('AppNavigator: Showing reset password screen with hash:', resetTokenHash);
     return (
       <NavigationContainer linking={linking} ref={navigationRef}>
         <NetworkStatusBar />
@@ -208,21 +210,44 @@ const AppNavigator = () => {
     );
   }
 
-  // Navigation state logic
+  // Simplified navigation state logic
   const shouldShowMain = isAuthenticated && !shouldShowResetPassword;
   
-  console.log('RootNavigator: Navigation decision -', {
+  console.log('AppNavigator: Navigation decision -', {
     isAuthenticated,
+    loading,
     shouldShowResetPassword,
     shouldShowMain,
     userId: user?.id
   });
 
   return (
-    <NavigationContainer linking={linking} ref={navigationRef}>
+    <NavigationContainer 
+      linking={linking} 
+      ref={navigationRef}
+      onReady={() => {
+        console.log('AppNavigator: Navigation container ready');
+        setNavigationReady(true);
+      }}
+      onStateChange={() => {
+        // Ensure we stay ready even after state changes
+        if (!navigationReady) {
+          setNavigationReady(true);
+        }
+      }}
+    >
       <NetworkStatusBar />
-      {/* Main navigation based on authentication state */}
-      {shouldShowMain ? <MainNavigator /> : <AuthNavigator />}
+      {/* 
+        Main navigation based on authentication state
+        MainNavigator is wrapped with InitializationGate to handle user data verification
+      */}
+      {shouldShowMain ? (
+        <InitializationGate>
+          <MainNavigator />
+        </InitializationGate>
+      ) : (
+        <AuthNavigator />
+      )}
     </NavigationContainer>
   );
 };

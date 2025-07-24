@@ -49,7 +49,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     hasInitFailed
   } = useUserInitialization();
 
-  // Handle auth state changes and update navigation
+  // Handle auth state changes and update navigation with debouncing
   useEffect(() => {
     console.log('AuthContext: Auth state changed - isAuthenticated:', !!user);
     if (user) {
@@ -69,61 +69,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsEmailVerified(false);
     }
     
-    // Use NavigationService to update navigation based on auth state
-    // This ensures that navigation is updated when the auth state changes
-    // even if AppNavigator doesn't re-render
+    // Use NavigationService to update navigation based on auth state with debouncing
+    // This prevents multiple rapid navigation updates during auth state changes
     if (!loading) {
-      NavigationService.navigateByAuthState(!!user);
+      // Debounce navigation updates to prevent race conditions and wait for navigation container to mount
+      const timeoutId = setTimeout(() => {
+        console.log('AuthContext: Updating navigation - isAuthenticated:', !!user);
+        NavigationService.navigateByAuthState(!!user);
+      }, 350); // 350ms debounce to ensure navigation container is ready and avoid rapid calls
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [user, loading]);
   
-  // Enable more aggressive auth state checking when user is not set
+  // Single session check on startup - trust Supabase's auth observer for updates
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
-    
-    if (!user) {
-      console.log('AuthContext: No user detected, setting up periodic checks');
+    // Only do a single check if we don't have a user but think we might have a session
+    if (!user && !loading) {
+      console.log('AuthContext: Performing single session check on startup');
       
-      const checkAuthState = async () => {
+      const checkInitialSession = async () => {
         try {
-          // Check Supabase session directly
           const { data } = await supabase.auth.getSession();
-          
           if (data?.session) {
-            console.log('AuthContext: Session found in periodic check');
-            
-            // Get user data and update state
+            console.log('AuthContext: Found existing session, getting user data');
             const { data: userData } = await supabase.auth.getUser();
             if (userData?.user) {
-              console.log('AuthContext: User found in periodic check, updating state:', userData.user.id);
+              console.log('AuthContext: Updating user from existing session:', userData.user.id);
               setUser(userData.user);
-              
-              // Clear interval once we find a user
-              if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-              }
             }
           }
         } catch (error) {
-          console.error('AuthContext: Error in periodic auth check:', error);
+          console.error('AuthContext: Error in initial session check:', error);
         }
       };
       
-      // Run check immediately
-      checkAuthState();
-      
-      // Set up interval
-      intervalId = setInterval(checkAuthState, 1500);
-      
-      // Clean up on unmount
-      return () => {
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
-      };
+      // Only run once when we transition from loading to not loading without a user
+      checkInitialSession();
     }
-  }, [user]);
+  }, [user, loading]);
   
   useEffect(() => {
     // First initialize the user (important for initial load)
@@ -159,26 +143,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setVerificationInProgress(false);
             
             if (!dataExists) {
-              console.error('AuthContext: User data verification failed, signing out user');
+              console.error('AuthContext: User data verification failed, but keeping user authenticated');
               
-              // Record this critical error before signing out
+              // Record this error but don't sign out - let user retry initialization
               await captureDiagnostics(
                 DiagnosticType.AUTH_FAILURE,
                 initialUser.id,
                 {
                   reason: 'data_verification_failed',
-                  action: 'sign_out',
+                  action: 'keep_authenticated_allow_retry',
                   timestamp: new Date().toISOString()
                 }
               );
               
-              // If verification failed and re-initialization failed, sign out
-              const { supabase } = await import('../supabase/config');
-              await supabase.auth.signOut();
-              setUser(null);
-              setAuthError(new Error('User data cannot be initialized. Please contact support.'));
+              // Keep user authenticated but set error state for UI to handle
+              setAuthError(new Error('User data initialization failed. The app will attempt to retry automatically.'));
+              console.log('AuthContext: User remains authenticated, InitializationGate will handle retry');
             } else {
               console.log('AuthContext: User data verified or re-initialized successfully');
+              // Clear any previous auth errors on successful verification
+              setAuthError(null);
             }
           } catch (initError) {
             const errorMessage = initError instanceof Error ? initError.message : 'Unknown error';
