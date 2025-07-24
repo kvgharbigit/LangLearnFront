@@ -140,6 +140,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   
   // Get subscription status from hook
   const subscriptionStatus = useSubscriptionStatus();
+  const { refresh: refreshSubscriptionStatus } = subscriptionStatus;
   
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -923,6 +924,8 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   await restorePurchases(); // Call the actual restore function
                   // CRITICAL: Sync restored subscription with database
                   await syncSubscriptionWithDatabase();
+                  // Refresh subscription status from hook with cache clear
+                  await refreshSubscriptionStatus(true);
                   await loadData();
                   Alert.alert('Success', 'Your purchases have been successfully restored!');
                 } catch (error) {
