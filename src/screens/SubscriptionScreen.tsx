@@ -919,26 +919,63 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             <TouchableOpacity
               style={styles.restoreButton}
               onPress={async () => {
+                setLoading(true);
+                
+                let restoreSucceeded = false;
+                let restoreError = null;
+                
                 try {
-                  setLoading(true);
-                  await restorePurchases(); // Call the actual restore function
-                  // CRITICAL: Sync restored subscription with database
-                  await syncSubscriptionWithDatabase();
-                  // Refresh subscription status from hook with cache clear
-                  await refreshSubscriptionStatus(true);
-                  await loadData();
-                  Alert.alert('Success', 'Your purchases have been successfully restored!');
+                  // Step 1: Attempt to restore purchases
+                  console.log('[RestorePurchases] Starting restore process...');
+                  await restorePurchases();
+                  restoreSucceeded = true;
+                  console.log('[RestorePurchases] ✅ Restore purchases succeeded');
                 } catch (error) {
-                  console.error('Error restoring purchases:', error);
-                  
-                  // Store the error for display in the UI
+                  console.error('[RestorePurchases] ❌ Restore purchases failed:', error);
+                  restoreError = error;
                   setRevenueCatError(error);
-                  
-                  // Still show the alert for normal operation
-                  Alert.alert('Error', 'Failed to restore purchases. Please try again.');
-                } finally {
-                  setLoading(false);
                 }
+                
+                // Step 2: If restore succeeded, try to sync and refresh data
+                if (restoreSucceeded) {
+                  // Try syncing - but don't let sync failures affect the success message
+                  try {
+                    console.log('[RestorePurchases] Syncing restored subscription with database...');
+                    await syncSubscriptionWithDatabase();
+                    console.log('[RestorePurchases] ✅ Database sync completed');
+                  } catch (syncError) {
+                    console.warn('[RestorePurchases] ⚠️ Database sync failed (non-critical):', syncError);
+                    // Don't fail the restore for sync errors
+                  }
+                  
+                  // Try refreshing status - but don't let refresh failures affect the success message
+                  try {
+                    console.log('[RestorePurchases] Refreshing subscription status...');
+                    await refreshSubscriptionStatus(true);
+                    console.log('[RestorePurchases] ✅ Status refresh completed');
+                  } catch (refreshError) {
+                    console.warn('[RestorePurchases] ⚠️ Status refresh failed (non-critical):', refreshError);
+                    // Don't fail the restore for refresh errors
+                  }
+                  
+                  // Try loading data - but don't let load failures affect the success message
+                  try {
+                    console.log('[RestorePurchases] Loading updated data...');
+                    await loadData();
+                    console.log('[RestorePurchases] ✅ Data load completed');
+                  } catch (loadError) {
+                    console.warn('[RestorePurchases] ⚠️ Data load failed (non-critical):', loadError);
+                    // Don't fail the restore for load errors
+                  }
+                  
+                  // Show success message since the actual restore worked
+                  Alert.alert('Success', 'Your purchases have been successfully restored!');
+                } else {
+                  // Only show error if the actual restore failed
+                  Alert.alert('Error', 'Failed to restore purchases. Please try again.');
+                }
+                
+                setLoading(false);
               }}
               disabled={loading || purchasing}
               accessibilityLabel="Restore Purchases"
