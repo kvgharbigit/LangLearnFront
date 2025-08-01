@@ -14,21 +14,23 @@ const DEFAULT_SIMULATE_VALUE = false;
 
 // Check if we're running in Expo Go (which doesn't support native modules)
 const isExpoGo = (): boolean => {
-  // Multiple checks for Expo Go environment
+  // Very strict detection - only trigger in actual Expo Go development client
+  // Err on the side of production to avoid simulation mode in real apps
   const isExpoOwnership = Constants.appOwnership === 'expo';
-  const isStoreClient = Constants.executionEnvironment === 'storeClient';
-  const isExpoURL = Constants.expoConfig?.slug || Constants.manifest?.slug;
-  const isDevelopment = __DEV__;
+  const isExpoDevClient = Constants.executionEnvironment === 'bare' || Constants.executionEnvironment === 'storeClient';
+  const hasExpoDevHost = Constants.expoConfig?.hostUri || Constants.manifest?.hostUri;
   
-  // In development or if any Expo Go indicators are present, use simulation
-  const result = isDevelopment || isExpoOwnership || isStoreClient || !!isExpoURL;
+  // Only simulate if ALL conditions are met for true Expo Go environment
+  const result = isExpoOwnership && isExpoDevClient && !!hasExpoDevHost;
   
-  console.log('[RevenueCat Config] Expo Go detection:', {
+  console.log('[RevenueCat Config] Expo Go detection (strict):', {
     appOwnership: Constants.appOwnership,
     executionEnvironment: Constants.executionEnvironment,
-    expoSlug: Constants.expoConfig?.slug,
-    manifestSlug: Constants.manifest?.slug,
-    isDev: isDevelopment,
+    hostUri: Constants.expoConfig?.hostUri || Constants.manifest?.hostUri,
+    isExpoOwnership,
+    isExpoDevClient,
+    hasExpoDevHost: !!hasExpoDevHost,
+    isDev: __DEV__,
     result: result
   });
   

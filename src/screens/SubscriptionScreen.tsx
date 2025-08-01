@@ -32,6 +32,7 @@ import {
   restorePurchases,
   syncSubscriptionWithDatabase
 } from '../services/revenueCatService';
+import { getUseSimulatedRevenueCat } from '../utils/revenueCatConfig';
 import { getUserUsage, getUserUsageInTokens } from '../services/usageService';
 import { 
   getStoreText, 
@@ -48,7 +49,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 const { width } = Dimensions.get('window');
 
 // Enhanced function to check environment status and collect diagnostics
-const logEnvironmentInfo = () => {
+const logEnvironmentInfo = async () => {
   try {
     const { getDeploymentEnvironment, getDetailedDeviceInfo } = require('../utils/deviceInfo');
     const deployEnv = getDeploymentEnvironment();
@@ -74,20 +75,30 @@ const logEnvironmentInfo = () => {
     
     // Try to check RevenueCat status
     try {
-      const Purchases = require('react-native-purchases');
-      console.log('RevenueCat SDK loaded successfully');
-      
-      // Check if we can access RevenueCat APIs
-      if (Purchases.getAppUserID) {
-        console.log('RevenueCat API accessible');
-        try {
-          const userID = Purchases.getAppUserID();
-          console.log('RevenueCat User ID:', userID || 'not available');
-        } catch (e) {
-          console.log('Could not get RevenueCat User ID:', e.message);
-        }
+      // Check simulation mode before accessing native modules
+      const simulationMode = await getUseSimulatedRevenueCat();
+      if (simulationMode) {
+        console.log('RevenueCat SDK not available: Using simulation mode');
       } else {
-        console.log('RevenueCat API not fully accessible');
+        try {
+          const Purchases = require('react-native-purchases');
+          console.log('RevenueCat SDK loaded successfully');
+          
+          // Check if we can access RevenueCat APIs
+          if (Purchases.getAppUserID) {
+            console.log('RevenueCat API accessible');
+            try {
+              const userID = Purchases.getAppUserID();
+              console.log('RevenueCat User ID:', userID || 'not available');
+            } catch (e) {
+              console.log('Could not get RevenueCat User ID:', e.message);
+            }
+          } else {
+            console.log('RevenueCat API not fully accessible');
+          }
+        } catch (e) {
+          console.log('RevenueCat SDK not available:', e.message);
+        }
       }
     } catch (e) {
       console.log('RevenueCat SDK not available:', e.message);
@@ -166,7 +177,7 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     syncAndLoadData();
     
     // Log environment info for debugging
-    logEnvironmentInfo();
+    logEnvironmentInfo().catch(console.error);
     
     // Load debug settings for UI indicators
     const loadUserPreferences = async () => {
@@ -1218,7 +1229,8 @@ const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                     style={styles.copyButton}
                     onPress={() => {
                       // Collect diagnostic info and display it
-                      const envInfo = logEnvironmentInfo();
+                      logEnvironmentInfo().catch(console.error);
+                      const envInfo = {};
                       const diagInfo = {
                         environment: {
                           __DEV__,
