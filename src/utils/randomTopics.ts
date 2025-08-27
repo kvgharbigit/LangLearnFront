@@ -1153,23 +1153,17 @@ export const getRandomTopicLesson = (): string => {
 };
 
 /**
- * Get a random topic for free conversation (randomly chooses between conversation starters or deep questions)
+ * Get a random topic for free conversation (only uses conversation starters)
  */
 export const getRandomFreeConversationTopic = (): string => {
-  const randomChoice = Math.random();
-  if (randomChoice < 0.5) {
-    return getRandomConversationStarter();
-  } else {
-    return getRandomDeepQuestion();
-  }
+  return getRandomConversationStarter();
 };
 
 /**
- * Get a random interview topic (randomly chooses between conversation starters or deep questions)
+ * Get a random interview topic (only uses deep questions)
  */
 export const getRandomInterviewTopic = (): string => {
-  const useConversationStarter = Math.random() < 0.5;
-  return useConversationStarter ? getRandomConversationStarter() : getRandomDeepQuestion();
+  return getRandomDeepQuestion();
 };
 
 /**
